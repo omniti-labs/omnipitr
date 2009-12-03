@@ -1,0 +1,12 @@
+=head1 OmniPITR - omnipitr-monitor
+
+=head2 USAGE
+
+=head2 DESCRIPTION
+
+=head2 EXAMPLES
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2009 OmniTI. All rights reserved.
+

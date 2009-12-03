@@ -1,0 +1,100 @@
+=head1 OmniPITR - Installation
+
+=head2 INSTALLATION
+
+You can get the OmniPITR project from L<https://labs.omniti.com/pgsoltools/trunk/omnipitr>. Within this directory you will find set of directories:
+
+=over
+
+=item * bin/
+
+This is where the scripts reside - usually this is the only place you need to
+look into.
+
+=item * doc/
+
+Documentation. In Plain Old Documentation format, so you can view it practically
+everywhere Perl is with I<perldoc> command.
+
+=item * lib/
+
+Here be dragons. Don't look. Don't touch. Be afraid.
+
+=back
+
+After fetching the omnipitr project/directory, put it in any place in your
+filesystem you'd want. Usually you will keep all of these together, but you can
+always remove the docs, put the scripts in some system bin/ directory, and put
+libs anyplace you want - just make sure that path to them is in I<PERL5LIB>
+environment variable.
+
+In case you will not decide to split the distribution - i.e. you will have
+someplace in your system I<omnipitr> directory, which will contain I<bin/> and
+I<lib/> directories (just like it is distributed) - you don't have to set
+I<PERL5LIB> - scripts will automatically find their libs.
+
+=head2 SANITY CHECK
+
+After installation it's good to run I<sanity-check.sh> script (from I<bin/>)
+directory - it will check if all prerequisites are available.
+
+Output might look like this:
+
+    postgres@server:~$ omnipitr/bin/sanity-check.sh
+    Checking:
+    - /var/lib/postgres/omnipitr/bin
+    - /var/lib/postgres/omnipitr/lib
+    5 programs, 7 libraries.
+    All checked, and looks ok.
+
+or like this:
+
+    postgres@server:~$ omnipitr/bin/sanity-check.sh
+    Checking:
+    - /var/lib/postgres/omnipitr/bin
+    - /var/lib/postgres/omnipitr/lib
+    5 programs, 7 libraries.
+    Warnings:
+    - you don't have ssh program available
+    - you don't have rsync program available
+    - your Perl is old (we support only 5.8 or newer. OmniPITR might work, but was not tested on your version of Perl)
+    Errors:
+    - you don't have any of programs used to transmit WAL files (ssh, rsync)
+    - you don't have POSIX Perl library (should be installed together with Perl)
+    All checked. 3 warnings, 2 errors.
+
+Depending on your particular usecase even the errors don't have to be fatal -
+for example, if your I<rsync>/I<ssh> binary is in directory that is not in
+I<$PATH> - it will not be found by sanity-check.sh, but you can always provide
+paths to them via I<--rsync-binary> or I<--ssh-binary> options to I<omnipitr-*>
+scripts.
+
+After I<sanity-check.sh> returned C<All checked, and looks ok.> you should be
+good with starting using the scripts.
+
+=head2 INITIAL SETUP
+
+To start Wal replication you will need to:
+
+=over
+
+=item 1. Start archiving wal segments: I<omnipitr-archive>
+
+=item 2. Make initial hot backup on master: I<omnipitr-master-backup>
+
+=item 3. Transfer the backup to slave server(s)
+
+=item 4. Start PostgreSQL recovery from hot-backup: I<omnipitr-restore>
+
+=back
+
+Afterwards you can/should monitor replication parameters with
+I<omnipitr-monitor>, and that would be all. Of course you can do hot-backups on
+slave (with I<omnipitr-slave-backup>) at any moment - just remember that doing
+them on slave requires more disc space - details in
+I<omnipitr-slave-backup.pod>.
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2009 OmniTI. All rights reserved.
+

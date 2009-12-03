@@ -1,0 +1,148 @@
+=head1 OmniPITR - omnipitr-archive
+
+=head2 USAGE
+
+/some/path/omnipitr/bin/omnipitr-archive [options] "%p"
+
+Options:
+
+=over
+
+=item --data-dir (-D)
+
+Where PostgreSQL datadir is located (path)
+
+=item --dst-local (-dl)
+
+Where to copy the wal segment on current server (path) (you can provide many of
+these)
+
+=item --dst-remote (-dr)
+
+Where to copy the wal segment on remote server. Supported ways to transport
+files are rsync and rsync over ssh. Please see L<DESCRIPTION> for more
+information (you can provide many of these)
+
+=item --rsync-binary (-r)
+
+Where to find rsync binary (defaults to searching through I<$PATH> environment
+variable)
+
+=item --tempdir (-t)
+
+Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
+variable location)
+
+=item --log (-l)
+
+Name of logfile (actually template, as it supports %% L<strftime(3)>
+markers
+
+=item --state-dir (-s)
+
+Name of directory to use as state-directory to handle errors when sending wal
+segments to many locations.
+
+=item --verbose (-v)
+
+Log verbosely what is happening.
+
+=back
+
+=head2 DESCRIPTION
+
+Call to I<omnipitr-archive> should be in I<archive_command> GUC in
+I<postgresql.conf>.
+
+Which options should be given depends only on installation, but generally you
+will need at least:
+
+=over
+
+=item * --data-dir
+
+PostgreSQL "%p" passed file path relative to I<DATADIR>, so it is required to
+know it.
+
+=item * --log
+
+to make sure that information is logged someplace about archiving progress
+
+=item * one of --dst-local or --dst-remote
+
+to specify where to send the WAL segments to
+
+=back
+
+If you'll specify more than 1 destination, you will also need to specify
+I<--state-dir>
+
+Of couse you can provide many --dst-local or many --dst-remote or many mix of
+these.
+
+Generally omnipitr-archive will try to deliver WAL segment to all destinations,
+and will fail if B<any> of them will not accept new segment.
+
+Segments will be transferred to destinations in this order:
+
+=over
+
+=item 1. All B<local> destinations, in order provided in command line
+
+=item 2. All B<remote> destinations, in order provided in command line
+
+=back
+
+In case any destination will fail, I<omnipitr-archive> will save state (which
+destinations it delivered the file to) and return error to PostgreSQL - which
+will cause PostgrerSQL to call I<omnipitr-archive> again for the same WAL
+segment after some time.
+
+State directory will be cleared after every successfull file send, so it should
+stay small in size (expect 1 file of under 500 bytes).
+
+When constructing command line to put in I<archive_command> PostgreSQL GUC,
+please remember that while providing C<"%p" "%f"> will work, I<omnipitr-archive>
+requires only "%p"
+
+=head3 Remote destination specification
+
+I<omnipitr-archive> can deliver WAL segments to remote locations using 2 ways of
+transporting the file:
+
+=over
+
+=item 1. rsync
+
+Standard rsync via rsync daemon (not via ssh!). You can specify remote url like
+this: C<rsync://remote_server/module/directory/> or any other syntax I<rsync>
+program supports as long as it starts with B<rsync://>
+
+=item 2. rsync over ssh
+
+Rsync working via ssh. This required passwordless ssh authentication from source
+account to destination (usually with passwordless ssh keys). Url for remote in
+this situation should look like this: C<rsync+ssh://server/path/> - this is
+equivalent to using C<rsync -e ssh SOURCE_FILE server/path/>
+
+=back
+
+=head2 EXAMPLES
+
+=head3 Minimal setup, with copying file to local directory:
+
+    archive_command='/.../omnipitr-archive -D /mnt/data/ -l /var/log/omnipitr/archive.log -dl /mnt/wal_archive/ "%p"'
+
+=head3 Minimal setup, with copying file to remote directory over rsync:
+
+    archive_command='/.../omnipitr-archive -D /mnt/data/ -l /var/log/omnipitr/archive.log -dr rsync://slave/postgres/wal_archive/ "%p"'
+
+=head3 2 remote destinations, 1 local, with non-standard rsync binary, and auto
+rotated logfile:
+
+    archive_command='/.../omnipitr-archive -r /opt/something/bin/rsync -D /mnt/data/ -l /var/log/omnipitr/archive-%Y-%m-%d.log -dr rsync://slave/postgres/wal_archive/ -dr rsync+ssh://backups@backupserver:/mnt/backups/wal_archive/ -s /var/lib/postgres/.omnipitr/ "%p"'
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2009 OmniTI. All rights reserved.
+

@@ -1,0 +1,51 @@
+=head1 OmniPITR
+
+=head2 OVERVIEW
+
+OmniPITR is a set of scripts to ease setting up WAL replication, and making hot backups from both Master and Slave systems.
+
+This set of scripts has been written to make the operation seamless, secure and as light on resources-usage as possible.
+
+To make it portable, it was written in Perl, but with assumption that it should work on any Perl installation - i.e. no dependencies on non-base Perl modules.
+
+=head2 INSTALLATION
+
+Simply fetch the directory L<https://labs.omniti.com/pgsoltools/trunk/omnipitr>, and you're done. More details are in I<doc/install.pod>.
+
+=head2 USAGE
+
+There is a set of scripts in bin/ directory. All named I<omnipitr-*> are scripts meant for general usage (others are not really useful unless you'll encounter some problems).
+
+For every one of them you will have documentation in I<doc/B<SCRIPT_NAME>.pod> - for example documentation for I<omnipitr-archive> script is in I<doc/omnipitr-archive.pod>.
+
+Quick list of programs:
+
+=over
+
+=item * omnipitr-archive
+
+This should be used on master server, as I<archive_command> command.
+
+=item * omnipitr-restore
+
+This should be used on slave server/servers, as I<restore_command> command.
+
+=item * omnipitr-master-backup
+
+Used to make hot backup on master DB server.
+
+=item * omnipitr-slave-backup
+
+Used to make hot backup on slave DB server.
+
+=item * omnipitr-monitor
+
+General script for I<Nagios>/I<Cacti> type of systems - monitoring, graphing. Provides a way to check for replication lag, last backup timestamp, and other metrics.
+
+=back
+
+In most of the cases you can simply call the program you want to use with I<--help> option to get brief overview of command line options.
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2009 OmniTI. All rights reserved.
