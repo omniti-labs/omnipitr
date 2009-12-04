@@ -15,7 +15,10 @@ Where PostgreSQL datadir is located (path)
 =item --dst-local (-dl)
 
 Where to copy the wal segment on current server (path) (you can provide many of
-these)
+these).
+
+You can also specify compression per-destination. Check L<COMPRESSION>
+section of the doc.
 
 =item --dst-remote (-dr)
 
@@ -23,10 +26,8 @@ Where to copy the wal segment on remote server. Supported ways to transport
 files are rsync and rsync over ssh. Please see L<DESCRIPTION> for more
 information (you can provide many of these)
 
-=item --rsync-binary (-r)
-
-Where to find rsync binary (defaults to searching through I<$PATH> environment
-variable)
+You can also specify compression per-destination. Check L<COMPRESSION>
+section of the doc.
 
 =item --tempdir (-t)
 
@@ -107,23 +108,79 @@ requires only "%p"
 
 =head3 Remote destination specification
 
-I<omnipitr-archive> can deliver WAL segments to remote locations using 2 ways of
-transporting the file:
+I<omnipitr-archive> delivers WAL segments to destination using rsync program.
+Both direct-rsync and rsync-over-ssh are supported (it's better to use direct
+rsync - it uses less resources due to lack of encryption.
+
+Destination url/location should be in a format that is usable by I<rsync>
+program.
+
+For example you can use:
 
 =over
 
-=item 1. rsync
+=item * rsync://user@remote_host/module/path/
 
-Standard rsync via rsync daemon (not via ssh!). You can specify remote url like
-this: C<rsync://remote_server/module/directory/> or any other syntax I<rsync>
-program supports as long as it starts with B<rsync://>
+=item * host:/path/
 
-=item 2. rsync over ssh
+=back
 
-Rsync working via ssh. This required passwordless ssh authentication from source
-account to destination (usually with passwordless ssh keys). Url for remote in
-this situation should look like this: C<rsync+ssh://server/path/> - this is
-equivalent to using C<rsync -e ssh SOURCE_FILE server/path/>
+To allow remote delivery you need to have rsync program. In case you're using
+rsync over ssh, program has also to be available.
+
+In case your rsync/ssh programs are in custom directories simply set I<$PATH>
+environemnt variable before starting PostgreSQL.
+
+=head2 COMPRESSION
+
+Every destination can have specified compression. To use it you should prefix
+destination path/url with compression type followed by '%' sign.
+
+Allowed compression types:
+
+=over
+
+=item * gzip
+
+Compresses with gzip program, used file extension is .gz
+
+=item * bzip2
+
+Compresses with bzip2 program, used file extension is .bz2
+
+=item * lzma
+
+Compresses with lzma program, used file extension is .lzma
+
+=back
+
+All compressions are done I<on B<NICE>> to make the operation as unobtrusive as
+possible.
+
+If you want to pass any extra arguments to compression program, you can either:
+
+=over
+
+=item * make a wrapper
+
+Write a program/script that will be named in the same way your actual
+compression program is named, but adding some parameters to call
+
+=item * use environment variables
+
+All of supported compression programs use environment variables:
+
+=over
+
+=item * gzip - GZIP
+
+=item * bzip2 - BZIP2
+
+=item * lzma - XZ_OPT
+
+=back
+
+For details - please consult manual to your choosen compression tool.
 
 =back
 
@@ -137,10 +194,9 @@ equivalent to using C<rsync -e ssh SOURCE_FILE server/path/>
 
     archive_command='/.../omnipitr-archive -D /mnt/data/ -l /var/log/omnipitr/archive.log -dr rsync://slave/postgres/wal_archive/ "%p"'
 
-=head3 2 remote destinations, 1 local, with non-standard rsync binary, and auto
-rotated logfile:
+=head3 2 remote, compressed destinations, 1 local, with auto rotated logfile:
 
-    archive_command='/.../omnipitr-archive -r /opt/something/bin/rsync -D /mnt/data/ -l /var/log/omnipitr/archive-%Y-%m-%d.log -dr rsync://slave/postgres/wal_archive/ -dr rsync+ssh://backups@backupserver:/mnt/backups/wal_archive/ -s /var/lib/postgres/.omnipitr/ "%p"'
+    archive_command='/.../omnipitr-archive -D /mnt/data/ -l /var/log/omnipitr/archive-%Y-%m-%d.log -dr gzip%rsync://slave/postgres/wal_archive/ -dr bzip2%backups@backupserver:/mnt/backups/wal_archive/ -dl /mnt/wal_archive/ -s /var/lib/postgres/.omnipitr/ "%p"'
 
 =head2 COPYRIGHT
 
