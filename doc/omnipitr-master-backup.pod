@@ -2,9 +2,252 @@
 
 =head2 USAGE
 
+/some/path/omnipitr/bin/omnipitr-master-backup [options]
+
+Options:
+
+=over
+
+=item --data-dir (-D)
+
+Where PostgreSQL datadir is located (path)
+
+=item --database (-d)
+
+Which database to connect to to issue required SQL queries. Defaults to
+template1.
+
+=item --host (-h)
+
+Which host to connect to when connecting to database to backup. Shouldn't really
+be changed in 99% of cases. Defaults to empty string - i.e. use UNIX sockets.
+
+=item --port (-p)
+
+Which port to connect to when connecting to database. Defaults to 5432.
+
+=item --username (-U)
+
+What username to use when connecting to database. Defaults to postgres.
+
+=item --dst-local (-dl)
+
+Where to copy the hot backup files on current server (you can provide many of
+these).
+
+You can also specify compression per-destination. Check L<COMPRESSION>
+section of the doc.
+
+=item --dst-remote (-dr)
+
+Where to copy the hot backup files on remote server. Supported ways to transport
+files are rsync and rsync over ssh. Please see L<DESCRIPTION> for more
+information (you can provide many of these)
+
+You can also specify compression per-destination. Check L<COMPRESSION>
+section of the doc.
+
+=item --tempdir (-t)
+
+Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
+variable location)
+
+=item --log (-l)
+
+Name of logfile (actually template, as it supports %% L<strftime(3)>
+markers
+
+=item --filename-template (-f)
+
+Template for naming output files. Check L<FILENAMES> section for details.
+
+=item --verbose (-v)
+
+Log verbosely what is happening.
+
+=back
+
 =head2 DESCRIPTION
 
+Running this program should be done by cronjob, or manually by database
+administrator.
+
+As a result of running it there are 2 files, usually named
+HOST-data-YYYY-MM-DD.tar and HOST-xlog-YYYY-MM-DD.tar. These files can be
+optionally compressed and delivered to many places - both local (on the same
+server) or remote (via rsync).
+
+Which options should be given depends only on installation, but generally you
+will need at least:
+
+=over
+
+=item * --data-dir
+
+Backup will process files in this directory.
+
+=item * --log
+
+to make sure that information is logged someplace about archiving progress
+
+=item * one of --dst-local or --dst-remote
+
+to specify where to send the backup files to
+
+=back
+
+Of course you can provide many --dst-local or many --dst-remote or many mix of
+these.
+
+Generally omnipitr-master-backup will try to deliver WAL segment to all
+destinations. In case remote destination will fail, omnipitr-master-backup will
+retry 3 times, with 5 minute delay between tries.
+
+In case of errors when writing to local destination - it is skipped, and error
+is logged.
+
+Segments will be transferred to destinations in this order:
+
+=over
+
+=item 1. All B<local> destinations, in order provided in command line
+
+=item 2. All B<remote> destinations, in order provided in command line
+
+=back
+
+=head3 Remote destination specification
+
+I<omnipitr-master-backup> delivers backup files to destination using rsync
+program.  Both direct-rsync and rsync-over-ssh are supported (it's better to use
+direct rsync - it uses less resources due to lack of encryption.
+
+Destination url/location should be in a format that is usable by I<rsync>
+program.
+
+For example you can use:
+
+=over
+
+=item * rsync://user@remote_host/module/path/
+
+=item * host:/path/
+
+=back
+
+To allow remote delivery you need to have rsync program. In case you're using
+rsync over ssh, I<ssh> program has also to be available.
+
+In case your rsync/ssh programs are in custom directories simply set I<$PATH>
+environemnt variable before starting PostgreSQL.
+
+=head2 COMPRESSION
+
+Every destination can have specified compression. To use it you should prefix
+destination path/url with compression type followed by '%' sign.
+
+Allowed compression types:
+
+=over
+
+=item * gzip
+
+Compresses with gzip program, used file extension is .gz
+
+=item * bzip2
+
+Compresses with bzip2 program, used file extension is .bz2
+
+=item * lzma
+
+Compresses with lzma program, used file extension is .lzma
+
+=back
+
+All compressions are done I<on B<NICE>> to make the operation as unobtrusive as
+possible.
+
+If you want to pass any extra arguments to compression program, you can either:
+
+=over
+
+=item * make a wrapper
+
+Write a program/script that will be named in the same way your actual
+compression program is named, but adding some parameters to call
+
+=item * use environment variables
+
+All of supported compression programs use environment variables:
+
+=over
+
+=item * gzip - GZIP
+
+=item * bzip2 - BZIP2
+
+=item * lzma - XZ_OPT
+
+=back
+
+For details - please consult manual to your choosen compression tool.
+
+=back
+
+B<It is strongly suggest to use only 1 compression method for all destinations>
+
+=head2 FILENAMES
+
+Naming of files for backups might be important depending on deployment.
+
+Generally, generated filenames are named using templates, with default template
+being:
+
+    __HOSTNAME__-__FILETYPE__-%Y-%m-%d.tar__CEXT__
+
+Within template (specified with --filename-template option) you can use
+following markers:
+
+=over
+
+=item * __HOSTNAME__
+
+Name of server backup is made on - as reported by L<hostname(1)> program.
+
+=item * __FILETYPE__
+
+It is actually required to have __FILETYPE__ - it specifies whether the file
+contains data (data) or xlog segments (xlog)
+
+=item * __CEXT__
+
+Based on compression algorithm choosen for given delivery. Can be empty (no
+compression), or contains dot (.) and literal extension associated with choosen
+compression program.
+
+=item * any %? markers
+
+like in L<strftime(3)> call.
+
+=back
+
+Filename template is evaluated at start, so any timestamp (%? markers) will
+relate to date/time of beginning of backup process.
+
 =head2 EXAMPLES
+
+=head3 Minimal setup, with copying file to local directory:
+
+    /.../omnipitr-master-backup -D /mnt/data -l /var/log/omnipitr/backup.log -dl /mnt/backups/
+
+=head3 Minimal setup, with compression, and copying file to remote directory over rsync:
+
+    /.../omnipitr-master-backup -D /mnt/data/ -l /var/log/omnipitr/backup.log -dr bzip2%rsync://slave/postgres/backups/
+
+=head3 2 remote, compressed destinations, 1 local, with auto rotated logfile,
+and modified filenames
+
+    /.../omnipitr-master-backup -D /mnt/data/ -l /var/log/omnipitr/backup-%Y-%m-%d.log -dr bzip2%rsync://slave/postgres/backups/ -dr gzip%backups:/mnt/hotbackups/ -dl /mnt/backups/ -f "main-__FILETYPE__-%Y%m%d_%H%M%S.tar__CEXT__"
 
 =head2 COPYRIGHT
 

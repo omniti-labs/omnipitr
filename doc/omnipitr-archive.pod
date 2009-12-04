@@ -126,7 +126,7 @@ For example you can use:
 =back
 
 To allow remote delivery you need to have rsync program. In case you're using
-rsync over ssh, program has also to be available.
+rsync over ssh, I<ssh> program has also to be available.
 
 In case your rsync/ssh programs are in custom directories simply set I<$PATH>
 environemnt variable before starting PostgreSQL.
