@@ -2,9 +2,242 @@
 
 =head2 USAGE
 
+/some/path/omnipitr/bin/omnipitr-restore [options] %f %p
+
+Options:
+
+=over
+
+=item --data-dir (-D)
+
+Where PostgreSQL datadir is located (path)
+
+=item --source (-s)
+
+Where I<omnipitr-restore> can find wal segments to use.
+
+Check L<Source specification> for more details.
+
+=item --recovery-delay (-w)
+
+Delay when recovering wal segments (in seconds).
+
+This is primarily used to keep window of safety before I<DELETE * FROM
+main_table> will be applied on slave database.
+
+=item --finish-trigger (-f)
+
+Name of file to watch for existence - if it exists, recovery process will stop,
+and PostgreSQL slave will become fully functional.
+
+Check L<Finishing recovery> section for more details.
+
+=item --remove-unneeded (-r)
+
+Makes I<omnipitr-restore> remove unneeded wal segments. These are B<not>
+segments that were passed to Pg - I<omnipitr-restore> checks last redo segment
+to make sure this is safe.
+
+=item --removal-pause-trigger (-p)
+
+Name of file to watch for existence. If it exists - I<omnipitr-restore> will not
+remove unneeded wal segments regardless of I<--removal-unneeded> option. This is
+to provide a way to make backups on slave.
+
+=item --log (-l)
+
+Name of logfile (actually template, as it supports %% L<strftime(3)>
+markers
+
+=item --verbose (-v)
+
+Log verbosely what is happening.
+
+=back
+
 =head2 DESCRIPTION
 
+Call to I<omnipitr-restore> should be in I<restore_command> variable in
+I<recovery.conf>.
+
+Which options should be given depends only on installation, but generally you
+will need at least:
+
+=over
+
+=item * --data-dir
+
+PostgreSQL "%p" passed file path is relative to I<DATADIR>, so it is required to
+know it.
+
+=item * --log
+
+to make sure that information is logged someplace about archiving progress
+
+=item * --source
+
+to specify where to load WAL segments from
+
+=back
+
+If you'll specify more than 1 destination, you will also need to specify
+I<--state-dir>
+
+Of couse you can provide many --dst-local or many --dst-remote or many mix of
+these.
+
+Generally omnipitr-restore will try to deliver WAL segment to all destinations,
+and will fail if B<any> of them will not accept new segment.
+
+Segments will be transferred to destinations in this order:
+
+=over
+
+=item 1. All B<local> destinations, in order provided in command line
+
+=item 2. All B<remote> destinations, in order provided in command line
+
+=back
+
+In case any destination will fail, I<omnipitr-restore> will save state (which
+destinations it delivered the file to) and return error to PostgreSQL - which
+will cause PostgrerSQL to call I<omnipitr-restore> again for the same WAL
+segment after some time.
+
+State directory will be cleared after every successfull file send, so it should
+stay small in size (expect 1 file of under 500 bytes).
+
+When constructing command line to put in I<restore_command> PostgreSQL GUC,
+please remember that while providing C<"%p" "%f"> will work, I<omnipitr-restore>
+requires only "%p"
+
+=head3 Source specification
+
+If the wal segments are compressed you have to prefix source path with
+compression type followed by '%' sign.
+
+Allowed compression types:
+
+=over
+
+=item * gzip
+
+Decompresses with gzip program, used file extension is .gz
+
+=item * bzip2
+
+Decompresses with bzip2 program, used file extension is .bz2
+
+=item * lzma
+
+Decompresses with lzma program, used file extension is .lzma
+
+=back
+
+If you want to pass any extra arguments to compression program, you can either:
+
+=over
+
+=item * make a wrapper
+
+Write a program/script that will be named in the same way your actual
+compression program is named, but adding some parameters to call
+
+=item * use environment variables
+
+All of supported compression programs use environment variables:
+
+=over
+
+=item * gzip - GZIP
+
+=item * bzip2 - BZIP2
+
+=item * lzma - XZ_OPT
+
+=back
+
+For details - please consult manual to your choosen compression tool.
+
+=back
+
+=head3 Finishing recovery
+
+There are 2 ways I<omnipitr-restore> can finish recovery, and there are 2
+separate ways to signal it that it should finish.
+
+First, the finishing procedures:
+
+=over
+
+=item * smart
+
+In this mode I<omnipitr-restore> will feed all available WAL segments to
+PostgreSQL (without any I<--recovery-delay> induced delay), and then finish
+restoration process.
+
+=item * immediate
+
+In this mode I<omnipitr-restore> will skip all pending WAL segments, and make
+PostgreSQL finish recover immediately.
+
+This can be useful in case of running really bad query (think: TRUNCATE users),
+and wanting to prevent this change to be replicated to slave.
+
+=back
+
+Now. I<omnipitr-restore> can be signaled into finishing recovery in 2 ways, one
+of which is optional.
+
+=over
+
+=item * trigger file
+
+This one is optional. If you will use --finish-trigger switch,
+I<omnipitr-restore> will look for this file, and if it exists - it will start
+finishing.
+
+If the file exists, and contains string "NOW" (without quotation characters, but
+with optional new line character "\n"), I<omnipitr-restore> will enter
+"immediate finish" procedure. If the content is different, or the file is empty
+- it will proceed in smart finish mode.
+
+=item * system signal
+
+This one works always, regardless of --finish-trigger switch. Generally you can
+send system signals (kill) to I<omnipitr-restore> to make it go to finish
+recovery procedure.
+
+2 signals are supported:
+
+=over
+
+=item * SIGUSR1
+
+makes the finish I<smart>
+
+=item * SIGUSR2
+
+makes the finish I<immediate>
+
+=back
+
+=back
+
 =head2 EXAMPLES
+
+=head3 Minimal setup:
+
+    restore_command='/.../omnipitr-restore -D /mnt/data/ -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ %f %p'
+
+=head3 Minimal setup, but with defined finish trigger and recovery delay (5
+mintues):
+
+    restore_command='/.../omnipitr-restore -D /mnt/data/ -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ -w 300 -f /tmp/finish.trigger %f %p'
+
+=head3 Setup as above, but with pause trigger defined for doing backups-on-slave and removing unneeded segments
+
+    restore_command='/.../omnipitr-restore -D /mnt/data/ -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ -w 300 -f /tmp/finish.trigger -r -p /tmp/pause.trigger %f %p'
 
 =head2 COPYRIGHT
 
