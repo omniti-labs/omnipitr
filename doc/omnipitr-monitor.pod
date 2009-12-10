@@ -2,11 +2,101 @@
 
 =head2 USAGE
 
+/some/path/omnipitr/bin/omnipitr-monitor --log=... --check=... [--state-dir=...] [options]
+
+Where:
+
+=over
+
+=item * --log (-l) Points to logfile created by I<OmniPITR> tool that should be monitored.
+
+It can contain strftime-type marks - just like --log argument to other
+I<OmniPITR> programs.
+
+=item * --check (-c) contains name of check that should be performed.
+
+For list of check, please read L<CHECKS> section.
+
+=item * --state-dir (-s) is a name of directory that can be used to store state
+between calls to checks
+
+This is primarily used to report rates or errors - to avoid checking full logs,
+and just check from last known position.
+
+=item * options depend on which check being performed.
+
+Most checks don't have any options. List of options for check is supplied in
+L<CHECKS> section.
+
+=back
+
 =head2 DESCRIPTION
 
+This script simply reads log files from other I<OmniPITR> tools, and reports
+values useful for monitoring in Nagios, Cacti or other tools.
+
+=head2 CHECKS
+
+=head3 last-archive-age
+
+When was the last WAL segment archived. Returns value in seconds being interval
+between "now" and the moment when last archive happened.
+
+Requires path to log from I<omnipitr-archive>
+
+=head3 last-restore-age
+
+When was the last WAL segment restored. Returns value in seconds being interval
+between "now" and the moment when last restore happened.
+
+Requires path to log from I<omnipitr-restore>
+
+=head3 errors
+
+Lists all errors that happened from last call to errors check in given logfile.
+
+Can have option:
+
+--from
+
+Where value of from is treated as:
+
+=over
+
+=item * Date time in format: %Y-%m-%d %H:%M:%S (for example: 2009-12-24
+15:45:32)
+
+=item * interval, in seconds (for example: 300 - means check last 5 minutes)
+
+=back
+
+Works with logfiles of all types.
+
+=head3 last-backup-age
+
+Returns when last backup was finished, in seconds that passed since.
+
+Requires path to log from I<omnipitr-master-backup> or I<omnipitr-slave-backup>
+
 =head2 EXAMPLES
+
+=head3 Getting age of last archive:
+
+    .../omnipitr-monitor -l /var/log/omnipitr/archive-%Y-%m-%d.log -c last-archive-age -s /var/lib/omnipitr
+
+=head3 Getting age of last wal restore:
+
+    .../omnipitr-monitor -l /var/log/omnipitr/restore-%Y-%m-%d.log -c last-restore-age -s /var/lib/omnipitr
+
+=head3 Getting errors for raporting:
+
+    .../omnipitr-monitor -l /var/log/omnipitr/archive-%Y-%m-%d.log -c errors -s /var/lib/omnipitr
+
+=head3 Getting errors for raporting, but checking always only last 10 minutes of
+logs:
+
+    .../omnipitr-monitor -l /var/log/omnipitr/archive-%Y-%m-%d.log -c errors -s /var/lib/omnipitr --from=600
 
 =head2 COPYRIGHT
 
 The OmniPITR project is Copyright (c) 2009 OmniTI. All rights reserved.
-
