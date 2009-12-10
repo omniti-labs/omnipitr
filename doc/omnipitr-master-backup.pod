@@ -113,7 +113,7 @@ retry 3 times, with 5 minute delay between tries.
 In case of errors when writing to local destination - it is skipped, and error
 is logged.
 
-Segments will be transferred to destinations in this order:
+Backups will be transferred to destinations in this order:
 
 =over
 
