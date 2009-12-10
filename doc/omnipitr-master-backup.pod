@@ -47,7 +47,7 @@ information (you can provide many of these)
 You can also specify compression per-destination. Check L<COMPRESSION>
 section of the doc.
 
-=item --tempdir (-t)
+=item --temp-dir (-t)
 
 Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
 variable location)
@@ -60,6 +60,13 @@ markers
 =item --filename-template (-f)
 
 Template for naming output files. Check L<FILENAMES> section for details.
+
+=item --pid-file
+
+Name of file to use for pidfile. If it is specified, than only one copy of
+I<omnipitr-master-backup> (with this pidfile) can run at the same time.
+
+Trying to run second copy of I<omnipitr-master-backup> will result in an error.
 
 =item --verbose (-v)
 

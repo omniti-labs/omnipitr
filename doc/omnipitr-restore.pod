@@ -49,6 +49,13 @@ to provide a way to make backups on slave.
 Name of logfile (actually template, as it supports %% L<strftime(3)>
 markers
 
+=item --pid-file
+
+Name of file to use for pidfile. If it is specified, than only one copy of
+I<omnipitr-restore> (with this pidfile) can run at the same time.
+
+Trying to run second copy of I<omnipitr-restore> will result in an error.
+
 =item --verbose (-v)
 
 Log verbosely what is happening.
