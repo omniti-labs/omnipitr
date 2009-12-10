@@ -94,6 +94,24 @@ slave (with I<omnipitr-slave-backup>) at any moment - just remember that doing
 them on slave requires more disc space - details in
 I<omnipitr-slave-backup.pod>.
 
+=head2 HINTS
+
+It is technically possible, and suggested to use the same logfiles for all
+programs running on given server.
+
+That is - you can setup archival to log to "archive.log" and backup to log to
+"backup.log", but you can make them both log to "omnipitr.log" - it will not
+break anything, and makes it simpler to manage log files.
+
+Same thing applies to state directories - these can be the same between various
+programs from I<OmniPITR> package.
+
+When creating any files I<OmniPITR> obeys ulimit, but doesn't enforce any
+additional restrictions. So, if you'd like it to create files that are readable
+only to owner, simply run it like this:
+
+    umask 0077; omnipitr-something ....
+
 =head2 COPYRIGHT
 
 The OmniPITR project is Copyright (c) 2009 OmniTI. All rights reserved.
