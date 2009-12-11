@@ -1,0 +1,12 @@
+#!/usr/bin/perl
+use strict;
+
+use Cwd qw(abs_path);
+use FindBin;
+use lib abs_path( "$FindBin::Bin/../lib" );
+
+use OmniPITR::Backup::Slave;
+
+OmniPITR::Backup::Slave->new()->run();
+
+# vim: set ft=perl :

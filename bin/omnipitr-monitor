@@ -1,0 +1,12 @@
+#!/usr/bin/perl
+use strict;
+
+use Cwd qw(abs_path);
+use FindBin;
+use lib abs_path( "$FindBin::Bin/../lib" );
+
+use OmniPITR::Monitor;
+
+OmniPITR::Monitor->new()->run();
+
+# vim: set ft=perl :
