@@ -62,7 +62,7 @@ done
 
 for MODULE in $( egrep "^use" "$BIN_DIR"/omnipitr-* $( find "$LIB_DIR" -name '*.pm' -print ) | sed 's/.*:use[[:space:]]*//; s/[;[:space:]].*//' | sort | uniq )
 do
-    if ! perl -e "use $MODULE" &>/dev/null
+    if ! perl -I"$LIB_DIR" -e "use $MODULE" &>/dev/null
     then
         ERRORS_COUNT=$(( 1 + $ERRORS_COUNT ))
         ERRORS[$ERRORS_COUNT]="you don't have $MODULE Perl library (should be installed together with Perl)"
