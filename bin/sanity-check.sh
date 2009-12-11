@@ -69,6 +69,15 @@ do
     fi
 done
 
+for MODULE in Time::HiRes
+do
+    if ! perl -I"$LIB_DIR" -e "use $MODULE" &>/dev/null
+    then
+        WARNINGS_COUNT=$(( 1 + $WARNINGS_COUNT ))
+        WARNINGS[$WARNINGS_COUNT]="you don't have $MODULE Perl library - it's optional, but it could help"
+    fi
+done
+
 # Report of status
 
 if [[ $WARNINGS_COUNT -gt 0 ]]
