@@ -51,7 +51,7 @@ fi
 
 for x in "$BIN_DIR"/omnipitr-* $( find "$LIB_DIR" -name '*.pm' -print )
 do
-    if ! perl -wc "$x" &>/dev/null
+    if ! perl -I"$LIB_DIR" -wc "$x" &>/dev/null
     then
         ERRORS_COUNT=$(( 1 + $ERRORS_COUNT ))
         ERRORS[$ERRORS_COUNT]="can't compile $x ?!"
