@@ -15,6 +15,8 @@ BEGIN {
 sub new {
     my $class                 = shift;
     my ( $filename_template ) = @_;
+    croak( 'Logfile name template was not provided!' ) unless $filename_template;
+
     my $self                  = bless {}, $class;
 
     $self->{ 'template' }       = $filename_template;
