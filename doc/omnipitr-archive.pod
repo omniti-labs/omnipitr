@@ -70,7 +70,8 @@ will need at least:
 =item * --data-dir
 
 PostgreSQL "%p" passed file path relative to I<DATADIR>, so it is required to
-know it.
+know it. If not provided, it is assumed to be "." ( which is perfectly in line
+with PostgreSQL assumptions about archive_command ).
 
 =item * --log
 

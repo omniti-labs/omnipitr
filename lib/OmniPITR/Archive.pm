@@ -9,12 +9,15 @@ use Getopt::Long;
 sub run {
     my $self = shift;
     print "YAY, it worked!\n";
+    print Dumper($self);
 }
 
 sub read_args {
     my $self = shift;
 
-    my %args = ();
+    my %args = (
+        'data-dir' => '.',
+    );
     croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
         unless GetOptions(
         \%args,
@@ -62,7 +65,6 @@ sub read_args {
 sub validate_args {
     my $self = shift;
 
-    $self->log->fatal( "--data-dir was not provided!" ) unless defined $self->{ 'data-dir' };
     $self->log->fatal( "Given data-dir (%s) is not valid", $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' } && -f File::Spec->catfile( $self->{ 'data-dir' }, 'PG_VERSION' );
 
     my $dst_count = scalar( @{ $self->{ 'destination' }->{ 'local' } } ) + scalar( @{ $self->{ 'destination' }->{ 'remote' } } );
