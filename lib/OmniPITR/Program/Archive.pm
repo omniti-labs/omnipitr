@@ -1,4 +1,4 @@
-package OmniPITR::Archive;
+package OmniPITR::Program::Archive;
 use strict;
 use warnings;
 use base qw( OmniPITR::Program );

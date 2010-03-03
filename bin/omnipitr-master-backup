@@ -5,8 +5,8 @@ use Cwd qw(abs_path);
 use FindBin;
 use lib abs_path( "$FindBin::Bin/../lib" );
 
-use OmniPITR::Backup::Master;
+use OmniPITR::Program::Backup::Master;
 
-OmniPITR::Backup::Master->new()->run();
+OmniPITR::Program::Backup::Master->new()->run();
 
 # vim: set ft=perl :
