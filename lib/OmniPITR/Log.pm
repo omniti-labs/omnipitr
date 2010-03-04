@@ -5,6 +5,7 @@ use English qw( -no_match_vars );
 use Carp;
 use File::Basename;
 use File::Path;
+use Data::Dumper;
 use POSIX qw(strftime floor);
 use IO::File;
 
@@ -13,11 +14,11 @@ BEGIN {
 }
 
 sub new {
-    my $class                 = shift;
+    my $class = shift;
     my ( $filename_template ) = @_;
     croak( 'Logfile name template was not provided!' ) unless $filename_template;
 
-    my $self                  = bless {}, $class;
+    my $self = bless {}, $class;
 
     $self->{ 'template' }       = $filename_template;
     $self->{ 'program' }        = basename( $PROGRAM_NAME );
@@ -33,6 +34,8 @@ sub _log {
 
     my $log_line_prefix = $self->get_log_line_prefix();
     my $fh              = $self->get_log_fh();
+
+    @args = map { ref $_ ? Dumper( $_ ) : $_ } @args;
 
     my $message = sprintf $format, @args;
     $message =~ s/\s*\z//;
@@ -60,7 +63,22 @@ sub error {
 sub fatal {
     my $self = shift;
     $self->_log( 'FATAL', @_ );
-    exit(1);
+    exit( 1 );
+}
+
+sub time_start {
+    my $self    = shift;
+    my $comment = shift;
+    $self->{ 'timers' }->{ $comment } = time();
+    return;
+}
+
+sub time_finish {
+    my $self    = shift;
+    my $comment = shift;
+    my $start   = delete $self->{ 'timers' }->{ $comment };
+    $self->log( 'Timer [%s] took: %.3fs', $comment, time() - ( $start || 0 ) );
+    return;
 }
 
 sub get_log_line_prefix {

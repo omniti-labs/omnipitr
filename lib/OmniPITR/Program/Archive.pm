@@ -1,78 +1,224 @@
 package OmniPITR::Program::Archive;
 use strict;
 use warnings;
+
 use base qw( OmniPITR::Program );
+
 use Carp;
+use OmniPITR::Tools qw( :all );
 use English qw( -no_match_vars );
 use File::Basename;
 use File::Spec;
-use File::Path qw( make_path );
+use File::Path qw( make_path remove_tree );
 use File::Copy;
 use Storable;
 use Getopt::Long;
-use Data::Dumper;
-use Digest::MD5;
+
+=head1 run()
+
+Main function, called by actual script in bin/, wraps all work done by script with the sole exception of reading and validating command line arguments.
+
+These tasks (reading and validating arguments) are in this module, but they are called from L<OmniPITR::Program::new()>
+
+Name of called method should be self explanatory, and if you need further information - simply check doc for the method you have questions about.
+
+=cut
 
 sub run {
     my $self = shift;
     $self->read_state();
     $self->prepare_temp_directory();
-    $self->copy_segment_to_temp_dir();
-}
-
-sub copy_segment_to_temp_dir {
-    my $self = shift;
-    return if $self->segment_already_copied();
-    my $new_file = $self->get_temp_filename_for( 'none' );
-    unless ( copy( $self->{'segment'}, $new_file ) ) {
-        $self->log->fatal('Cannot copy %s to %s : %s', $self->{'segment'}, $new_file, $OS_ERROR );
-    }
-    my $has_md5 = $self->md5sum( $new_file );
-    $self->{'state'}->{'compressed'}->{'none'} = $has_md5;
-    $self->save_state();
+    $self->make_all_necessary_compressions();
+    $self->send_to_destinations();
+    $self->cleanup();
+    $self->log->log( 'Segment %s successfully sent to all destinations.', $self->{ 'segment' } );
     return;
 }
 
-sub segment_already_copied {
-    my $self = shift;
-    return unless $self->{ 'state' }->{ 'compressed' }->{ 'none' };
-    my $want_md5 = $self->{ 'state' }->{ 'compressed' }->{ 'none' };
+=head1 send_to_destinations()
 
-    my $temp_file_name = $self->get_temp_filename_for( 'none' );
+Does all the actual sending of segments to local and remote destinations.
+
+It keeps it's state to be able to continue in case of error.
+
+Since both local and remote destinations are handled in the same way, there is no point in duplicating the code to 2 methods.
+
+Important notice - this function has to have the ability to choose whether to use temp file (for compressed destinations), or original segment (for uncompressed ones). This is done by this line:
+
+    my $local_file = $dst->{ 'compression' } eq 'none' ? $self->{ 'segment' } : $self->get_temp_filename_for( $dst->{ 'compression' } );
+
+=cut
+
+sub send_to_destinations {
+    my $self = shift;
+
+    for my $destination_type ( qw( local remote ) ) {
+        next unless my $dst_list = $self->{ 'destination' }->{ $destination_type };
+        for my $dst ( @{ $dst_list } ) {
+            next if $self->segment_already_sent( $destination_type, $dst );
+
+            my $local_file = $dst->{ 'compression' } eq 'none' ? $self->{ 'segment' } : $self->get_temp_filename_for( $dst->{ 'compression' } );
+
+            my $destination_file_path = $dst->{ 'path' };
+            $destination_file_path =~ s{/*\z}{};
+            $destination_file_path .= '/' . basename( $local_file );
+
+            my $comment = 'Sending ' . $local_file . ' to ' . $destination_file_path;
+
+            $self->log->time_start( $comment ) if $self->{ 'verbose' };
+            my $response = run_command( $self->{ 'temp-dir' }, 'rsync', $local_file, $destination_file_path );
+            $self->log->time_finish( $comment ) if $self->{ 'verbose' };
+
+            if ( $response->{ 'error_code' } ) {
+                $self->log->fatal( "Cannot send segment %s to %s : %s", $local_file, $destination_file_path, $response );
+            }
+            $self->{ 'state' }->{ 'sent' }->{ $destination_type }->{ $dst->{ 'path' } } = 1;
+            $self->save_state();
+        }
+    }
+    return;
+}
+
+=head1 segment_already_sent()
+
+Simple function, that checks if segment has been already sent to given destination, and if yes - logs such information.
+
+=cut
+
+sub segment_already_sent {
+    my $self = shift;
+    my ( $type, $dst ) = @_;
+    return unless $self->{ 'state' }->{ 'sent' }->{ $type };
+    return unless $self->{ 'state' }->{ 'sent' }->{ $type }->{ $dst->{ 'path' } };
+    $self->log->log( 'Segment already sent to %s. Skipping.', $dst->{ 'path' } );
+    return 1;
+}
+
+=head1 cleanup()
+
+Function is called only if segment has been successfully compressed and sent to all destinations.
+
+It basically removes tempdir with compressed copies of segment, and state file for given segment.
+
+=cut
+
+sub cleanup {
+    my $self = shift;
+    remove_tree( $self->{ 'temp-dir' } );
+    unlink $self->{ 'state-file' };
+    return;
+}
+
+=head1 get_list_of_all_necessary_compressions()
+
+Scans list of destinations, and gathers list of all compressions that have to be made.
+
+This is to be able to compress file only once even when having multiple destinations that require compressed format.
+
+=cut
+
+sub get_list_of_all_necessary_compressions {
+    my $self = shift;
+
+    my %compression = ();
+
+    for my $dst_type ( qw( local remote ) ) {
+        next unless my $dsts = $self->{ 'destination' }->{ $dst_type };
+        for my $destination ( @{ $dsts } ) {
+            $compression{ $destination->{ 'compression' } } = 1;
+        }
+    }
+    $self->{ 'compressions' } = [ grep { $_ ne 'none' } keys %compression ];
+    return;
+}
+
+=head1 make_all_necessary_compressions()
+
+Wraps all work required to compress segment to all necessary formats.
+
+Call to actuall compressor has to be done via "bash -c" to be able to easily use run_command() function which has side benefits of getting stdout, stderr, and proper fetching error codes.
+
+Overhead of additional fork+exec for bash should be negligible.
+
+=cut
+
+sub make_all_necessary_compressions {
+    my $self = shift;
+    $self->get_list_of_all_necessary_compressions();
+
+    for my $compression ( @{ $self->{ 'compressions' } } ) {
+        next if $self->segment_already_compressed( $compression );
+        my $compressed_filename = $self->get_temp_filename_for( $compression );
+
+        my $compressor_binary = $self->{ $compression . '-path' } || $compression;
+
+        my $compression_command = sprintf 'nice %s --stdout %s > %s', $compressor_binary, quotemeta( $self->{ 'segment' } ), quotemeta( $compressed_filename );
+
+        $self->log->time_start( 'Compressing with ' . $compression ) if $self->{ 'verbose' };
+        my $response = run_command( $self->{ 'temp-dir' }, 'bash', '-c', $compression_command );
+        $self->log->time_finish( 'Compressing with ' . $compression ) if $self->{ 'verbose' };
+
+        if ( $response->{ 'error_code' } ) {
+            $self->log->fatal( 'Error while compressing with %s : %s', $compression, $response );
+        }
+
+        $self->{ 'state' }->{ 'compressed' }->{ $compression } = file_md5sum( $compressed_filename );
+        $self->save_state();
+    }
+    return;
+}
+
+=head1 segment_already_compressed()
+
+Helper function which checks if segment has been already compressed.
+
+It uses state file, and checks compressed file md5sum to be sure that the file wasn't damaged between prior run and now.
+
+=cut
+
+sub segment_already_compressed {
+    my $self = shift;
+    my $type = shift;
+    return unless $self->{ 'state' }->{ 'compressed' }->{ $type };
+    my $want_md5 = $self->{ 'state' }->{ 'compressed' }->{ $type };
+
+    my $temp_file_name = $self->get_temp_filename_for( $type );
     return unless -e $temp_file_name;
 
-    my $has_md5 = $self->md5sum( $temp_file_name );
+    my $has_md5 = file_md5sum( $temp_file_name );
     if ( $has_md5 eq $want_md5 ) {
-        $self->log->log('Segment has been already copied to temp location.');
+        $self->log->log( 'Segment has been already compressed with %s.', $type );
         return 1;
     }
 
     unlink $temp_file_name;
-    $self->log->error( 'Segment already copied, but with bad MD5 ?!' );
+    $self->log->error( 'Segment already compressed to %s, but with bad MD5 (file: %s, state: %s), recompressing.', $type, $has_md5, $want_md5 );
 
     return;
 }
+
+=head1 get_temp_filename_for()
+
+Helper function to build full (with path) filename for compressed segment, assuming given compression.
+
+=cut
 
 sub get_temp_filename_for {
     my $self = shift;
     my $type = shift;
 
-    return File::Spec->catfile( $self->{ 'temp-dir' }, $type );
+    return File::Spec->catfile( $self->{ 'temp-dir' }, basename( $self->{ 'segment' } ) . ext_for_compression( $type ) );
 }
 
-sub md5sum {
-    my $self     = shift;
-    my $filename = shift;
+=head1 prepare_temp_directory()
 
-    my $ctx = Digest::MD5->new;
+Helper function, which builds path for temp directory, and creates it.
 
-    open my $fh, '<', $filename or $self->log->fatal( 'Cannot open file for md5summing %s : %s', $filename, $OS_ERROR );
-    $ctx->addfile( $fh );
-    my $md5 = $ctx->hexdigest();
-    close $fh;
+Path is generated by using given temp-dir, 'omnipitr-archive' name, and filename of segment.
 
-    return $md5;
-}
+For example, for temp-dir '/tmp' and segment being pg_xlog/000000010000000000000003, actual, used temp directory would be /tmp/omnipitr-archive/000000010000000000000003/.
+
+=cut
 
 sub prepare_temp_directory {
     my $self = shift;
@@ -81,6 +227,14 @@ sub prepare_temp_directory {
     $self->{ 'temp-dir' } = $full_temp_dir;
     return;
 }
+
+=head1 read_state()
+
+Helper function to read state from state file.
+
+Name of state file is the same as filename of WAL segment being archived, but it is in state-dir.
+
+=cut
 
 sub read_state {
     my $self = shift;
@@ -94,6 +248,12 @@ sub read_state {
     return;
 }
 
+=head1 save_state()
+
+Helper function to save state to state-file.
+
+=cut
+
 sub save_state {
     my $self = shift;
 
@@ -104,32 +264,46 @@ sub save_state {
     return;
 }
 
+=head1 read_args()
+
+Function which does all the parsing, and transformation of command line arguments.
+
+It also verified base facts about passed WAL segment name, but all other validations, are being done in separate function: L<validate_args()>.
+
+=cut
+
 sub read_args {
     my $self = shift;
 
     my @argv_copy = @ARGV;
 
     my %args = (
-        'data-dir' => '.',
-        'temp-dir' => $ENV{ 'TMPDIR' } || '/tmp',
+        'data-dir'   => '.',
+        'temp-dir'   => $ENV{ 'TMPDIR' } || '/tmp',
+        'gzip-path'  => 'gzip',
+        'bzip2-path' => 'bzip2',
+        'lzma-path'  => 'lzma',
     );
 
     croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
         unless GetOptions(
         \%args,
+        'bzip2-path|bp=s',
         'data-dir|D=s',
         'dst-local|dl=s@',
         'dst-remote|dr=s@',
-        'temp-dir|t=s',
+        'gzip-path|gp=s',
         'log|l=s',
-        'state-dir|s=s',
+        'lzma-path|lp=s',
         'pid-file=s',
-        'verbose|v'
+        'state-dir|s=s',
+        'temp-dir|t=s',
+        'verbose|v',
         );
 
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
 
-    for my $key ( qw( data-dir temp-dir state-dir pid-file verbose ) ) {
+    for my $key ( qw( data-dir temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path ) ) {
         $self->{ $key } = $args{ $key };
     }
 
@@ -166,6 +340,15 @@ sub read_args {
 
     return;
 }
+
+=head1 validate_args()
+
+Does all necessary validation of given command line arguments.
+
+One exception is for compression programs paths - technically, it could be validated in here, but benefit would be pretty limited, and code to do so relatively complex, as compression program path
+might, but doesn't have to be actual file path - it might be just program name (without path), which is the default.
+
+=cut
 
 sub validate_args {
     my $self = shift;

@@ -55,6 +55,21 @@ Trying to run second copy of I<omnipitr-archive> will result in an error.
 
 Log verbosely what is happening.
 
+=item --gzip-path (-gp)
+
+Full path to gzip program - in case you can't set proper PATH environment
+variable.
+
+=item --bzip2-path (-bp)
+
+Full path to bzip2 program - in case you can't set proper PATH environment
+variable.
+
+=item --lzma-path (-lp)
+
+Full path to lzma program - in case you can't set proper PATH environment
+variable.
+
 =back
 
 =head2 DESCRIPTION
@@ -164,6 +179,8 @@ Compresses with lzma program, used file extension is .lzma
 
 All compressions are done I<on B<NICE>> to make the operation as unobtrusive as
 possible.
+
+All programs are passed I<--stdout> option to compress without modifying source file.
 
 If you want to pass any extra arguments to compression program, you can either:
 
