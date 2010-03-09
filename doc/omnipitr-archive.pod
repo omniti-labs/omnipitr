@@ -157,7 +157,7 @@ environemnt variable before starting PostgreSQL.
 =head2 COMPRESSION
 
 Every destination can have specified compression. To use it you should prefix
-destination path/url with compression type followed by '%' sign.
+destination path/url with compression type followed by '=' sign.
 
 Allowed compression types:
 
@@ -221,7 +221,7 @@ For details - please consult manual to your choosen compression tool.
 
 =head3 2 remote, compressed destinations, 1 local, with auto rotated logfile:
 
-    archive_command='/.../omnipitr-archive -D /mnt/data/ -l /var/log/omnipitr/archive-%Y-%m-%d.log -dr gzip%rsync://slave/postgres/wal_archive/ -dr bzip2%backups@backupserver:/mnt/backups/wal_archive/ -dl /mnt/wal_archive/ -s /var/lib/postgres/.omnipitr/ "%p"'
+    archive_command='/.../omnipitr-archive -D /mnt/data/ -l /var/log/omnipitr/archive-%Y-%m-%d.log -dr gzip=rsync://slave/postgres/wal_archive/ -dr bzip2=backups@backupserver:/mnt/backups/wal_archive/ -dl /mnt/wal_archive/ -s /var/lib/postgres/.omnipitr/ "%p"'
 
 =head2 COPYRIGHT
 
