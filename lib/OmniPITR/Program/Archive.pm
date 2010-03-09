@@ -318,7 +318,7 @@ sub read_args {
 
         for my $item ( @items ) {
             my $current = { 'compression' => 'none', };
-            if ( $item =~ s/\A(gzip|bzip2|lzma)\%// ) {
+            if ( $item =~ s/\A(gzip|bzip2|lzma)=// ) {
                 $current->{ 'compression' } = $1;
             }
             $current->{ 'path' } = $item;
