@@ -55,7 +55,9 @@ variable location)
 =item --log (-l)
 
 Name of logfile (actually template, as it supports %% L<strftime(3)>
-markers
+markers. Unfortunately due to the %x usage by PostgreSQL, We cannot use %%
+macros directly. Instead - any occurence of ^ character in log dir will be first
+changed to %, and later on passed to strftime.
 
 =item --filename-template (-f)
 
@@ -210,7 +212,7 @@ Naming of files for backups might be important depending on deployment.
 Generally, generated filenames are named using templates, with default template
 being:
 
-    __HOSTNAME__-__FILETYPE__-%Y-%m-%d.tar__CEXT__
+    __HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__
 
 Within template (specified with --filename-template option) you can use
 following markers:
@@ -232,13 +234,13 @@ Based on compression algorithm choosen for given delivery. Can be empty (no
 compression), or contains dot (.) and literal extension associated with choosen
 compression program.
 
-=item * any %? markers
+=item * any ^? markers
 
-like in L<strftime(3)> call.
+like in L<strftime(3)> call, but ^ will be changed to % first.
 
 =back
 
-Filename template is evaluated at start, so any timestamp (%? markers) will
+Filename template is evaluated at start, so any timestamp (^? markers) will
 relate to date/time of beginning of backup process.
 
 =head2 EXAMPLES
@@ -254,7 +256,7 @@ relate to date/time of beginning of backup process.
 =head3 2 remote, compressed destinations, 1 local, with auto rotated logfile,
 and modified filenames
 
-    /.../omnipitr-master-backup -D /mnt/data/ -l /var/log/omnipitr/backup-%Y-%m-%d.log -dr bzip2=rsync://slave/postgres/backups/ -dr gzip=backups:/mnt/hotbackups/ -dl /mnt/backups/ -f "main-__FILETYPE__-%Y%m%d_%H%M%S.tar__CEXT__"
+    /.../omnipitr-master-backup -D /mnt/data/ -l /var/log/omnipitr/backup-^Y-^m-^d.log -dr bzip2=rsync://slave/postgres/backups/ -dr gzip=backups:/mnt/hotbackups/ -dl /mnt/backups/ -f "main-__FILETYPE__-^Y^m^d_^H^M^S.tar__CEXT__"
 
 =head2 COPYRIGHT
 

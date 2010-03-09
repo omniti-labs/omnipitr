@@ -63,7 +63,9 @@ Passed segment will always be uncompressed.
 =item --log (-l)
 
 Name of logfile (actually template, as it supports %% L<strftime(3)>
-markers
+markers. Unfortunately due to the %x usage by PostgreSQL, We cannot use %%
+macros directly. Instead - any occurence of ^ character in log dir will be first
+changed to %, and later on passed to strftime.
 
 =item --pid-file
 

@@ -11,7 +11,9 @@ Where:
 =item * --log (-l) Points to logfile created by I<OmniPITR> tool that should be monitored.
 
 It can contain strftime-type marks - just like --log argument to other
-I<OmniPITR> programs.
+I<OmniPITR> programs.. Unfortunately due to the %x usage by PostgreSQL, We cannot use %%
+macros directly. Instead - any occurence of ^ character in log dir will be first
+changed to %, and later on passed to strftime.
 
 =item * --check (-c) contains name of check that should be performed.
 
@@ -63,7 +65,7 @@ Where value of from is treated as:
 
 =over
 
-=item * Date time in format: %Y-%m-%d %H:%M:%S (for example: 2009-12-24
+=item * Date time in format: ^Y-^m-^d ^H:^M:^S (for example: 2009-12-24
 15:45:32)
 
 =item * interval, in seconds (for example: 300 - means check last 5 minutes)
@@ -82,20 +84,20 @@ Requires path to log from I<omnipitr-master-backup> or I<omnipitr-slave-backup>
 
 =head3 Getting age of last archive:
 
-    .../omnipitr-monitor -l /var/log/omnipitr/archive-%Y-%m-%d.log -c last-archive-age -s /var/lib/omnipitr
+    .../omnipitr-monitor -l /var/log/omnipitr/archive-^Y-^m-^d.log -c last-archive-age -s /var/lib/omnipitr
 
 =head3 Getting age of last wal restore:
 
-    .../omnipitr-monitor -l /var/log/omnipitr/restore-%Y-%m-%d.log -c last-restore-age -s /var/lib/omnipitr
+    .../omnipitr-monitor -l /var/log/omnipitr/restore-^Y-^m-^d.log -c last-restore-age -s /var/lib/omnipitr
 
 =head3 Getting errors for raporting:
 
-    .../omnipitr-monitor -l /var/log/omnipitr/archive-%Y-%m-%d.log -c errors -s /var/lib/omnipitr
+    .../omnipitr-monitor -l /var/log/omnipitr/archive-^Y-^m-^d.log -c errors -s /var/lib/omnipitr
 
 =head3 Getting errors for raporting, but checking always only last 10 minutes of
 logs:
 
-    .../omnipitr-monitor -l /var/log/omnipitr/archive-%Y-%m-%d.log -c errors -s /var/lib/omnipitr --from=600
+    .../omnipitr-monitor -l /var/log/omnipitr/archive-^Y-^m-^d.log -c errors -s /var/lib/omnipitr --from=600
 
 =head2 COPYRIGHT
 
