@@ -10,7 +10,8 @@ Options:
 
 =item --data-dir (-D)
 
-Where PostgreSQL datadir is located (path)
+Where PostgreSQL datadir is located (path) (defaults to current working
+directory).
 
 =item --source (-s)
 
@@ -43,6 +44,21 @@ to make sure this is safe.
 Name of file to watch for existence. If it exists - I<omnipitr-restore> will not
 remove unneeded wal segments regardless of I<--removal-unneeded> option. This is
 to provide a way to make backups on slave.
+
+=item --pre-removal-processing (-h)
+
+If given, argument will be treated as shell command to run when any segment will
+be removed from archive.
+
+If the hook will finish without errors - segment will be removed. If there will
+be errors - removal procedure will be postponed, and after some time, it will be
+retried.
+
+There will be one extra parameter attached, which will be name of the segment
+file to be processed (prepared in such a way that it will be relative to current
+working directory).
+
+Passed segment will always be uncompressed.
 
 =item --log (-l)
 
@@ -231,11 +247,26 @@ makes the finish I<immediate>
 
 =back
 
+=head3 Segment removal
+
+omnipitr-restore will automatically remove segments that are no longer
+necessary.
+
+To make it happen, it will periodically run I<pg_controldata> program, and check
+name of last segment required for redo.
+
+If pre-removal-processing is defined, it will be called before actuall removal.
+
+omnipitr-restore will remove segments chronologically - oldest segments first.
+
+One useful idea for pre-removal-processing, is using L<omnipitr-archive> for
+processing - to send xlog segments to some permanent storage place.
+
 =head2 EXAMPLES
 
 =head3 Minimal setup:
 
-    restore_command='/.../omnipitr-restore -D /mnt/data/ -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ %f %p'
+    restore_command='/.../omnipitr-restore -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ %f %p'
 
 =head3 Minimal setup, but with defined finish trigger and recovery delay (5
 mintues):
@@ -245,6 +276,10 @@ mintues):
 =head3 Setup as above, but with pause trigger defined for doing backups-on-slave and removing unneeded segments
 
     restore_command='/.../omnipitr-restore -D /mnt/data/ -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ -w 300 -f /tmp/finish.trigger -r -p /tmp/pause.trigger %f %p'
+
+=head3 Minimal setup, but with backing up segments to remote server:
+
+    restore_command='/.../omnipitr-restore -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ -h "/.../omnipitr-archive -l /var/log/omnipitr/archive.log -dr bzip2%rsync://backup/postgres/xlogs/" %f %p'
 
 =head2 COPYRIGHT
 
