@@ -159,7 +159,7 @@ sub make_all_necessary_compressions {
         $self->log->time_finish( 'Compressing with ' . $compression ) if $self->{ 'verbose' };
 
         if ( $response->{ 'error_code' } ) {
-            $self->log->fatal( 'Error while compressing with %s : %s', $compression, $response );
+            $self->log->fatal( 'Error while compressing with %s : %s', $compression, Dumper($response) );
         }
 
         $self->{ 'state' }->{ 'compressed' }->{ $compression } = file_md5sum( $compressed_filename );
