@@ -60,6 +60,11 @@ working directory).
 
 Passed segment will always be uncompressed.
 
+=item --temp-dir (-t)
+
+Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
+variable location). This is only used when using pre-removal-processing.
+
 =item --log (-l)
 
 Name of logfile (actually template, as it supports %% L<strftime(3)>
@@ -77,6 +82,26 @@ Trying to run second copy of I<omnipitr-restore> will result in an error.
 =item --verbose (-v)
 
 Log verbosely what is happening.
+
+=item --gzip-path (-gp)
+
+Full path to gzip program - in case you can't set proper PATH environment
+variable.
+
+=item --bzip2-path (-bp)
+
+Full path to bzip2 program - in case you can't set proper PATH environment
+variable.
+
+=item --lzma-path (-lp)
+
+Full path to lzma program - in case you can't set proper PATH environment
+variable.
+
+=item --pgcontroldata-path (-pp)
+
+Full path to pg_controldata program - in case you can't set proper PATH
+environment variable.
 
 =back
 
@@ -233,19 +258,18 @@ This one works always, regardless of --finish-trigger switch. Generally you can
 send system signals (kill) to I<omnipitr-restore> to make it go to finish
 recovery procedure.
 
-2 signals are supported:
+Only 1 signals are supported:
 
 =over
 
 =item * SIGUSR1
 
-makes the finish I<smart>
-
-=item * SIGUSR2
-
 makes the finish I<immediate>
 
 =back
+
+It is currently not possible to forcing 'smart' finishing by signal, due to
+the fact that L<omnipitr-restore> is restarted after every segment.
 
 =back
 

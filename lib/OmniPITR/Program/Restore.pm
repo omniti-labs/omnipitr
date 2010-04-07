@@ -2,5 +2,265 @@ package OmniPITR::Program::Restore;
 use strict;
 use warnings;
 
-1;
+use base qw( OmniPITR::Program );
 
+use Carp;
+use OmniPITR::Tools qw( :all );
+use English qw( -no_match_vars );
+use File::Basename;
+use File::Spec;
+use File::Path qw( make_path remove_tree );
+use File::Copy;
+use Storable;
+use Getopt::Long;
+
+=head1 run()
+
+Main function, called by actual script in bin/, wraps all work done by script with the sole exception of reading and validating command line arguments.
+
+These tasks (reading and validating arguments) are in this module, but they are called from L<OmniPITR::Program::new()>
+
+Name of called method should be self explanatory, and if you need further information - simply check doc for the method you have questions about.
+
+=cut
+
+sub run {
+    my $self = shift;
+
+    $SIG{ 'USR1' } = sub {
+        $self->{ 'finish' } = 'immediate';
+        return;
+    };
+
+    while ( 1 ) {
+        $self->try_to_restore_and_exit();
+        sleep 1;
+        next if $self->{ 'finish' };
+        $self->check_for_trigger_file();
+        next if $self->{ 'finish' };
+        $self->do_some_removal();
+    }
+}
+
+sub do_some_removal {
+    my $self = shift;
+    return unless $self->{ 'remove-unneeded' };
+    if ( $self->{ 'removal-pause-trigger' } ) {
+        return if -e $self->{ 'removal-pause-trigger' };
+    }
+}
+
+sub try_to_restore_and_exit {
+    my $self = shift;
+
+    if ( $self->{ 'finish' } eq 'immediate' ) {
+        $self->log->error( 'Got immediate finish request. Dying.' );
+        $self->exit_with_status( 1 );
+    }
+
+    my $wanted_file = File::Spec->catfile( $self->{ 'source' }->{ 'path' }, $self->{ 'segment' } );
+    $wanted_file .= ext_for_compression( $self->{ 'source' }->{ 'compression' } ) if $self->{ 'source' }->{ 'compression' };
+
+    unless ( -e $wanted_file ) {
+        if ( $self->{ 'finish' } ) {
+            $self->log->error( 'Got finish request. Dying.' );
+            $self->exit_with_status( 1 );
+        }
+    }
+
+    if (   ( $self->{ 'recovery-delay' } )
+        && ( !$self->{ 'finish' } ) )
+    {
+        my @file_info  = stat( $wanted_file );
+        my $file_mtime = $file_info[ 9 ];
+        my $ok_since   = time - $self->{ 'recovery-delay' };
+        if ( $ok_since > $file_mtime ) {
+            if ( $self->{ 'verbose' } ) {
+                unless ( $self->{ 'logged_delay' } ) {
+                    $self->log->log( 'Segment %s found, but it is too fresh (mtime = %u, accepted since %u)', $self->{ 'segment' }, $file_mtime, $ok_since );
+                    $self->{ 'logged_delay' } = 1;
+                }
+            }
+            return;
+        }
+    }
+
+    my $full_destination = File::Spec->catfile( $self->{ 'data-dir' }, $self->{ 'segment_destination' } );
+
+    unless ( $self->{ 'source' }->{ 'compression' } ) {
+        if ( copy( $wanted_file, $full_destination ) ) {
+            $self->log->log( 'Segment %s restored, from non-compressed source.', $self->{ 'segment' } );
+            $self->exit_with_status( 0 );
+        }
+        $self->log->error( 'Segment %s restoration failed: %s.', $self->{ 'segment' }, $OS_ERROR );
+        $self->exit_with_status( 1 );
+    }
+
+    my $compression = $self->{ 'source' }->{ 'compression' };
+    my $command = sprintf '%s --decompress --stdout %s > %s', quotemeta( $self->{ "$compression-path" } ), quotemeta( $wanted_file ), quotemeta( $full_destination );
+
+    $self->prepare_temp_directory();
+
+    my $response = run_command( $self->{ 'temp-dir' }, 'bash', '-c', $command );
+
+    if ( $response->{ 'error_code' } ) {
+        $self->log->error( 'Error while decompressing with %s : %s', $compression, Dumper( $response ) );
+        $self->exit_with_status( 1 );
+    }
+
+    $self->log->log( 'Segment %s restored, from %s compressed source.', $self->{ 'segment' }, $compression, );
+    $self->exit_with_status( 0 );
+}
+
+sub check_for_trigger_file {
+    my $self = shift;
+
+    return unless $self->{ 'finish-trigger' };
+    return unless -e $self->{ 'finish-trigger' };
+
+    if ( open my $fh, '<', $self->{ 'finish-trigger' } ) {
+        local $INPUT_RECORD_SEPARATOR = undef;
+        my $content = <$fh>;
+        close $fh;
+
+        $self->{ 'finish' } = $content =~ m{\ANOW\n?\z} ? 'immediate' : 'smart';
+
+        $self->log->log( 'Finish trigger found, %s mode.', $self->{ 'finish' } );
+        return;
+    }
+    $self->log->fatal( 'Finish trigger (%s) exists, but cannot be open?! : %s', $self->{ 'finish-trigger' }, $OS_ERROR );
+}
+
+=head1 exit_with_status()
+
+Exit function, doing cleanup (remove temp-dir), and exiting with given status.
+
+=cut
+
+sub exit_with_status {
+    my $self = shift;
+    my $code = shift;
+
+    remove_tree( $self->{ 'temp-dir' } ) if $self->{ 'temp-dir-prepared' };
+
+    exit( $code );
+}
+
+=head1 prepare_temp_directory()
+
+Helper function, which builds path for temp directory, and creates it.
+
+Path is generated by using given temp-dir and 'omnipitr-restore' name.
+
+For example, for temp-dir '/tmp', actual, used temp directory would be /tmp/omnipitr-restore/.
+
+=cut
+
+sub prepare_temp_directory {
+    my $self = shift;
+    return if $self->{ 'temp-dir-prepared' };
+    my $full_temp_dir = File::Spec->catfile( $self->{ 'temp-dir' }, basename( $PROGRAM_NAME ) );
+    make_path( $full_temp_dir );
+    $self->{ 'temp-dir' }          = $full_temp_dir;
+    $self->{ 'temp-dir-prepared' } = 1;
+    return;
+}
+
+=head1 read_args()
+
+Function which does all the parsing, and transformation of command line arguments.
+
+It also verified base facts about passed WAL segment name, but all other validations, are being done in separate function: L<validate_args()>.
+
+=cut
+
+sub read_args {
+    my $self = shift;
+
+    my @argv_copy = @ARGV;
+
+    my %args = (
+        'bzip2-path'         => 'bzip2',
+        'data-dir'           => '.',
+        'gzip-path'          => 'gzip',
+        'lzma-path'          => 'lzma',
+        'pgcontroldata-path' => 'pg_controldata',
+        'temp-dir'           => $ENV{ 'TMPDIR' } || '/tmp',
+    );
+
+    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
+        unless GetOptions(
+        \%args,
+        'bzip2-path|bp=s',
+        'data-dir|D=s',
+        'finish-trigger|f=s',
+        'gzip-path|gp=s',
+        'log|l=s',
+        'lzma-path|lp=s',
+        'pgcontroldata-path|pp=s',
+        'pid-file=s',
+        'pre-removal-processing|h=s',
+        'recovery-delay|w=i',
+        'removal-pause-trigger|p=s',
+        'remove-unneeded|r=s',
+        'source|s=s',
+        'temp-dir|t=s',
+        'verbose|v',
+        );
+
+    croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
+    $args{ 'log' } =~ tr/^/%/;
+
+    for my $key ( keys %args ) {
+        next if $key =~ m{ \A (?: source | log ) \z }x;    # Skip those, not needed in $self
+        $self->{ $key } = $args{ $key };
+    }
+
+    # We do it here so it will actually work for reporing problems in validation
+    $self->{ 'log_template' } = $args{ 'log' };
+    $self->{ 'log' }          = OmniPITR::Log->new( $self->{ 'log_template' } );
+
+    $self->log->fatal( 'Source path not provided!' ) unless $args{ 'source' };
+
+    if ( $args{ 'source' } =~ s/\A(gzip|bzip2|lzma)=// ) {
+        $self->{ 'source' }->{ 'compression' } = $1;
+    }
+    $self->{ 'source' }->{ 'path' } = $args{ 'source' };
+
+    # These could theoretically go into validation, but we need to check if we can get anything to put in segment* keys in $self
+    $self->log->fatal( 'WAL segment file name and/or destination have not been given' ) if 2 > scalar @ARGV;
+    $self->log->fatal( 'Too many arguments given.' ) if 2 < scalar @ARGV;
+
+    @{ $self }{ qw( segment segment_destination ) } = @ARGV;
+
+    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->{ 'verbose' };
+
+    $self->{ 'finish' } = '';
+
+    return;
+}
+
+=head1 validate_args()
+
+Does all necessary validation of given command line arguments.
+
+One exception is for compression programs paths - technically, it could be validated in here, but benefit would be pretty limited, and code to do so relatively complex, as compression program path
+might, but doesn't have to be actual file path - it might be just program name (without path), which is the default.
+
+=cut
+
+sub validate_args {
+    my $self = shift;
+
+    $self->log->fatal( 'Given data-dir (%s) is not valid', $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' } && -f File::Spec->catfile( $self->{ 'data-dir' }, 'PG_VERSION' );
+
+    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{\A[a-f0-9]{24}\z};
+
+    $self->log->fatal( 'Given source (%s) is not a directory', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
+    $self->log->fatal( 'Given source (%s) is not readable',    $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };
+    $self->log->fatal( 'Given source (%s) is not writable',    $self->{ 'source' }->{ 'path' } ) unless -w $self->{ 'source' }->{ 'path' };
+
+    return;
+}
+
+1;
