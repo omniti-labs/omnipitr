@@ -121,7 +121,7 @@ sub get_list_of_segments_to_remove {
     my @too_old = ();
     for my $file ( @content ) {
         $file =~ s/\Q$extension\E\z//;
-        next unless $file =~ m{\A[a-f0-9]{24}\z};
+        next unless $file =~ m{\A[a-fA-F0-9]{24}\z};
         next unless $file lt $last_important;
         push @too_old, $file;
     }
@@ -400,7 +400,7 @@ sub validate_args {
 
     $self->log->fatal( 'Given data-dir (%s) is not valid', $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' } && -f File::Spec->catfile( $self->{ 'data-dir' }, 'PG_VERSION' );
 
-    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{\A[a-f0-9]{24}\z};
+    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{\A[a-fA-F0-9]{24}\z};
 
     $self->log->fatal( 'Given source (%s) is not a directory', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Given source (%s) is not readable',    $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };

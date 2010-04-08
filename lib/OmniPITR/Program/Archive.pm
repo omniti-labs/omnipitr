@@ -369,7 +369,7 @@ sub validate_args {
         $self->log->fatal( "Given --state-dir (%s) is not writable",    $self->{ 'state-dir' } ) unless -w $self->{ 'state-dir' };
     }
 
-    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless basename( $self->{ 'segment' } ) =~ m{\A[a-f0-9]{24}\z};
+    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless basename( $self->{ 'segment' } ) =~ m{\A[a-fA-F0-9]{24}\z};
     my $segment_file_name = $self->{ 'segment' };
     $segment_file_name = File::Spec->catfile( $self->{ 'data-dir' }, $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{^/};
 
