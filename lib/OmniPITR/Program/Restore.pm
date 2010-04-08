@@ -137,8 +137,8 @@ sub get_last_redo_segment {
     my $self = shift;
     my $CD   = shift;
 
-    my $segment  = $control_data->{ "Latest checkpoint's REDO location" };
-    my $timeline = $control_data->{ "Latest checkpoint's TimeLineID" };
+    my $segment  = $CD->{ "Latest checkpoint's REDO location" };
+    my $timeline = $CD->{ "Latest checkpoint's TimeLineID" };
 
     my ( $series, $offset ) = split m{/}, $segment;
 
