@@ -13,6 +13,7 @@ use File::Path qw( make_path remove_tree );
 use File::Copy;
 use Storable;
 use Getopt::Long;
+use Cwd;
 
 =head1 run()
 
@@ -44,10 +45,142 @@ sub run {
 
 sub do_some_removal {
     my $self = shift;
+
     return unless $self->{ 'remove-unneeded' };
-    if ( $self->{ 'removal-pause-trigger' } ) {
-        return if -e $self->{ 'removal-pause-trigger' };
+
+    return if $self->{ 'removal-pause-trigger' } && -e $self->{ 'removal-pause-trigger' };
+
+    my $control_data = $self->get_control_data();
+    return unless $control_data;
+
+    my $last_important = $self->get_last_redo_segment( $control_data );
+    return unless $last_important;
+
+    my @to_be_removed = $self->get_list_of_segments_to_remove( $last_important );
+    return if 0 == scalar @to_be_removed;
+
+    for my $segment_name ( @to_be_removed ) {
+        return unless $self->handle_pre_removal_processing( $segment_name );
+
+        my $segment_file_name = File::Spec->catfile( $self->{ 'source' }->{ 'path' }, $segment_name );
+        $segment_file_name .= ext_for_compression( $self->{ 'source' }->{ 'compression' } ) if $self->{ 'source' }->{ 'compression' };
+        my $result = unlink $segment_file_name;
+        unless ( 1 == $result ) {
+            $self->log->error( 'Error while unlinking %s : %s', $segment_file_name, $OS_ERROR );
+            return;
+        }
+        $self->log->log( 'Segment %s (%s) removed, as it is too old (older than %s)', $segment_name, $segment_file_name, $last_important );
     }
+    return;
+}
+
+sub handle_pre_removal_processing {
+    my $self         = shift;
+    my $segment_name = shift;
+    return unless $self->{ 'pre-removal-processing' };
+
+    $self->prepare_temp_directory();
+    my $xlog_dir  = File::Spec->catfile( $self->{ 'temp-dir' }, 'pg_xlog' );
+    my $xlog_file = File::Spec->catfile( $xlog_dir,             $segment_name );
+    make_path( $xlog_dir );
+
+    my $response = $self->copy_segment_to( $segment_name, $xlog_file );
+    if ( $response ) {
+        $self->log->error( 'Error while copying segment for pre removal processing for %s : %s', $segment_name, $response );
+        return;
+    }
+
+    my $previous_dir = gwtcwd();
+    chdir $self->{ 'temp-dir' };
+    my $full_command = $self->{ 'pre-removal-processing' } . " pg_xlog/$segment_name";
+    my $result = run_command( $self->{ 'tempdir' }, 'bash', '-c', $full_command );
+    chdir $previous_dir;
+
+    remove_tree( $xlog_dir );
+    return 1 unless $result->{ 'error_code' };
+
+    $self->log->error( 'Error while calling pre removal processing [%s] : %s', $full_command, Dumper( $result ) );
+
+    return;
+}
+
+sub get_list_of_segments_to_remove {
+    my $self           = shift;
+    my $last_important = shift;
+
+    my $extension = ext_for_compression( $self->{ 'source' }->{ 'compression' } ) if $self->{ 'source' }->{ 'compression' };
+    my $dir;
+
+    unless ( opendir( $dir, $self->{ 'source' } ) ) {
+        $self->log->error( 'Cannot open source directory (%s) for reading: %s', $self->{ 'source' }->{ 'path' }, $OS_ERROR );
+        return;
+    }
+    my @content = readdir $dir;
+    closedir $dir;
+
+    my @too_old = ();
+    for my $file ( @content ) {
+        $file =~ s/\Q$extension\E\z//;
+        next unless $file =~ m{\A[a-f0-9]{24}\z};
+        next unless $file lt $last_important;
+        push @too_old, $file;
+    }
+    return if 0 == scalar @too_old;
+
+    my @sorted = sort @too_old;
+    splice( @sorted, $self->{ 'remove-at-a-time' } );
+
+    return @sorted;
+}
+
+sub get_last_redo_segment {
+    my $self = shift;
+    my $CD   = shift;
+
+    my $segment  = $control_data->{ "Latest checkpoint's REDO location" };
+    my $timeline = $control_data->{ "Latest checkpoint's TimeLineID" };
+
+    my ( $series, $offset ) = split m{/}, $segment;
+
+    $offset =~ s/.{6}$//;
+
+    my $segment_filename = sprintf '%08s%08s%08s', $timeline, $series, $offset;
+
+    return $segment_filename;
+}
+
+sub get_control_data {
+    my $self = shift;
+
+    $self->prepare_temp_directory();
+
+    my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'pgcontroldata-path' }, $self->{ 'data-dir' } );
+    if ( $response->{ 'error_code' } ) {
+        $self->log->error( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, Dumper( $response ) );
+        return;
+    }
+
+    my $control_data = {};
+
+    my @lines = split( /\s*\n/, $response->{ 'stdout' } );
+    for my $line ( @lines ) {
+        unless ( $line =~ m{\A([^:]+):\s*(.*)\z} ) {
+            $self->log->error( 'Pg_controldata for %s contained unparseable line: [%s]', $self->{ 'data-dir' }, $line );
+            $self->exit_with_status( 1 );
+        }
+        $control_data->{ $1 } = $2;
+    }
+
+    unless ( $control_data->{ "Latest checkpoint's REDO location" } ) {
+        $self->log->error( 'Pg_controldata for %s did not contain latest checkpoint redo location', $self->{ 'data-dir' } );
+        return;
+    }
+    unless ( $control_data->{ "Latest checkpoint's TimeLineID" } ) {
+        $self->log->error( 'Pg_controldata for %s did not contain latest checkpoint timeline ID', $self->{ 'data-dir' } );
+        return;
+    }
+
+    return $control_data;
 }
 
 sub try_to_restore_and_exit {
@@ -87,29 +220,40 @@ sub try_to_restore_and_exit {
 
     my $full_destination = File::Spec->catfile( $self->{ 'data-dir' }, $self->{ 'segment_destination' } );
 
-    unless ( $self->{ 'source' }->{ 'compression' } ) {
-        if ( copy( $wanted_file, $full_destination ) ) {
-            $self->log->log( 'Segment %s restored, from non-compressed source.', $self->{ 'segment' } );
-            $self->exit_with_status( 0 );
-        }
-        $self->log->error( 'Segment %s restoration failed: %s.', $self->{ 'segment' }, $OS_ERROR );
+    my $response = $self->copy_segment_to( $self->{ 'segment' }, $full_destination );
+
+    if ( $response ) {
+        $self->log->error( $response );
         $self->exit_with_status( 1 );
     }
 
+    $self->log->log( 'Segment %s restored', $self->{ 'segment' } );
+    $self->exit_with_status( 0 );
+}
+
+sub copy_segment_to {
+    my $self = shift;
+    my ( $segment_name, $destination ) = @_;
+
+    my $wanted_file = File::Spec->catfile( $self->{ 'source' }->{ 'path' }, $segment_name );
+    $wanted_file .= ext_for_compression( $self->{ 'source' }->{ 'compression' } ) if $self->{ 'source' }->{ 'compression' };
+
+    unless ( $self->{ 'source' }->{ 'compression' } ) {
+        if ( copy( $wanted_file, $destination ) ) {
+            return;
+        }
+        return sprintf( 'Copying %s to %s failed: %s', $wanted_file, $destination, $OS_ERROR );
+    }
+
     my $compression = $self->{ 'source' }->{ 'compression' };
-    my $command = sprintf '%s --decompress --stdout %s > %s', quotemeta( $self->{ "$compression-path" } ), quotemeta( $wanted_file ), quotemeta( $full_destination );
+    my $command = sprintf '%s --decompress --stdout %s > %s', quotemeta( $self->{ "$compression-path" } ), quotemeta( $wanted_file ), quotemeta( $destination );
 
     $self->prepare_temp_directory();
 
     my $response = run_command( $self->{ 'temp-dir' }, 'bash', '-c', $command );
 
-    if ( $response->{ 'error_code' } ) {
-        $self->log->error( 'Error while decompressing with %s : %s', $compression, Dumper( $response ) );
-        $self->exit_with_status( 1 );
-    }
-
-    $self->log->log( 'Segment %s restored, from %s compressed source.', $self->{ 'segment' }, $compression, );
-    $self->exit_with_status( 0 );
+    return sprintf( 'Uncompressing %s to %s failed: %s', $wanted_file, $destination, Dumper( $response ) ) if $response->{ 'error_code' };
+    return;
 }
 
 sub check_for_trigger_file {
@@ -185,6 +329,7 @@ sub read_args {
         'gzip-path'          => 'gzip',
         'lzma-path'          => 'lzma',
         'pgcontroldata-path' => 'pg_controldata',
+        'remove-at-a-time'   => 3,
         'temp-dir'           => $ENV{ 'TMPDIR' } || '/tmp',
     );
 
@@ -200,6 +345,7 @@ sub read_args {
         'pgcontroldata-path|pp=s',
         'pid-file=s',
         'pre-removal-processing|h=s',
+        'remove-at-a-time|rt=i',
         'recovery-delay|w=i',
         'removal-pause-trigger|p=s',
         'remove-unneeded|r=s',

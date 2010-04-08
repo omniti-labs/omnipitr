@@ -39,6 +39,13 @@ Makes I<omnipitr-restore> remove unneeded wal segments. These are B<not>
 segments that were passed to Pg - I<omnipitr-restore> checks last redo segment
 to make sure this is safe.
 
+=item --remove-at-a-time (-rt)
+
+When removing old segments, remove at most that many segments before re-entering
+loop to check for signals and/or new segment availability for Postgres.
+
+Defaults to 3.
+
 =item --removal-pause-trigger (-p)
 
 Name of file to watch for existence. If it exists - I<omnipitr-restore> will not
@@ -305,7 +312,7 @@ mintues):
 
 =head3 Minimal setup, but with backing up segments to remote server:
 
-    restore_command='/.../omnipitr-restore -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ -h "/.../omnipitr-archive -l /var/log/omnipitr/archive.log -dr bzip2=rsync://backup/postgres/xlogs/" %f %p'
+    restore_command='/.../omnipitr-restore -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ -h "/.../omnipitr-archive --force-data-dir -l /var/log/omnipitr/archive.log -dr bzip2=rsync://backup/postgres/xlogs/" %f %p'
 
 =head2 COPYRIGHT
 
