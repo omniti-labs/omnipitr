@@ -105,7 +105,7 @@ It basically removes tempdir with compressed copies of segment, and state file f
 sub cleanup {
     my $self = shift;
     remove_tree( $self->{ 'temp-dir' } );
-    unlink $self->{ 'state-file' };
+    unlink $self->{ 'state-file' } if $self->{ 'state-file' };
     return;
 }
 
