@@ -12,6 +12,7 @@ use File::Spec;
 use File::Path qw( make_path remove_tree );
 use File::Copy;
 use Storable;
+use Data::Dumper;
 use Getopt::Long;
 use Cwd;
 
@@ -77,14 +78,18 @@ sub do_some_removal {
 sub handle_pre_removal_processing {
     my $self         = shift;
     my $segment_name = shift;
-    return unless $self->{ 'pre-removal-processing' };
+    return 1 unless $self->{ 'pre-removal-processing' };
 
     $self->prepare_temp_directory();
     my $xlog_dir  = File::Spec->catfile( $self->{ 'temp-dir' }, 'pg_xlog' );
     my $xlog_file = File::Spec->catfile( $xlog_dir,             $segment_name );
     make_path( $xlog_dir );
 
+    my $comment = 'Copying segment ' . $segment_name . ' to ' . $xlog_file;
+    $self->log->time_start( $comment ) if $self->{ 'verbose' };
     my $response = $self->copy_segment_to( $segment_name, $xlog_file );
+    $self->log->time_finish( $comment ) if $self->{ 'verbose' };
+
     if ( $response ) {
         $self->log->error( 'Error while copying segment for pre removal processing for %s : %s', $segment_name, $response );
         return;
@@ -92,14 +97,21 @@ sub handle_pre_removal_processing {
 
     my $previous_dir = gwtcwd();
     chdir $self->{ 'temp-dir' };
+
     my $full_command = $self->{ 'pre-removal-processing' } . " pg_xlog/$segment_name";
+
+    my $comment = 'Running pre-removal-processing command: ' . $full_command;
+
+    $self->log->time_start( $comment ) if $self->{ 'verbose' };
     my $result = run_command( $self->{ 'tempdir' }, 'bash', '-c', $full_command );
+    $self->log->time_finish( $comment ) if $self->{ 'verbose' };
+
     chdir $previous_dir;
 
     remove_tree( $xlog_dir );
     return 1 unless $result->{ 'error_code' };
 
-    $self->log->error( 'Error while calling pre removal processing [%s] : %s', $full_command, Dumper( $result ) );
+    $self->log->error( 'Error while calling pre removal processing [%s] : %s', $full_command, $result );
 
     return;
 }
@@ -111,7 +123,7 @@ sub get_list_of_segments_to_remove {
     my $extension = ext_for_compression( $self->{ 'source' }->{ 'compression' } ) if $self->{ 'source' }->{ 'compression' };
     my $dir;
 
-    unless ( opendir( $dir, $self->{ 'source' } ) ) {
+    unless ( opendir( $dir, $self->{ 'source' }->{ 'path' } ) ) {
         $self->log->error( 'Cannot open source directory (%s) for reading: %s', $self->{ 'source' }->{ 'path' }, $OS_ERROR );
         return;
     }
@@ -121,11 +133,13 @@ sub get_list_of_segments_to_remove {
     my @too_old = ();
     for my $file ( @content ) {
         $file =~ s/\Q$extension\E\z//;
-        next unless $file =~ m{\A[a-fA-F0-9]{24}\z};
+        next unless $file =~ m{\A[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?\z};
         next unless $file lt $last_important;
         push @too_old, $file;
     }
     return if 0 == scalar @too_old;
+
+    $self->log->log( '%u segments too old, to be removed.', scalar @too_old ) if $self->{ 'verbose' };
 
     my @sorted = sort @too_old;
     splice( @sorted, $self->{ 'remove-at-a-time' } );
@@ -156,7 +170,7 @@ sub get_control_data {
 
     my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'pgcontroldata-path' }, $self->{ 'data-dir' } );
     if ( $response->{ 'error_code' } ) {
-        $self->log->error( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, Dumper( $response ) );
+        $self->log->error( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, $response );
         return;
     }
 
@@ -199,6 +213,7 @@ sub try_to_restore_and_exit {
             $self->log->error( 'Got finish request. Dying.' );
             $self->exit_with_status( 1 );
         }
+        return;
     }
 
     if (   ( $self->{ 'recovery-delay' } )
@@ -206,13 +221,13 @@ sub try_to_restore_and_exit {
     {
         my @file_info  = stat( $wanted_file );
         my $file_mtime = $file_info[ 9 ];
-        my $ok_since   = time - $self->{ 'recovery-delay' };
-        if ( $ok_since > $file_mtime ) {
-            if ( $self->{ 'verbose' } ) {
-                unless ( $self->{ 'logged_delay' } ) {
-                    $self->log->log( 'Segment %s found, but it is too fresh (mtime = %u, accepted since %u)', $self->{ 'segment' }, $file_mtime, $ok_since );
-                    $self->{ 'logged_delay' } = 1;
-                }
+        my $ok_since   = time() - $self->{ 'recovery-delay' };
+        if ( $ok_since <= $file_mtime ) {
+            if (   ( $self->{ 'verbose' } )
+                && ( !$self->{ 'logged_delay' } ) )
+            {
+                $self->log->log( 'Segment %s found, but it is too fresh (mtime = %u, accepted since %u)', $self->{ 'segment' }, $file_mtime, $ok_since );
+                $self->{ 'logged_delay' } = 1;
             }
             return;
         }
@@ -220,7 +235,10 @@ sub try_to_restore_and_exit {
 
     my $full_destination = File::Spec->catfile( $self->{ 'data-dir' }, $self->{ 'segment_destination' } );
 
+    my $comment = 'Copying segment ' . $self->{ 'segment' } . ' to ' . $full_destination;
+    $self->log->time_start( $comment ) if $self->{ 'verbose' };
     my $response = $self->copy_segment_to( $self->{ 'segment' }, $full_destination );
+    $self->log->time_finish( $comment ) if $self->{ 'verbose' };
 
     if ( $response ) {
         $self->log->error( $response );
@@ -333,7 +351,7 @@ sub read_args {
         'temp-dir'           => $ENV{ 'TMPDIR' } || '/tmp',
     );
 
-    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
+    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-restore.pod' )
         unless GetOptions(
         \%args,
         'bzip2-path|bp=s',
@@ -348,7 +366,7 @@ sub read_args {
         'remove-at-a-time|rt=i',
         'recovery-delay|w=i',
         'removal-pause-trigger|p=s',
-        'remove-unneeded|r=s',
+        'remove-unneeded|r',
         'source|s=s',
         'temp-dir|t=s',
         'verbose|v',
@@ -379,9 +397,9 @@ sub read_args {
 
     @{ $self }{ qw( segment segment_destination ) } = @ARGV;
 
-    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->{ 'verbose' };
-
     $self->{ 'finish' } = '';
+
+    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->{ 'verbose' };
 
     return;
 }
@@ -400,7 +418,7 @@ sub validate_args {
 
     $self->log->fatal( 'Given data-dir (%s) is not valid', $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' } && -f File::Spec->catfile( $self->{ 'data-dir' }, 'PG_VERSION' );
 
-    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{\A[a-fA-F0-9]{24}\z};
+    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{\A[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?\z};
 
     $self->log->fatal( 'Given source (%s) is not a directory', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Given source (%s) is not readable',    $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };
