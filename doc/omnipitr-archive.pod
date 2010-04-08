@@ -12,6 +12,11 @@ Options:
 
 Where PostgreSQL datadir is located (path)
 
+=item --force-data-dir (-f)
+
+Forces usage of given (or default) data dir even if it doesn't look like
+PostgreSQL data directory.
+
 =item --dst-local (-dl)
 
 Where to copy the wal segment on current server (path) (you can provide many of

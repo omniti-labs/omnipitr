@@ -159,7 +159,7 @@ sub make_all_necessary_compressions {
         $self->log->time_finish( 'Compressing with ' . $compression ) if $self->{ 'verbose' };
 
         if ( $response->{ 'error_code' } ) {
-            $self->log->fatal( 'Error while compressing with %s : %s', $compression, Dumper($response) );
+            $self->log->fatal( 'Error while compressing with %s : %s', $compression, Dumper( $response ) );
         }
 
         $self->{ 'state' }->{ 'compressed' }->{ $compression } = file_md5sum( $compressed_filename );
@@ -292,6 +292,7 @@ sub read_args {
         'data-dir|D=s',
         'dst-local|dl=s@',
         'dst-remote|dr=s@',
+        'force-data-dir|f',
         'gzip-path|gp=s',
         'log|l=s',
         'lzma-path|lp=s',
@@ -354,7 +355,9 @@ might, but doesn't have to be actual file path - it might be just program name (
 sub validate_args {
     my $self = shift;
 
-    $self->log->fatal( "Given data-dir (%s) is not valid", $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' } && -f File::Spec->catfile( $self->{ 'data-dir' }, 'PG_VERSION' );
+    unless ( $self->{ 'force-data-dir' } ) {
+        $self->log->fatal( "Given data-dir (%s) is not valid", $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' } && -f File::Spec->catfile( $self->{ 'data-dir' }, 'PG_VERSION' );
+    }
 
     my $dst_count = scalar( @{ $self->{ 'destination' }->{ 'local' } } ) + scalar( @{ $self->{ 'destination' }->{ 'remote' } } );
     $self->log->fatal( "No --dst-* has been provided!" ) if 0 == $dst_count;
