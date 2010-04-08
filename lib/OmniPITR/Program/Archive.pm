@@ -159,7 +159,7 @@ sub make_all_necessary_compressions {
         $self->log->time_finish( 'Compressing with ' . $compression ) if $self->{ 'verbose' };
 
         if ( $response->{ 'error_code' } ) {
-            $self->log->fatal( 'Error while compressing with %s : %s', $compression, Dumper( $response ) );
+            $self->log->fatal( 'Error while compressing with %s : %s', $compression, $response );
         }
 
         $self->{ 'state' }->{ 'compressed' }->{ $compression } = file_md5sum( $compressed_filename );
@@ -369,7 +369,7 @@ sub validate_args {
         $self->log->fatal( "Given --state-dir (%s) is not writable",    $self->{ 'state-dir' } ) unless -w $self->{ 'state-dir' };
     }
 
-    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless basename( $self->{ 'segment' } ) =~ m{\A[a-fA-F0-9]{24}\z};
+    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless basename( $self->{ 'segment' } ) =~ m{\A[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?\z};
     my $segment_file_name = $self->{ 'segment' };
     $segment_file_name = File::Spec->catfile( $self->{ 'data-dir' }, $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{^/};
 
@@ -377,9 +377,11 @@ sub validate_args {
     $self->log->fatal( 'Given segment (%s) is not a file.',   $segment_file_name ) unless -f $segment_file_name;
     $self->log->fatal( 'Given segment (%s) is not readable.', $segment_file_name ) unless -r $segment_file_name;
 
-    my $expected_size = 256**3;
-    my $file_size     = ( -s $segment_file_name );
-    $self->log->fatal( 'Given segment (%s) has incorrect size (%u vs %u).', $segment_file_name, $file_size, $expected_size ) unless $expected_size == $file_size;
+    unless ( $self->{ 'segment' } =~ m{\.backup\z} ) {
+        my $expected_size = 256**3;
+        my $file_size     = ( -s $segment_file_name );
+        $self->log->fatal( 'Given segment (%s) has incorrect size (%u vs %u).', $segment_file_name, $file_size, $expected_size ) unless $expected_size == $file_size;
+    }
 
     $self->{ 'segment' } = $segment_file_name;
     return;
