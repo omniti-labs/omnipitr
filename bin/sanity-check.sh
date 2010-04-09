@@ -1,7 +1,7 @@
 #!/bin/bash
 
-BIN_DIR=$( readlink -f $( dirname $0 ) )
-LIB_DIR=$( readlink -f $( dirname $0 )/../lib )
+BIN_DIR=$( perl -le 'use Cwd qw(realpath); print realpath(shift)' "$( dirname $0 )" )
+LIB_DIR=$( perl -le 'use Cwd qw(realpath); print realpath(shift)' "$( dirname $0 )/../lib" )
 
 echo "Checking:"
 echo "- $BIN_DIR"
