@@ -60,7 +60,7 @@ done
 
 # modules check
 
-for MODULE in $( egrep "^use" "$BIN_DIR"/omnipitr-* $( find "$LIB_DIR" -name '*.pm' -print ) | perl -pe 's/.*:use\s*//; s/[;\s].*//' | sort | uniq )
+for MODULE in $( egrep "^use" "$BIN_DIR"/omnipitr-* $( find "$LIB_DIR" -name '*.pm' -print ) | perl -pe 's/.*:use\s*//; s/[;\s].*//' | egrep -v '^OmniPITR' | sort | uniq )
 do
     if ! perl -I"$LIB_DIR" -e "use $MODULE" &>/dev/null
     then
