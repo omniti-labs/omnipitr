@@ -49,7 +49,13 @@ sub do_some_removal {
 
     return unless $self->{ 'remove-unneeded' };
 
-    return if $self->{ 'removal-pause-trigger' } && -e $self->{ 'removal-pause-trigger' };
+    if ( $self->{ 'removal-pause-trigger' } && -e $self->{ 'removal-pause-trigger' } ) {
+        unless ( $self->{ 'trigger-logged' } ) {
+            $self->{ 'trigger-logged' }++;
+            $self->log->log( 'Pause trigger exists (%s), NOT removing any old segments.', $self->{ 'removal-pause-trigger' } );
+        }
+        return;
+    }
 
     my $control_data = $self->get_control_data();
     return unless $control_data;
@@ -95,12 +101,12 @@ sub handle_pre_removal_processing {
         return;
     }
 
-    my $previous_dir = gwtcwd();
+    my $previous_dir = getcwd();
     chdir $self->{ 'temp-dir' };
 
     my $full_command = $self->{ 'pre-removal-processing' } . " pg_xlog/$segment_name";
 
-    my $comment = 'Running pre-removal-processing command: ' . $full_command;
+    $comment = 'Running pre-removal-processing command: ' . $full_command;
 
     $self->log->time_start( $comment ) if $self->{ 'verbose' };
     my $result = run_command( $self->{ 'tempdir' }, 'bash', '-c', $full_command );
