@@ -305,7 +305,7 @@ sub read_args {
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
     $args{ 'log' } =~ tr/^/%/;
 
-    for my $key ( qw( data-dir temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path ) ) {
+    for my $key ( qw( data-dir temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path force-data-dir ) ) {
         $self->{ $key } = $args{ $key };
     }
 
