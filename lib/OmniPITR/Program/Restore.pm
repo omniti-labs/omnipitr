@@ -18,11 +18,16 @@ use Cwd;
 
 =head1 run()
 
-Main function, called by actual script in bin/, wraps all work done by script with the sole exception of reading and validating command line arguments.
+Main function, called by actual script in bin/, wraps all work done by
+script with the sole exception of reading and validating command line
+arguments.
 
-These tasks (reading and validating arguments) are in this module, but they are called from L<OmniPITR::Program::new()>
+These tasks (reading and validating arguments) are in this module, but
+they are called from L<OmniPITR::Program::new()>
 
-Name of called method should be self explanatory, and if you need further information - simply check doc for the method you have questions about.
+Name of called method should be self explanatory, and if you need
+further information - simply check doc for the method you have questions
+about.
 
 =cut
 
@@ -43,6 +48,16 @@ sub run {
         $self->do_some_removal();
     }
 }
+
+=head1 do_some_removal()
+
+Wraps all work necessary to remove obsolete WAL segments from archive.
+
+Contains actual I<unlink> calls, but all other work (checking
+pg_controldata, extracting last REDO segment, getting list of files to
+remove, calling pre-removal hook) is delegated to dedicated methods.
+
+=cut
 
 sub do_some_removal {
     my $self = shift;
@@ -80,6 +95,33 @@ sub do_some_removal {
     }
     return;
 }
+
+=head1 handle_pre_removal_processing()
+
+Before removing obsolete WAL segment, I<omnipitr-restore> can call
+arbitrary program to do whatever is necessary - for example - to send
+the WAL segment to backup server.
+
+This is done in here. Each segment is first uncompressed to temporary
+directory, and then given program is called.
+
+Temporary directory is always made so that it "looks" like it was called
+by archive-command from PostgreSQL, i.e.:
+
+=over
+
+=item * Current directory contains pg_xlog directory
+
+=item * Segment is unpacked
+
+=item * Segment is in pg_xlog directory
+
+=item * Handler program is called with segment name like
+'pg_xlog/000000010000000500000073'
+
+=back
+
+=cut
 
 sub handle_pre_removal_processing {
     my $self         = shift;
@@ -122,6 +164,18 @@ sub handle_pre_removal_processing {
     return;
 }
 
+=head1 get_list_of_segments_to_remove()
+
+Scans source directory, and returns names of all files, which are
+"older" than last required segment (REDO segment from pg_controldata).
+
+Older - is defined as alphabetically smaller than REDO segment.
+
+Returns at most X files, where X is defined by --remove-at-a-time
+command line option.
+
+=cut
+
 sub get_list_of_segments_to_remove {
     my $self           = shift;
     my $last_important = shift;
@@ -153,6 +207,17 @@ sub get_list_of_segments_to_remove {
     return @sorted;
 }
 
+=head1 get_last_redo_segment()
+
+Based on information from pg_controldata, returns name of file that
+contains oldest file required in case recovery would have to be
+restarted.
+
+This is required to be able to tell which files can be safely removed
+from archive.
+
+=cut
+
 sub get_last_redo_segment {
     my $self = shift;
     my $CD   = shift;
@@ -168,6 +233,22 @@ sub get_last_redo_segment {
 
     return $segment_filename;
 }
+
+=head1 get_control_data()
+
+Calls pg_controldata, and parses its output.
+
+Verifies that output contains 2 critical pieces of information:
+
+=over
+
+=item * Latest checkpoint's REDO location
+
+=item * Latest checkpoint's TimeLineID
+
+=back
+
+=cut
 
 sub get_control_data {
     my $self = shift;
@@ -202,6 +283,21 @@ sub get_control_data {
 
     return $control_data;
 }
+
+=head1 try_to_restore_and_exit()
+
+Checks if requested wal segment exists, and is ready to be restored (
+vide --recovery-delay option).
+
+Handles also situations where there is finish request (both immediate
+and smart).
+
+If recovery worked - finished with status 0.
+
+If no file can be returned yet - goes back to main loop in L<run()>
+method.
+
+=cut
 
 sub try_to_restore_and_exit {
     my $self = shift;
@@ -255,6 +351,13 @@ sub try_to_restore_and_exit {
     $self->exit_with_status( 0 );
 }
 
+=head1 copy_segment_to()
+
+Helper function which deals with copying segment from archive to given
+destination, handling compression when necessary.
+
+=cut
+
 sub copy_segment_to {
     my $self = shift;
     my ( $segment_name, $destination ) = @_;
@@ -279,6 +382,13 @@ sub copy_segment_to {
     return sprintf( 'Uncompressing %s to %s failed: %s', $wanted_file, $destination, Dumper( $response ) ) if $response->{ 'error_code' };
     return;
 }
+
+=head1 check_for_trigger_file()
+
+Checks existence and possibly content of finish-trigger file, setting
+appropriate flags.
+
+=cut
 
 sub check_for_trigger_file {
     my $self = shift;
@@ -336,9 +446,15 @@ sub prepare_temp_directory {
 
 =head1 read_args()
 
-Function which does all the parsing, and transformation of command line arguments.
+Function which does all the parsing, and transformation of command line
+arguments.
 
-It also verified base facts about passed WAL segment name, but all other validations, are being done in separate function: L<validate_args()>.
+It also verified base facts about passed WAL segment name, but all other
+validations, are being done in separate function: L<validate_args()>.
+
+=cut
+
+=head1 read_args()
 
 =cut
 
@@ -414,8 +530,11 @@ sub read_args {
 
 Does all necessary validation of given command line arguments.
 
-One exception is for compression programs paths - technically, it could be validated in here, but benefit would be pretty limited, and code to do so relatively complex, as compression program path
-might, but doesn't have to be actual file path - it might be just program name (without path), which is the default.
+One exception is for compression programs paths - technically, it could
+be validated in here, but benefit would be pretty limited, and code to
+do so relatively complex, as compression program path might, but doesn't
+have to be actual file path - it might be just program name (without
+path), which is the default.
 
 =cut
 

@@ -10,6 +10,15 @@ use base qw( Exporter );
 our @EXPORT_OK = qw( file_md5sum run_command ext_for_compression );
 our %EXPORT_TAGS = ( 'all' => \@EXPORT_OK );
 
+=head1 ext_for_compression()
+
+Simple function returning file extension for given compression schema.
+
+It could be easily handled with hash, but I decided to use function, to
+have explicit die/croak in case of bad compression type.
+
+=cut
+
 sub ext_for_compression {
     my $compression = lc shift;
     return '.gz'   if $compression eq 'gzip';
@@ -17,6 +26,14 @@ sub ext_for_compression {
     return '.lzma' if $compression eq 'lzma';
     croak 'Unknown compression type: ' . $compression;
 }
+
+=head1 file_md5sum()
+
+Wrapper around Digest::MD5 to calculate md5 sum of file.
+
+Returned checksum is hex encoded - like output of I<md5sum> program.
+
+=cut
 
 sub file_md5sum {
     my $filename = shift;
@@ -30,6 +47,28 @@ sub file_md5sum {
 
     return $md5;
 }
+
+=head1 run_command()
+
+Runs given program, adding proper escapes of values, and gets stdout and
+stderr of it.
+
+Returns hashref which contains:
+
+=over
+
+=item * stderr - stringified stderr output from program
+
+=item * stdout - stringified stdout output from program
+
+=item * status - return value of system() call
+
+=item * error_code - undef in case there was no error, or stringified
+error information
+
+=back
+
+=cut
 
 sub run_command {
     my ( $temp_dir, @cmd ) = @_;

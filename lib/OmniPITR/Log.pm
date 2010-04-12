@@ -13,6 +13,14 @@ BEGIN {
     eval { use Time::HiRes qw( time ); };
 }
 
+=head1 new()
+
+Constructor for logger class.
+
+Takes one argument: template (using %*, strftime variables).
+
+=cut
+
 sub new {
     my $class = shift;
     my ( $filename_template ) = @_;
@@ -28,12 +36,35 @@ sub new {
     return $self;
 }
 
+=head1 _log()
+
+Internal function, shouldn't be called from client code.
+
+Gets loglevel (assumed to be string), format, and list of values to
+fill-in in the format, using standard sprintf semantics.
+
+Each line (even in multiline log messages) is prefixed with
+metainformation (timestamp, pid, program name).
+
+In case reference is passed as one of args - it is dumped using
+Data::Dumper.
+
+Thanks to this this:
+
+    $object->_log('loglevel', '%s', $object);
+
+Will print dump of $object and not stuff like 'HASH(0xdeadbeef)'.
+
+For client-code open methods check L<log()>, L<error()> and L<fatal()>.
+
+=cut
+
 sub _log {
     my $self = shift;
     my ( $level, $format, @args ) = @_;
 
-    my $log_line_prefix = $self->get_log_line_prefix();
-    my $fh              = $self->get_log_fh();
+    my $log_line_prefix = $self->_get_log_line_prefix();
+    my $fh              = $self->_get_log_fh();
 
     @args = map { ref $_ ? Dumper( $_ ) : $_ } @args;
 
@@ -50,15 +81,53 @@ sub _log {
     return;
 }
 
+=head1 log()
+
+Client code facing method, which calls internal L<_log()> method, giving
+'LOG' as loglevel, and passing rest of arguments without modifications.
+
+Example:
+
+    $logger->log( 'i = %u', $i );
+
+=cut
+
 sub log {
     my $self = shift;
     return $self->_log( 'LOG', @_ );
 }
 
+=head1 error()
+
+Client code facing method, which calls internal L<_log()> method, giving
+'ERROR' as loglevel, and passing rest of arguments without
+modifications.
+
+Example:
+
+    $logger->error( 'File creation failed: %s', $OS_ERROR );
+
+=cut
+
 sub error {
     my $self = shift;
     return $self->_log( 'ERROR', @_ );
 }
+
+=head1 fatal()
+
+Client code facing method, which calls internal L<_log()> method, giving
+'FATAL' as loglevel, and passing rest of arguments without
+modifications.
+
+Additionally, after logging the message, it exits main program, setting
+error status 1.
+
+Example:
+
+    $logger->fatal( 'Called from user with uid = %u, and not 0!', $user_uid );
+
+=cut
 
 sub fatal {
     my $self = shift;
@@ -66,12 +135,43 @@ sub fatal {
     exit( 1 );
 }
 
+=head1 time_start()
+
+Starts timer.
+
+Should be used together with time_finish, for example like this:
+
+    $logger->time_start( 'zipping' );
+    $zip->run();
+    $logger->time_finish( 'zipping' );
+
+Arguments to time_start and time_finish should be the same to allow
+matching of events.
+
+=cut
+
 sub time_start {
     my $self    = shift;
     my $comment = shift;
     $self->{ 'timers' }->{ $comment } = time();
     return;
 }
+
+=head1 time_finish()
+
+Finished calculation of time for given block of code.
+
+Calling:
+
+    $logger->time_finish( 'Compressing with gzip' );
+
+Will log line like this:
+
+    2010-04-09 00:08:35.148118 +0200 : 19713 : omnipitr-archive : LOG : Timer [Compressing with gzip] took: 0.351s
+
+Assuming related time_start() was called 0.351s earlier.
+
+=cut
 
 sub time_finish {
     my $self    = shift;
@@ -81,7 +181,26 @@ sub time_finish {
     return;
 }
 
-sub get_log_line_prefix {
+=head1 _get_log_line_prefix()
+
+Internal method generating line prefix, which is prepended to every
+logged line of text.
+
+Prefix contains ( " : " separated ):
+
+=over
+
+=item * Timestamp, with microsecond precision
+
+=item * Process ID (PID) of logging program
+
+=item * Name of program that logged the message
+
+=back
+
+=cut
+
+sub _get_log_line_prefix {
     my $self         = shift;
     my $time         = time();
     my $date_time    = strftime( '%Y-%m-%d %H:%M:%S', localtime $time );
@@ -92,7 +211,19 @@ sub get_log_line_prefix {
     return sprintf "%s : %u : %s", $time_stamp, $PROCESS_ID, $self->{ 'program' };
 }
 
-sub get_log_fh {
+=head1 _get_log_fh()
+
+Internal method handling logic to close and open logfiles when
+necessary, based of given logfile template, current time, and when
+previous logline was logged.
+
+At any given moment only 1 filehandle will be opened, and it will be
+closed, and reopened, when time changes in such way that it would
+require another filename.
+
+=cut
+
+sub _get_log_fh {
     my $self = shift;
 
     my $time = floor( time() );
