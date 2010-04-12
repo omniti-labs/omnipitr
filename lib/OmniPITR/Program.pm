@@ -11,20 +11,19 @@ sub new {
     my $self = bless {}, $class;
     $self->read_args();
     $self->validate_args();
-    $self->{'pid-file'} = Proc::Pidfile->new( 'pidfile' => $self->{ 'pid-file' } ) if $self->{'pid-file'};
+    $self->{ 'pid-file' } = Proc::Pidfile->new( 'pidfile' => $self->{ 'pid-file' } ) if $self->{ 'pid-file' };
 
     return $self;
 }
 
 sub run {
     my $self = shift;
-    croak("run() method in OmniPITR::Program was not overridden!");
+    croak( "run() method in OmniPITR::Program was not overridden!" );
 }
 
 # Shortcuts
-sub verbose { return shift->{'verbose'}; }
-sub log { return shift->{'log'}; }
+sub verbose { return shift->{ 'verbose' }; }
+sub log     { return shift->{ 'log' }; }
 
 1;
-
 
