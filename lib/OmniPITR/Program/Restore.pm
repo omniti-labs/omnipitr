@@ -134,9 +134,9 @@ sub handle_pre_removal_processing {
     make_path( $xlog_dir );
 
     my $comment = 'Copying segment ' . $segment_name . ' to ' . $xlog_file;
-    $self->log->time_start( $comment ) if $self->{ 'verbose' };
+    $self->log->time_start( $comment ) if $self->verbose;
     my $response = $self->copy_segment_to( $segment_name, $xlog_file );
-    $self->log->time_finish( $comment ) if $self->{ 'verbose' };
+    $self->log->time_finish( $comment ) if $self->verbose;
 
     if ( $response ) {
         $self->log->error( 'Error while copying segment for pre removal processing for %s : %s', $segment_name, $response );
@@ -150,9 +150,9 @@ sub handle_pre_removal_processing {
 
     $comment = 'Running pre-removal-processing command: ' . $full_command;
 
-    $self->log->time_start( $comment ) if $self->{ 'verbose' };
+    $self->log->time_start( $comment ) if $self->verbose;
     my $result = run_command( $self->{ 'tempdir' }, 'bash', '-c', $full_command );
-    $self->log->time_finish( $comment ) if $self->{ 'verbose' };
+    $self->log->time_finish( $comment ) if $self->verbose;
 
     chdir $previous_dir;
 
@@ -199,7 +199,7 @@ sub get_list_of_segments_to_remove {
     }
     return if 0 == scalar @too_old;
 
-    $self->log->log( '%u segments too old, to be removed.', scalar @too_old ) if $self->{ 'verbose' };
+    $self->log->log( '%u segments too old, to be removed.', scalar @too_old ) if $self->verbose;
 
     my @sorted = sort @too_old;
     splice( @sorted, $self->{ 'remove-at-a-time' } );
@@ -325,7 +325,7 @@ sub try_to_restore_and_exit {
         my $file_mtime = $file_info[ 9 ];
         my $ok_since   = time() - $self->{ 'recovery-delay' };
         if ( $ok_since <= $file_mtime ) {
-            if (   ( $self->{ 'verbose' } )
+            if (   ( $self->verbose )
                 && ( !$self->{ 'logged_delay' } ) )
             {
                 $self->log->log( 'Segment %s found, but it is too fresh (mtime = %u, accepted since %u)', $self->{ 'segment' }, $file_mtime, $ok_since );
@@ -338,9 +338,9 @@ sub try_to_restore_and_exit {
     my $full_destination = File::Spec->catfile( $self->{ 'data-dir' }, $self->{ 'segment_destination' } );
 
     my $comment = 'Copying segment ' . $self->{ 'segment' } . ' to ' . $full_destination;
-    $self->log->time_start( $comment ) if $self->{ 'verbose' };
+    $self->log->time_start( $comment ) if $self->verbose;
     my $response = $self->copy_segment_to( $self->{ 'segment' }, $full_destination );
-    $self->log->time_finish( $comment ) if $self->{ 'verbose' };
+    $self->log->time_finish( $comment ) if $self->verbose;
 
     if ( $response ) {
         $self->log->error( $response );
@@ -521,7 +521,7 @@ sub read_args {
 
     $self->{ 'finish' } = '';
 
-    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->{ 'verbose' };
+    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
 
     return;
 }

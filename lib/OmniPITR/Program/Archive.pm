@@ -65,9 +65,9 @@ sub send_to_destinations {
 
             my $comment = 'Sending ' . $local_file . ' to ' . $destination_file_path;
 
-            $self->log->time_start( $comment ) if $self->{ 'verbose' };
+            $self->log->time_start( $comment ) if $self->verbose;
             my $response = run_command( $self->{ 'temp-dir' }, 'rsync', $local_file, $destination_file_path );
-            $self->log->time_finish( $comment ) if $self->{ 'verbose' };
+            $self->log->time_finish( $comment ) if $self->verbose;
 
             if ( $response->{ 'error_code' } ) {
                 $self->log->fatal( "Cannot send segment %s to %s : %s", $local_file, $destination_file_path, $response );
@@ -154,9 +154,9 @@ sub make_all_necessary_compressions {
 
         my $compression_command = sprintf 'nice %s --stdout %s > %s', $compressor_binary, quotemeta( $self->{ 'segment' } ), quotemeta( $compressed_filename );
 
-        $self->log->time_start( 'Compressing with ' . $compression ) if $self->{ 'verbose' };
+        $self->log->time_start( 'Compressing with ' . $compression ) if $self->verbose;
         my $response = run_command( $self->{ 'temp-dir' }, 'bash', '-c', $compression_command );
-        $self->log->time_finish( 'Compressing with ' . $compression ) if $self->{ 'verbose' };
+        $self->log->time_finish( 'Compressing with ' . $compression ) if $self->verbose;
 
         if ( $response->{ 'error_code' } ) {
             $self->log->fatal( 'Error while compressing with %s : %s', $compression, $response );
@@ -338,7 +338,7 @@ sub read_args {
 
     $self->{ 'segment' } = shift @ARGV;
 
-    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->{ 'verbose' };
+    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
 
     return;
 }
