@@ -60,6 +60,7 @@ sub send_to_destinations {
             my $local_file = $dst->{ 'compression' } eq 'none' ? $self->{ 'segment' } : $self->get_temp_filename_for( $dst->{ 'compression' } );
 
             my $destination_file_path = $dst->{ 'path' };
+            my $is_backup = ( $dst->{ 'path' } eq $self->{ 'dst-backup' } );
             $destination_file_path =~ s{/*\z}{};
             $destination_file_path .= '/' . basename( $local_file );
 
@@ -70,7 +71,12 @@ sub send_to_destinations {
             $self->log->time_finish( $comment ) if $self->verbose;
 
             if ( $response->{ 'error_code' } ) {
-                $self->log->fatal( "Cannot send segment %s to %s : %s", $local_file, $destination_file_path, $response );
+                if ( $is_backup ) {
+                    $self->log->error( "Sending segment %s to backup destination %s generated (ignored) error: %s", $local_file, $destination_file_path, $response );
+                }
+                else {
+                    $self->log->fatal( "Cannot send segment %s to %s : %s", $local_file, $destination_file_path, $response );
+                }
             }
             $self->{ 'state' }->{ 'sent' }->{ $destination_type }->{ $dst->{ 'path' } } = 1;
             $self->save_state();
@@ -290,6 +296,7 @@ sub read_args {
         \%args,
         'bzip2-path|bp=s',
         'data-dir|D=s',
+        'dst-backup|db=s',
         'dst-local|dl=s@',
         'dst-remote|dr=s@',
         'force-data-dir|f',
@@ -305,7 +312,7 @@ sub read_args {
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
     $args{ 'log' } =~ tr/^/%/;
 
-    for my $key ( qw( data-dir temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path force-data-dir ) ) {
+    for my $key ( qw( data-dir dst-backup temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path force-data-dir ) ) {
         $self->{ $key } = $args{ $key };
     }
 
@@ -357,6 +364,22 @@ sub validate_args {
 
     unless ( $self->{ 'force-data-dir' } ) {
         $self->log->fatal( "Given data-dir (%s) is not valid", $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' } && -f File::Spec->catfile( $self->{ 'data-dir' }, 'PG_VERSION' );
+    }
+
+    if ( $self->{ 'dst-backup' } ) {
+        if ( $self->{ 'dst-backup' } =~ m{\A(gzip|bzip2|lzma)=} ) {
+            $self->log->fatal( 'dst-backup cannot be compressed! [%]', $self->{ 'dst-backup' } );
+        }
+        unless ( $self->{ 'dst-backup' } =~ m{\A/} ) {
+            $self->log->fatal( 'dst-backup has to be absolute path, and it is not: %s', $self->{ 'dst-backup' } );
+        }
+        if ( -e $self->{ 'dst-backup' } ) {
+            push @{ $self->{ 'destination' }->{ 'local' } },
+                {
+                'compression' => 'none',
+                'path'        => $self->{ 'destination' }->{ 'local' },
+                };
+        }
     }
 
     my $dst_count = scalar( @{ $self->{ 'destination' }->{ 'local' } } ) + scalar( @{ $self->{ 'destination' }->{ 'remote' } } );
