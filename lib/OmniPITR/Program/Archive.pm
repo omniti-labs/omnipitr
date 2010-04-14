@@ -377,7 +377,7 @@ sub validate_args {
             push @{ $self->{ 'destination' }->{ 'local' } },
                 {
                 'compression' => 'none',
-                'path'        => $self->{ 'destination' }->{ 'local' },
+                'path'        => $self->{ 'dst-backup'} ,
                 };
         }
     }
