@@ -34,6 +34,18 @@ information (you can provide many of these)
 You can also specify compression per-destination. Check L<COMPRESSION>
 section of the doc.
 
+=item --dst-backup (-db)
+
+Special destination, that cannot be compressed (existence of compression prefix
+will cause I<omnipitr-archive> to raise exception, has to be absolute path
+(starts with /), and can be non-existing.
+
+This is special directory that shouldn't usually exist, but if it exists - it
+will receive copy of every wal segment rotated.
+
+The sole purpose of this option is to make I<omnipitr-master-backup> working. If
+you do not intend to make hot backups on master - you can safely not use it.
+
 =item --temp-dir (-t)
 
 Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
