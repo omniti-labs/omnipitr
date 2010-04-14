@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use OmniPITR::Log;
 use English qw( -no_match_vars );
-use Proc::Pidfile;
+use OmniPITR::Pidfile;
 use Carp;
 
 =head1 new()
@@ -23,7 +23,7 @@ sub new {
     my $self = bless {}, $class;
     $self->read_args();
     $self->validate_args();
-    $self->{ 'pid-file' } = Proc::Pidfile->new( 'pidfile' => $self->{ 'pid-file' } ) if $self->{ 'pid-file' };
+    $self->{ 'pid-file' } = OmniPITR::Pidfile->new( 'pidfile' => $self->{ 'pid-file' } ) if $self->{ 'pid-file' };
 
     return $self;
 }
