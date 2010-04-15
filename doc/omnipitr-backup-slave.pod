@@ -1,8 +1,8 @@
-=head1 OmniPITR - omnipitr-slave-backup
+=head1 OmniPITR - omnipitr-backup-slave
 
 =head2 USAGE
 
-/some/path/omnipitr/bin/omnipitr-slave-backup [options]
+/some/path/omnipitr/bin/omnipitr-backup-slave [options]
 
 Options:
 
@@ -48,9 +48,9 @@ Template for naming output files. Check L<FILENAMES> section for details.
 =item --pid-file
 
 Name of file to use for pidfile. If it is specified, than only one copy of
-I<omnipitr-slave-backup> (with this pidfile) can run at the same time.
+I<omnipitr-backup-slave> (with this pidfile) can run at the same time.
 
-Trying to run second copy of I<omnipitr-slave-backup> will result in an error.
+Trying to run second copy of I<omnipitr-backup-slave> will result in an error.
 
 =item --verbose (-v)
 
@@ -90,8 +90,8 @@ to specify where to send the backup files to
 Of course you can provide many --dst-local or many --dst-remote or many mix of
 these.
 
-Generally omnipitr-slave-backup will try to deliver WAL segment to all
-destinations. In case remote destination will fail, omnipitr-slave-backup will
+Generally omnipitr-backup-slave will try to deliver WAL segment to all
+destinations. In case remote destination will fail, omnipitr-backup-slave will
 retry 3 times, with 5 minute delay between tries.
 
 In case of errors when writing to local destination - it is skipped, and error
@@ -109,7 +109,7 @@ Backups will be transferred to destinations in this order:
 
 =head3 Remote destination specification
 
-I<omnipitr-slave-backup> delivers backup files to destination using rsync
+I<omnipitr-backup-slave> delivers backup files to destination using rsync
 program.  Both direct-rsync and rsync-over-ssh are supported (it's better to use
 direct rsync - it uses less resources due to lack of encryption.
 
@@ -226,16 +226,16 @@ relate to date/time of beginning of backup process.
 
 =head3 Minimal setup, with copying file to local directory:
 
-    /.../omnipitr-slave-backup -D /mnt/data -l /var/log/omnipitr/backup.log -dl /mnt/backups/
+    /.../omnipitr-backup-slave -D /mnt/data -l /var/log/omnipitr/backup.log -dl /mnt/backups/
 
 =head3 Minimal setup, with compression, and copying file to remote directory over rsync:
 
-    /.../omnipitr-slave-backup -D /mnt/data/ -l /var/log/omnipitr/backup.log -dr bzip2=rsync://slave/postgres/backups/
+    /.../omnipitr-backup-slave -D /mnt/data/ -l /var/log/omnipitr/backup.log -dr bzip2=rsync://slave/postgres/backups/
 
 =head3 2 remote, compressed destinations, 1 local, with auto rotated logfile,
 and modified filenames
 
-    /.../omnipitr-slave-backup -D /mnt/data/ -l /var/log/omnipitr/backup-^Y-^m-^d.log -dr bzip2=rsync://slave/postgres/backups/ -dr gzip=backups:/mnt/hotbackups/ -dl /mnt/backups/ -f "main-__FILETYPE__-^Y^m^d_^H^M^S.tar__CEXT__"
+    /.../omnipitr-backup-slave -D /mnt/data/ -l /var/log/omnipitr/backup-^Y-^m-^d.log -dr bzip2=rsync://slave/postgres/backups/ -dr gzip=backups:/mnt/hotbackups/ -dl /mnt/backups/ -f "main-__FILETYPE__-^Y^m^d_^H^M^S.tar__CEXT__"
 
 =head2 COPYRIGHT
 
