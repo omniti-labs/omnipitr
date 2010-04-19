@@ -192,7 +192,7 @@ sub get_list_of_segments_to_remove {
 
     my @too_old = ();
     for my $file ( @content ) {
-        $file =~ s/\Q$extension\E\z//;
+        $file =~ s/\Q$extension\E\z// if $extension;
         next unless $file =~ m{\A[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?\z};
         next unless $file lt $last_important;
         push @too_old, $file;
@@ -313,6 +313,10 @@ sub try_to_restore_and_exit {
     unless ( -e $wanted_file ) {
         if ( $self->{ 'finish' } ) {
             $self->log->error( 'Got finish request. Dying.' );
+            $self->exit_with_status( 1 );
+        }
+        if ( $self->{ 'segment' } =~ m{\A[a-fA-f0-9]{8}\.history\z} ) {
+            $self->log->log( 'Requested history file (%s) that does not exist. Returning error.', $self->{ 'segment' } );
             $self->exit_with_status( 1 );
         }
         return;
@@ -543,7 +547,7 @@ sub validate_args {
 
     $self->log->fatal( 'Given data-dir (%s) is not valid', $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' } && -f File::Spec->catfile( $self->{ 'data-dir' }, 'PG_VERSION' );
 
-    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{\A[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?\z};
+    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{\A([a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?|[a-fA-F0-9]{8}\.history)\z};
 
     $self->log->fatal( 'Given source (%s) is not a directory', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Given source (%s) is not readable',    $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };
