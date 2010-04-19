@@ -9,7 +9,7 @@ use OmniPITR::Tools qw( :all );
 use English qw( -no_match_vars );
 use File::Basename;
 use File::Spec;
-use File::Path qw( make_path remove_tree );
+use File::Path qw( mkpath rmtree );
 use File::Copy;
 use Storable;
 use Data::Dumper;
@@ -131,7 +131,7 @@ sub handle_pre_removal_processing {
     $self->prepare_temp_directory();
     my $xlog_dir  = File::Spec->catfile( $self->{ 'temp-dir' }, 'pg_xlog' );
     my $xlog_file = File::Spec->catfile( $xlog_dir,             $segment_name );
-    make_path( $xlog_dir );
+    mkpath( $xlog_dir );
 
     my $comment = 'Copying segment ' . $segment_name . ' to ' . $xlog_file;
     $self->log->time_start( $comment ) if $self->verbose;
@@ -156,7 +156,7 @@ sub handle_pre_removal_processing {
 
     chdir $previous_dir;
 
-    remove_tree( $xlog_dir );
+    rmtree( $xlog_dir );
     return 1 unless $result->{ 'error_code' };
 
     $self->log->error( 'Error while calling pre removal processing [%s] : %s', $full_command, $result );
@@ -419,7 +419,7 @@ sub exit_with_status {
     my $self = shift;
     my $code = shift;
 
-    remove_tree( $self->{ 'temp-dir' } ) if $self->{ 'temp-dir-prepared' };
+    rmtree( $self->{ 'temp-dir' } ) if $self->{ 'temp-dir-prepared' };
 
     exit( $code );
 }
@@ -438,7 +438,7 @@ sub prepare_temp_directory {
     my $self = shift;
     return if $self->{ 'temp-dir-prepared' };
     my $full_temp_dir = File::Spec->catfile( $self->{ 'temp-dir' }, basename( $PROGRAM_NAME ) );
-    make_path( $full_temp_dir );
+    mkpath( $full_temp_dir );
     $self->{ 'temp-dir' }          = $full_temp_dir;
     $self->{ 'temp-dir-prepared' } = 1;
     return;

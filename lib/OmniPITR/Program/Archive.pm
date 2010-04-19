@@ -9,7 +9,7 @@ use OmniPITR::Tools qw( :all );
 use English qw( -no_match_vars );
 use File::Basename;
 use File::Spec;
-use File::Path qw( make_path remove_tree );
+use File::Path qw( mkpath rmtree );
 use File::Copy;
 use Storable;
 use Getopt::Long;
@@ -110,7 +110,7 @@ It basically removes tempdir with compressed copies of segment, and state file f
 
 sub cleanup {
     my $self = shift;
-    remove_tree( $self->{ 'temp-dir' } );
+    rmtree( $self->{ 'temp-dir' } );
     unlink $self->{ 'state-file' } if $self->{ 'state-file' };
     return;
 }
@@ -229,7 +229,7 @@ For example, for temp-dir '/tmp' and segment being pg_xlog/000000010000000000000
 sub prepare_temp_directory {
     my $self = shift;
     my $full_temp_dir = File::Spec->catfile( $self->{ 'temp-dir' }, basename( $PROGRAM_NAME ), basename( $self->{ 'segment' } ) );
-    make_path( $full_temp_dir );
+    mkpath( $full_temp_dir );
     $self->{ 'temp-dir' } = $full_temp_dir;
     return;
 }
