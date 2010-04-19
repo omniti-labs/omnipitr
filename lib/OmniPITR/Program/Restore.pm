@@ -202,7 +202,7 @@ sub get_list_of_segments_to_remove {
     $self->log->log( '%u segments too old, to be removed.', scalar @too_old ) if $self->verbose;
 
     my @sorted = sort @too_old;
-    splice( @sorted, $self->{ 'remove-at-a-time' } );
+    splice( @sorted, $self->{ 'remove-at-a-time' } ) if $self->{ 'remove-at-a-time' } < scalar @sorted;
 
     return @sorted;
 }
