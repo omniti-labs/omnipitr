@@ -21,11 +21,34 @@ Constructor also handles pid file creation, in case it was requested.
 sub new {
     my $class = shift;
     my $self = bless {}, $class;
+    $self->check_debug();
     $self->read_args();
     $self->validate_args();
     $self->{ 'pid-file' } = OmniPITR::Pidfile->new( 'pidfile' => $self->{ 'pid-file' } ) if $self->{ 'pid-file' };
 
     return $self;
+}
+
+=head1 check_debug()
+
+Internal method providing --debug option handling to every omnipitr program.
+
+If *first* argument to omnipitr program it will print to stderr all arguments, and environment variables.
+
+=cut
+
+sub check_debug {
+    my $self = shift;
+    return unless '--debug' eq $ARGV[ 0 ];
+
+    warn "DEBUG INFORMATION:\n";
+    for my $key ( sort keys %ENV ) {
+        warn sprintf( "ENV: '%s' => '%s'\n", $key, $ENV{ $key } );
+    }
+    warn "Command line arguments: [" . join( "] , [", @ARGV ) . "]\n";
+    shift @ARGV;
+
+    return;
 }
 
 =head1 run()

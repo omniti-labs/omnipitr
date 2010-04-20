@@ -67,7 +67,7 @@ sub send_to_destinations {
             my $comment = 'Sending ' . $local_file . ' to ' . $destination_file_path;
 
             $self->log->time_start( $comment ) if $self->verbose;
-            my $response = run_command( $self->{ 'temp-dir' }, 'rsync', $local_file, $destination_file_path );
+            my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'rsync-path' }, $local_file, $destination_file_path );
             $self->log->time_finish( $comment ) if $self->verbose;
 
             if ( $response->{ 'error_code' } ) {
@@ -289,6 +289,7 @@ sub read_args {
         'gzip-path'  => 'gzip',
         'bzip2-path' => 'bzip2',
         'lzma-path'  => 'lzma',
+        'rsync-path' => 'rsync',
     );
 
     croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
@@ -303,6 +304,7 @@ sub read_args {
         'gzip-path|gp=s',
         'log|l=s',
         'lzma-path|lp=s',
+        'rsync-path|rp=s',
         'pid-file=s',
         'state-dir|s=s',
         'temp-dir|t=s',
@@ -312,7 +314,7 @@ sub read_args {
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
     $args{ 'log' } =~ tr/^/%/;
 
-    for my $key ( qw( data-dir dst-backup temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path force-data-dir ) ) {
+    for my $key ( qw( data-dir dst-backup temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path force-data-dir rsync-path ) ) {
         $self->{ $key } = $args{ $key };
     }
 
@@ -377,7 +379,7 @@ sub validate_args {
             push @{ $self->{ 'destination' }->{ 'local' } },
                 {
                 'compression' => 'none',
-                'path'        => $self->{ 'dst-backup'} ,
+                'path'        => $self->{ 'dst-backup' },
                 };
         }
     }
@@ -392,7 +394,8 @@ sub validate_args {
         $self->log->fatal( "Given --state-dir (%s) is not writable",    $self->{ 'state-dir' } ) unless -w $self->{ 'state-dir' };
     }
 
-    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless basename( $self->{ 'segment' } ) =~ m{\A(?:[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?|[a-fA-F0-9]{8}\.history)\z};
+    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } )
+        unless basename( $self->{ 'segment' } ) =~ m{\A(?:[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?|[a-fA-F0-9]{8}\.history)\z};
     my $segment_file_name = $self->{ 'segment' };
     $segment_file_name = File::Spec->catfile( $self->{ 'data-dir' }, $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{^/};
 

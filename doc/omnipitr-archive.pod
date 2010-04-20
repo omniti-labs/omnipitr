@@ -89,6 +89,11 @@ variable.
 Full path to lzma program - in case you can't set proper PATH environment
 variable.
 
+=item --rsync-path (-rp)
+
+Full path to rsync program - in case you can't set proper PATH environment
+variable.
+
 =back
 
 =head2 DESCRIPTION
