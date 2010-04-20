@@ -227,7 +227,7 @@ sub get_last_redo_segment {
 
     my ( $series, $offset ) = split m{/}, $segment;
 
-    $offset =~ s/.{6}$//;
+    $offset =~ s/.{0,6}$//;
 
     my $segment_filename = sprintf '%08s%08s%08s', $timeline, $series, $offset;
 
