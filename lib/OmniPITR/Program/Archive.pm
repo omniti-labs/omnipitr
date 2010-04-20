@@ -60,7 +60,12 @@ sub send_to_destinations {
             my $local_file = $dst->{ 'compression' } eq 'none' ? $self->{ 'segment' } : $self->get_temp_filename_for( $dst->{ 'compression' } );
 
             my $destination_file_path = $dst->{ 'path' };
-            my $is_backup = ( $dst->{ 'path' } eq $self->{ 'dst-backup' } );
+
+            my $is_backup = undef;
+            if ( $self->{ 'dst-backup' } ) {
+                $is_backup = 1 if $dst->{ 'path' } eq $self->{ 'dst-backup' };
+            }
+
             $destination_file_path =~ s{/*\z}{};
             $destination_file_path .= '/' . basename( $local_file );
 
