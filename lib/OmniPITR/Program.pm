@@ -39,6 +39,7 @@ If *first* argument to omnipitr program it will print to stderr all arguments, a
 
 sub check_debug {
     my $self = shift;
+    return if 0 == scalar @ARGV;
     return unless '--debug' eq $ARGV[ 0 ];
 
     warn "DEBUG INFORMATION:\n";

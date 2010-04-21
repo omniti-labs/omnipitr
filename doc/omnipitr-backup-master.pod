@@ -30,6 +30,12 @@ Which port to connect to when connecting to database. Defaults to 5432.
 
 What username to use when connecting to database. Defaults to postgres.
 
+=item --xlogs (-x)
+
+Directory that (if doesn't exist) will be created. Then - will be used as source
+of xlogs to archive. Afterwards - it will be removed (if it didn't exist in the
+beginning).
+
 =item --dst-local (-dl)
 
 Where to copy the hot backup files on current server (you can provide many of
@@ -51,6 +57,11 @@ section of the doc.
 
 Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
 variable location)
+
+=item --state-dir (-s)
+
+Name of directory to use as state-directory to handle errors when sending wal
+segments to many locations.
 
 =item --log (-l)
 
@@ -97,6 +108,16 @@ variable.
 =item --tar-path (-tp)
 
 Full path to tar program - in case you can't set proper PATH environment
+variable.
+
+=item --rsync-path (-rp)
+
+Full path to rsync program - in case you can't set proper PATH environment
+variable.
+
+=item --psql-path (-pp)
+
+Full path to psql program - in case you can't set proper PATH environment
 variable.
 
 =back
