@@ -1,0 +1,33 @@
+
+=head1 OmniPITR
+
+=head2 TODO
+
+Even while developing first version of the OmniPITR, we know there are things
+that could be improved. But first things first - we have to finish development
+of base functionality before starting work on new stuff.
+
+Here are the already known about missing features:
+
+=over
+
+=item * Ability to use %r in omnipitr-restore instead of relying on
+pg_controldata
+
+While definitely good thing, we will still keep code to use pg_controldata as %r
+is not available in 8.2.
+
+=item * Provide support for --help option
+
+Well, it can be helpful to avoid having to type another command to get to docs
+
+=item * Add support for config file
+
+This has the benefit over command line options that it lets you change the
+options without Pg restart (in omnipitr-restore case at least).
+
+=back
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2009 OmniTI. All rights reserved.
