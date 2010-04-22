@@ -26,11 +26,6 @@ Delay when recovering wal segments (in seconds).
 This is primarily used to keep window of safety before I<DELETE * FROM
 main_table> will be applied on slave database.
 
-This delay does not apply to initial recovery (getting system from backup till
-"Minimum recovery ending location"). Reason for this is simple - before reaching
-minimum recovery ending location database can be in nonconsistent state. So
-there is no point in stalling till we get to point where database is consistent.
-
 =item --finish-trigger (-f)
 
 Name of file to watch for existence - if it exists, recovery process will stop,
