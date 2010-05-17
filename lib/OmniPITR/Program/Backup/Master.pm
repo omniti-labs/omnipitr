@@ -14,15 +14,295 @@ use File::Spec;
 use File::Path qw( mkpath rmtree );
 use File::Copy;
 use Storable;
+use Cwd;
 use Getopt::Long qw( :config no_ignore_case );
 
 sub run {
     my $self = shift;
-    $self->read_state();
     $self->get_list_of_all_necessary_compressions();
     $self->choose_base_local_destinations();
 
+    $self->start_pg_backup();
+    $self->compress_pgdata();
+
+    $self->stop_pg_backup();
+    $self->compress_xlogs();
+
+    $self->deliver_to_all_destinations();
+
+    $self->log->log( 'All done%s.', $self->{ 'had_errors' } ? ' with errors' : '' );
+    exit( 1 ) if $self->{ 'had_errors' };
+
     return;
+}
+
+sub deliver_to_all_destinations {
+    my $self = shift;
+
+    # $self->log->log( '%s', $self );
+
+    $self->deliver_to_all_local_destinations();
+
+    $self->deliver_to_all_remote_destinations();
+
+    return;
+}
+
+sub deliver_to_all_local_destinations {
+    my $self = shift;
+    return unless $self->{ 'destination' }->{ 'local' };
+    for my $dst ( @{ $self->{ 'destination' }->{ 'local' } } ) {
+        next if $dst->{ 'path' } eq $self->{ 'base' }->{ $dst->{ 'compression' } };
+
+        my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
+
+        for my $type ( qw( data xlog ) ) {
+
+            my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
+            my $source_filename = File::Spec->catfile( $B, $filename );
+            my $destination_filename = File::Spec->catfile( $dst->{ 'path' }, $filename );
+
+            my $time_msg = sprintf 'Copying %s to %s', $source_filename, $destination_filename;
+            $self->log->time_start( $time_msg ) if $self->verbose;
+
+            my $rc = copy( $source_filename, $destination_filename );
+
+            $self->log->time_finish( $time_msg ) if $self->verbose;
+
+            unless ( $rc ) {
+                $self->log->error( 'Cannot copy %s to %s : %s', $source_filename, $destination_filename, $OS_ERROR );
+                $self->{ 'had_errors' } = 1;
+            }
+
+        }
+    }
+    return;
+}
+
+sub deliver_to_all_remote_destinations {
+    my $self = shift;
+    return unless $self->{ 'destination' }->{ 'remote' };
+    for my $dst ( @{ $self->{ 'destination' }->{ 'remote' } } ) {
+
+        my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
+
+        for my $type ( qw( data xlog ) ) {
+
+            my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
+            my $source_filename = File::Spec->catfile( $B, $filename );
+            my $destination_filename = $dst->{ 'path' };
+            $destination_filename =~ s{/*\z}{/};
+            $destination_filename .= $filename;
+
+            my $time_msg = sprintf 'Copying %s to %s', $source_filename, $destination_filename;
+            $self->log->time_start( $time_msg ) if $self->verbose;
+
+            my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'rsync-path' }, $source_filename, $destination_filename );
+
+            $self->log->time_finish( $time_msg ) if $self->verbose;
+
+            if ( $response->{ 'error_code' } ) {
+                $self->log->error( 'Cannot send archive %s to %s: %s', $source_filename, $destination_filename, $response );
+                $self->{ 'had_errors' } = 1;
+            }
+        }
+    }
+    return;
+}
+
+sub compress_xlogs {
+    my $self = shift;
+    $self->log->time_start( 'Compressing xlogs' ) if $self->verbose;
+    $self->start_writers( 'xlog' );
+
+    $self->tar_and_compress(
+        'work_dir' => $self->{ 'xlogs' } . '.real',
+        'tar_dir'  => basename( $self->{ 'data-dir' } ),
+    );
+    $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
+
+    return;
+}
+
+sub compress_pgdata {
+    my $self = shift;
+    $self->log->time_start( 'Compressing $PGDATA' ) if $self->verbose;
+    $self->start_writers( 'data' );
+
+    $self->tar_and_compress(
+        'work_dir' => dirname( $self->{ 'data-dir' } ),
+        'tar_dir'  => basename( $self->{ 'data-dir' } ),
+        'excludes' => [ qw( pg_log/* pg_xlog/0* pg_xlog/archive_status/* postmaster.pid ) ],
+    );
+
+    $self->log->time_finish( 'Compressing $PGDATA' ) if $self->verbose;
+    return;
+}
+
+sub tar_and_compress {
+    my $self = shift;
+    my %ARGS = @_;
+
+    my @compression_command = ( $self->{ 'nice-path' }, $self->{ 'tar-path' }, 'cf', '-' );
+    if ( $ARGS{ 'excludes' } ) {
+        push @compression_command, map { sprintf '--exclude=%s/%s', $ARGS{ 'tar_dir' }, $_ } @{ $ARGS{ 'excludes' } };
+    }
+    push @compression_command, $ARGS{ 'tar_dir' };
+
+    my $compression_str = join ' ', map { quotemeta $_ } @compression_command;
+
+    $self->prepare_temp_directory();
+    my $tar_stderr_filename = File::Spec->catfile( $self->{ 'temp-dir' }, 'tar.stderr' );
+    $compression_str .= ' 2> ' . quotemeta( $tar_stderr_filename );
+
+    my $previous_dir = getcwd;
+    chdir $ARGS{ 'work_dir' } if $ARGS{ 'work_dir' };
+
+    my $tar;
+    unless ( open $tar, '-|', $compression_str ) {
+        $self->clean_and_die( 'Cannot start tar (%s) : %s', $compression_str, $OS_ERROR );
+    }
+
+    chdir $previous_dir if $ARGS{ 'work_dir' };
+
+    my $buffer;
+    while ( my $len = sysread( $tar, $buffer, 8192 ) ) {
+        while ( my ( $type, $fh ) = each %{ $self->{ 'writers' } } ) {
+            my $written = syswrite( $fh, $buffer, $len );
+            next if $written == $len;
+            $self->clean_and_die( "Writting %u bytes to filehandle for <%s> compression wrote only %u bytes ?!", $len, $written );
+        }
+    }
+    close $tar;
+
+    for my $fh ( values %{ $self->{ 'writers' } } ) {
+        close $fh;
+    }
+
+    delete $self->{ 'writers' };
+
+    my $stderr_output;
+    my $stderr;
+    unless ( open $stderr, '<', $tar_stderr_filename ) {
+        $self->log->log( 'Cannot open tar stderr file (%s) for reading: %s', $tar_stderr_filename );
+        return;
+    }
+    {
+        local $/;
+        $stderr_output = <$stderr>;
+    };
+    close $stderr;
+    return unless $stderr_output;
+    $self->log->log( 'Tar (%s) generated these output on stderr:', $compression_str );
+    $self->log->log( '==============================================' );
+    $self->log->log( '%s', $stderr_output );
+    $self->log->log( '==============================================' );
+    unlink $tar_stderr_filename;
+    return;
+}
+
+sub start_writers {
+    my $self      = shift;
+    my $data_type = shift;
+
+    my %writers = ();
+
+    COMPRESSION:
+    while ( my ( $type, $dst_path ) = each %{ $self->{ 'base' } } ) {
+        my $filename = $self->get_archive_filename( $data_type, $type );
+
+        my $full_file_path = File::Spec->catfile( $dst_path, $filename );
+
+        if ( $type eq 'none' ) {
+            if ( open my $fh, '>', $full_file_path ) {
+                $writers{ $type } = $fh;
+                $self->log->log( "Starting \"none\" writer to $full_file_path" ) if $self->verbose;
+                next COMPRESSION;
+            }
+            $self->clean_and_die( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
+        }
+
+        my @command = map { quotemeta $_ } ( $self->{ 'nice-path' }, $self->{ $type . '-path' }, '--stdout', '-' );
+        push @command, ( '>', quotemeta( $full_file_path ) );
+
+        $self->log->log( "Starting \"%s\" writer to %s", $type, $full_file_path ) if $self->verbose;
+        if ( open my $fh, '|-', join( ' ', @command ) ) {
+            $writers{ $type } = $fh;
+            next COMPRESSION;
+        }
+        $self->clean_and_die( 'Cannot open command. Error: %s, Command: %s', $OS_ERROR, \@command );
+    }
+    $self->{ 'writers' } = \%writers;
+    return;
+}
+
+sub get_archive_filename {
+    my $self = shift;
+    my ( $type, $compression ) = @_;
+
+    my $ext = $compression eq 'none' ? '' : ext_for_compression( $compression );
+
+    my $filename = $self->{ 'filename-template' };
+    $filename =~ s/__FILETYPE__/$type/g;
+    $filename =~ s/__CEXT__/$ext/g;
+
+    return $filename;
+}
+
+sub stop_pg_backup {
+    my $self = shift;
+
+    $self->prepare_temp_directory();
+
+    my @command = ( @{ $self->{ 'psql' } }, "SELECT pg_stop_backup()" );
+
+    $self->log->time_start( 'pg_stop_backup()' ) if $self->verbose;
+    my $status = run_command( $self->{ 'temp-dir' }, @command );
+    $self->log->time_finish( 'pg_stop_backup()' ) if $self->verbose;
+
+    $self->clean_and_die( 'Running pg_stop_backup() failed: %s', $status ) if $status->{ 'error_code' };
+
+    $status->{ 'stdout' } =~ s/\s*\z//;
+    $self->log->log( q{pg_stop_backup('omnipitr') returned %s.}, $status->{ 'stdout' } );
+
+    my $subdir = basename( $self->{ 'data-dir' } );
+
+    unlink( $self->{ 'xlogs' } );
+
+    return;
+}
+
+sub start_pg_backup {
+    my $self = shift;
+
+    my $subdir = basename( $self->{ 'data-dir' } );
+    $self->clean_and_die( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . '.real',                 $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . '.real' );
+    $self->clean_and_die( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . ".real/$subdir",         $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . ".real/$subdir" );
+    $self->clean_and_die( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog" );
+    $self->clean_and_die( 'Cannot symlink %s to %s: %s', $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' } . $OS_ERROR )
+        unless symlink( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' } );
+
+    $self->prepare_temp_directory();
+
+    my @command = ( @{ $self->{ 'psql' } }, "SELECT pg_start_backup('omnipitr')" );
+
+    $self->log->time_start( 'pg_start_backup()' ) if $self->verbose;
+    my $status = run_command( $self->{ 'temp-dir' }, @command );
+    $self->log->time_finish( 'pg_start_backup()' ) if $self->verbose;
+
+    $self->clean_and_die( 'Running pg_start_backup() failed: %s', $status ) if $status->{ 'error_code' };
+
+    $status->{ 'stdout' } =~ s/\s*\z//;
+    $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $status->{ 'stdout' } );
+
+    return;
+}
+
+sub clean_and_die {
+    my $self          = shift;
+    my @msg_with_args = @_;
+    rmtree( $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' } );
+    $self->log->fatal( @msg_with_args );
 }
 
 sub choose_base_local_destinations {
@@ -48,6 +328,7 @@ sub choose_base_local_destinations {
         mkpath( $tmp_dir );
         $base->{ $type } = $tmp_dir;
     }
+
     return;
 }
 
@@ -70,46 +351,11 @@ For example, for temp-dir '/tmp' and segment being pg_xlog/000000010000000000000
 
 sub prepare_temp_directory {
     my $self = shift;
+    return if $self->{ 'temp-dir-prepared' };
     my $full_temp_dir = File::Spec->catfile( $self->{ 'temp-dir' }, basename( $PROGRAM_NAME ) );
     mkpath( $full_temp_dir );
     $self->{ 'temp-dir' }          = $full_temp_dir;
     $self->{ 'temp-dir-prepared' } = $full_temp_dir;
-    return;
-}
-
-=head1 read_state()
-
-Helper function to read state from state file.
-
-Name of state file is the same as filename of WAL segment being archived, but it is in state-dir.
-
-=cut
-
-sub read_state {
-    my $self = shift;
-    $self->{ 'state' } = {};
-
-    return unless $self->{ 'state-dir' };
-
-    $self->{ 'state-file' } = File::Spec->catfile( $self->{ 'state-dir' }, 'omnipitr-backup-master.state' );
-    return unless -f $self->{ 'state-file' };
-    $self->{ 'state' } = retrieve( $self->{ 'state-file' } );
-    return;
-}
-
-=head1 save_state()
-
-Helper function to save state to state-file.
-
-=cut
-
-sub save_state {
-    my $self = shift;
-
-    return unless $self->{ 'state-file' };
-
-    store( $self->{ 'state' }, $self->{ 'state-file' } );
-
     return;
 }
 
@@ -150,8 +396,7 @@ sub read_args {
     my @argv_copy = @ARGV;
 
     my %args = (
-        'data-dir'          => '.',
-        'temp-dir'          => $ENV{ 'TMPDIR' } || '/tmp',
+        'temp-dir' => $ENV{ 'TMPDIR' } || '/tmp',
         'gzip-path'         => 'gzip',
         'bzip2-path'        => 'bzip2',
         'lzma-path'         => 'lzma',
@@ -163,7 +408,7 @@ sub read_args {
         'filename-template' => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__',
     );
 
-    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-master-backup.pod' )
+    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-backup-master.pod' )
         unless GetOptions(
         \%args,
         'data-dir|D=s',
@@ -178,7 +423,7 @@ sub read_args {
         'log|l=s',
         'filename-template|f=s',
         'pid-file',
-        'verbose|v=s',
+        'verbose|v',
         'gzip-path|gp=s',
         'bzip2-path|bp=s',
         'lzma-path|lp=s',
@@ -186,7 +431,6 @@ sub read_args {
         'psql-path|pp=s',
         'tar-path|tp=s',
         'rsync-path|rp=s',
-        'state-dir|s=s',
         );
 
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
@@ -226,6 +470,16 @@ sub read_args {
 
     $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
 
+    my @psql = ();
+    push @psql, $self->{ 'psql-path' };
+    push @psql, '-qAtX';
+    push @psql, ( '-U', $self->{ 'username' } ) if $self->{ 'username' };
+    push @psql, ( '-d', $self->{ 'database' } ) if $self->{ 'database' };
+    push @psql, ( '-h', $self->{ 'host' } )     if $self->{ 'host' };
+    push @psql, ( '-p', $self->{ 'port' } )     if $self->{ 'port' };
+    push @psql, '-c';
+    $self->{ 'psql' } = \@psql;
+
     return;
 }
 
@@ -241,18 +495,26 @@ might, but doesn't have to be actual file path - it might be just program name (
 sub validate_args {
     my $self = shift;
 
+    $self->log->fatal( 'Data-dir was not provided!' ) unless defined $self->{ 'data-dir' };
+    $self->log->fatal( 'Provided data-dir (%s) does not exist!',   $self->{ 'data-dir' } ) unless -e $self->{ 'data-dir' };
+    $self->log->fatal( 'Provided data-dir (%s) is not directory!', $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' };
+    $self->log->fatal( 'Provided data-dir (%s) is not readable!',  $self->{ 'data-dir' } ) unless -r $self->{ 'data-dir' };
+
     my $dst_count = scalar( @{ $self->{ 'destination' }->{ 'local' } } ) + scalar( @{ $self->{ 'destination' }->{ 'remote' } } );
     $self->log->fatal( "No --dst-* has been provided!" ) if 0 == $dst_count;
 
-    if ( 1 < $dst_count ) {
-        $self->log->fatal( "More than 1 --dst-* has been provided, but no --state-dir!" ) if !$self->{ 'state-dir' };
-        $self->log->fatal( "Given --state-dir (%s) does not exist",     $self->{ 'state-dir' } ) unless -e $self->{ 'state-dir' };
-        $self->log->fatal( "Given --state-dir (%s) is not a directory", $self->{ 'state-dir' } ) unless -d $self->{ 'state-dir' };
-        $self->log->fatal( "Given --state-dir (%s) is not writable",    $self->{ 'state-dir' } ) unless -w $self->{ 'state-dir' };
-    }
-
     $self->log->fatal( "Filename template does not contain __FILETYPE__ placeholder!" ) unless $self->{ 'filename-template' } =~ /__FILETYPE__/;
     $self->log->fatal( "Filename template cannot contain / or \\ characters!" ) if $self->{ 'filename-template' } =~ m{[/\\]};
+
+    $self->log->fatal( "Xlogs dir (--xlogs) was not given! Cannot work without it" ) unless defined $self->{ 'xlogs' };
+    $self->{ 'xlogs' } =~ s{/+$}{};
+    $self->log->fatal( "Xlogs dir (%s) already exists! It shouldn't.",           $self->{ 'xlogs' } ) if -e $self->{ 'xlogs' };
+    $self->log->fatal( "Xlogs side dir (%s.real) already exists! It shouldn't.", $self->{ 'xlogs' } ) if -e $self->{ 'xlogs' } . '.real';
+
+    my $xlog_parent = dirname( $self->{ 'xlogs' } );
+    $self->log->fatal( 'Xlogs dir (%s) parent (%s) does not exist. Cannot continue.',   $self->{ 'xlogs' }, $xlog_parent ) unless -e $xlog_parent;
+    $self->log->fatal( 'Xlogs dir (%s) parent (%s) is not directory. Cannot continue.', $self->{ 'xlogs' }, $xlog_parent ) unless -d $xlog_parent;
+    $self->log->fatal( 'Xlogs dir (%s) parent (%s) is not writable. Cannot continue.',  $self->{ 'xlogs' }, $xlog_parent ) unless -w $xlog_parent;
 
     return;
 }
