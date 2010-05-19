@@ -17,6 +17,15 @@ use Storable;
 use Cwd;
 use Getopt::Long qw( :config no_ignore_case );
 
+=head1 run()
+
+Main function wrapping all work.
+
+Starts with getting list of compressions that have to be done, then it chooses where to compress to (important if we have remote-only destination), then it makes actual backup, and delivers to all
+destinations.
+
+=cut
+
 sub run {
     my $self = shift;
     $self->get_list_of_all_necessary_compressions();
@@ -36,10 +45,14 @@ sub run {
     return;
 }
 
+=head1 deliver_to_all_destinations()
+
+Simple wrapper to have single point to call to deliver backups to all requested backups.
+
+=cut
+
 sub deliver_to_all_destinations {
     my $self = shift;
-
-    # $self->log->log( '%s', $self );
 
     $self->deliver_to_all_local_destinations();
 
@@ -47,6 +60,12 @@ sub deliver_to_all_destinations {
 
     return;
 }
+
+=head1 deliver_to_all_local_destinations()
+
+Copies backups to all local destinations which are not also base destinations for their respective compressions.
+
+=cut
 
 sub deliver_to_all_local_destinations {
     my $self = shift;
@@ -79,6 +98,12 @@ sub deliver_to_all_local_destinations {
     return;
 }
 
+=head1 deliver_to_all_remote_destinations()
+
+Delivers backups to remote destinations using rsync program.
+
+=cut
+
 sub deliver_to_all_remote_destinations {
     my $self = shift;
     return unless $self->{ 'destination' }->{ 'remote' };
@@ -110,6 +135,12 @@ sub deliver_to_all_remote_destinations {
     return;
 }
 
+=head1 compress_xlogs()
+
+Wrapper function which encapsulates all work required to compress xlog segments that accumulated during backup of data directory.
+
+=cut
+
 sub compress_xlogs {
     my $self = shift;
     $self->log->time_start( 'Compressing xlogs' ) if $self->verbose;
@@ -123,6 +154,12 @@ sub compress_xlogs {
 
     return;
 }
+
+=head1 compress_pgdata()
+
+Wrapper function which encapsulates all work required to compress data directory.
+
+=cut
 
 sub compress_pgdata {
     my $self = shift;
@@ -138,6 +175,26 @@ sub compress_pgdata {
     $self->log->time_finish( 'Compressing $PGDATA' ) if $self->verbose;
     return;
 }
+
+=head1 tar_and_compress()
+
+Worker function which does all of the actual tar, and sending data to compression filehandles.
+
+Takes hash (not hashref) as argument, and uses following keys from it:
+
+=over
+
+=item * tar_dir - which directory to compress
+
+=item * work_dir - what should be current working directory when executing tar
+
+=item * excludes - optional key, that (if exists) is treated as arrayref of shell globs (tar dir) of items to exclude from backup
+
+=back
+
+If tar will print anything to STDERR it will be logged. Error status code is ignored, as it is expected that tar will generate errors (due to files modified while archiving).
+
+=cut
 
 sub tar_and_compress {
     my $self = shift;
@@ -201,6 +258,14 @@ sub tar_and_compress {
     return;
 }
 
+=head1 start_writers()
+
+Starts set of filehandles, which write to file, or to compression program, to create final archives.
+
+Each compression schema gets its own filehandle, and printing data to it, will pass it to file directly or through compression program that has been chosen based on command line arguments.
+
+=cut
+
 sub start_writers {
     my $self      = shift;
     my $data_type = shift;
@@ -236,6 +301,12 @@ sub start_writers {
     return;
 }
 
+=head1 get_archive_filename()
+
+Helper function, which takes filetype and compression schema to use, and returns generated filename (based on filename-template command line option).
+
+=cut
+
 sub get_archive_filename {
     my $self = shift;
     my ( $type, $compression ) = @_;
@@ -248,6 +319,16 @@ sub get_archive_filename {
 
     return $filename;
 }
+
+=head1 stop_pg_backup()
+
+Runs pg_stop_backup() PostgreSQL function, which is crucial in backup process.
+
+This happens after data directory compression, but before compression of xlogs.
+
+This function also removes temporary destination for xlogs (dst-backup for omnipitr-archive).
+
+=cut
 
 sub stop_pg_backup {
     my $self = shift;
@@ -271,6 +352,12 @@ sub stop_pg_backup {
 
     return;
 }
+
+=head1 start_pg_backup()
+
+Executes pg_start_backup() postgresql function, and (before it) creates temporary destination for xlogs (dst-backup for omnipitr-archive).
+
+=cut
 
 sub start_pg_backup {
     my $self = shift;
@@ -298,12 +385,26 @@ sub start_pg_backup {
     return;
 }
 
+=head1 clean_and_die()
+
+Helper function called by other parts of code - removes temporary destination for xlogs, and exits program with logging passed message.
+
+=cut
+
 sub clean_and_die {
     my $self          = shift;
     my @msg_with_args = @_;
     rmtree( $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' } );
     $self->log->fatal( @msg_with_args );
 }
+
+=head1 choose_base_local_destinations()
+
+Chooses single local destination for every compression schema required by destinations specifications.
+
+In case some compression schema exists only for remote destination, local temp directory is created in --temp-dir location.
+
+=cut
 
 sub choose_base_local_destinations {
     my $self = shift;
@@ -332,6 +433,12 @@ sub choose_base_local_destinations {
     return;
 }
 
+=head1 DESTROY()
+
+Destroctor for object - removes temp directory on program exit.
+
+=cut
+
 sub DESTROY {
     my $self = shift;
     return unless $self->{ 'temp-dir-prepared' };
@@ -343,9 +450,9 @@ sub DESTROY {
 
 Helper function, which builds path for temp directory, and creates it.
 
-Path is generated by using given temp-dir, 'omnipitr-archive' name, and filename of segment.
+Path is generated by using given temp-dir and 'omnipitr-backup-master' named.
 
-For example, for temp-dir '/tmp' and segment being pg_xlog/000000010000000000000003, actual, used temp directory would be /tmp/omnipitr-archive/000000010000000000000003/.
+For example, for temp-dir '/tmp' used temp directory would be /tmp/omnipitr-backup-master.
 
 =cut
 
@@ -385,8 +492,6 @@ sub get_list_of_all_necessary_compressions {
 =head1 read_args()
 
 Function which does all the parsing, and transformation of command line arguments.
-
-It also verified base facts about passed WAL segment name, but all other validations, are being done in separate function: L<validate_args()>.
 
 =cut
 
