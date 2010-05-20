@@ -1,0 +1,364 @@
+=head1 OmniPITR - how to setup.
+
+=head2 OVERVIEW
+
+Following documentation walks you through installation, setup and running of
+master-slave replication of PostgreSQL database using WAL segment files (also
+known as PiTR Replication.
+
+It will also cover methods of making backups, both from master and slave
+servers, and methods for monitoring replication status.
+
+=head2 SETUP OVERVIEW
+
+Following document provides information about setting replication/backup
+scenario, on 3 machines, with following responsibilities:
+
+=over
+
+=item * master server - server (both hardware and software) that contains the working,
+writable PostgreSQL instance
+
+=item * slave server - server (both hardware and software) that contains secondary,
+warm or hot standby server. With PostgreSQL pre 9.0 it's not readable, but from
+9.0 you can send read-only queries to it.
+
+=item * backup server - additional machine that is being used as storage for
+backup files - both full-database backups and/or backup of currently generated
+xlog files (WAL segments)
+
+=back
+
+Before setting replication it is required that you have PostgreSQL installed on
+both master and slave servers, and working PostgreSQL cluster on master.
+
+Paths should be the same on master and slave - at least to data directory.
+
+For the purpose of example, I assume following paths on each servers - you are
+in no way obliged to use the same paths - these are just explanations if
+something wouldn't be clear from examples later on:
+
+=head3 Master server paths
+
+=over
+
+=item * /home/postgres - home directory of postgres user - user that is used to
+run PostgreSQL
+
+=item * /home/postgres/data - data directory for PostgreSQL
+
+=item * /home/postgres/data/postgresql.conf - PostgreSQL configuration file for
+master
+
+=item * /var/tmp - temporary directory that can be freely used
+
+=back
+
+=head3 Slave server paths
+
+=over
+
+=item * /home/postgres - home directory of postgres user - user that is used to
+run PostgreSQL
+
+=item * /var/tmp - temporary directory that can be freely used
+
+=back
+
+=head3 Backup server paths
+
+=over
+
+=item * /var/backups - backups directory - all backups should arrive in here.
+
+=back
+
+=head2 PREPARATION
+
+To make everything working we need a way to copy files from master to slave and
+backup, and from slave to backup.
+
+Since I<OmniPITR> is using RSync for all transfers, we can effectively use two
+ways of communication:
+
+=over
+
+=item * rsync over ssh
+
+=item * direct rsync
+
+=back
+
+First method is usually easier to setup - as you most likely have ssh daemon on
+all machines, so it is enough to install rsync program, and you're virtually
+good to go.
+
+Second method is a bit more complex, as you need additinally to setup rsync
+daemon, but it pays off in increased security, faster transfers and less
+resource-intensive work. The biggest drawback is that data being sent are not
+encrypted. Which might, or might not be an issue, depending on distance, and
+trust for connection - i.e. using encrypted vpn and then plain rsync is (in my
+opinion) favorable over rsync-over-ssh, due to extra security steps we can have
+when using rsync as daemon.
+
+In any way, we need to make some extra directories:
+
+=over
+
+=item * On master server:
+
+=over
+
+=item * /home/postgres/omnipitr - this is where omnipitr will store it's
+internal datafiles (rather small)
+
+=item * /home/postgres/omnipitr/log - place for omnipitr log
+
+=item * /home/postgres/omnipitr/state - place for omnipitr state files
+
+=item * /var/tmp/omnipitr - place for temporary files (larger) created and used
+by omnipitr
+
+=back
+
+=item * On slave server:
+
+=over
+
+=item * /home/postgres/wal_archive - this is where master will send xlog
+segments to be used for replication
+
+=item * /home/postgres/omnipitr - this is where omnipitr will store it's
+internal datafiles (rather small)
+
+=item * /home/postgres/omnipitr/log - place for omnipitr log
+
+=item * /home/postgres/omnipitr/state - place for omnipitr state files
+
+=item * /var/tmp/omnipitr - place for temporary files (larger) created and used
+by omnipitr
+
+=back
+
+=item * On backup server:
+
+=over
+
+=item * /var/backups/database - top level directory for database backups
+
+=item * /var/backups/database/hot_backup - directory to put hot backup files in
+
+=item * /var/backups/database/xlog - directory to put xlog segments in
+
+=back
+
+=back
+
+And then we need to allow uploads to them.
+
+For this - you'd rather consult your sysadmins. For the sake of this document, I
+assume that the chosen method was direct rsync, and we have working following
+rsync paths:
+
+=over
+
+=item * rsync://slave/wal_archive/ - points to /home/postgres/wal_archive/, with
+write access for master, without password
+
+=item * rsync://backup/database/ - points to /var/backups/database, with write
+access for master and slave, without password
+
+=back
+
+=head2 ACTUAL INSTALLATION AND CONFIGURATION
+
+On both master and slave machines, please install omnipitr to /opt/omnipitr
+directory, for example using:
+
+    $ svn co https://labs.omniti.com/pgtreats/trunk/omnipitr /opt/omnipitr
+
+Now, on both machines, check if the installation is OK, that is run sanity
+check:
+
+    $ /opt/omnipitr/bin/sanity-check.sh
+    Checking:
+    - /opt/omnipitr/bin
+    - /opt/omnipitr/lib
+    5 programs, 9 libraries.
+    All checked, and looks ok.
+
+if there are any errors/warnings - do whatever you can to fix them.
+
+Now. If this works well, we can move on to setting up all subsequent steps.
+
+=head3 Archival of XLOGs from master
+
+In /home/postgres/data/postgresql.conf find section "WRITE AHEAD LOG" ->
+"Archiving". Usually it contains lines like these:
+
+    #archive_mode = off    # allows archiving to be done
+    #archive_command = ''  # command to use to archive a logfile segment
+    #archive_timeout = 0   # force a logfile segment switch after this
+
+You need to enable archive_mode:
+
+    archive_mode = one
+
+(in older versions ( pre 8.2 ) there is no archive_mode. It's ok - just don't
+add it).
+
+Set archive_command to:
+
+    archive_command = '/opt/omnipitr/bin/omnipitr-archive -l /home/postgres/omnipitr/log/omnipitr-^Y^m^d.log -s /home/postgres/omnipitr/state -dr gzip=rsync://slave/wal_archive/ -dr gzip=rsync://backup/database/xlog/ -db /var/tmp/omnipitr/dstbackup -t /var/tmp/omnipitr/ -v "%p"'
+
+and archive_timeout to:
+
+    archive_timeout = 60
+
+This will make sure that in worst case you have 1 minute lag.
+
+Meaning of options:
+
+=over
+
+=item * -l /home/postgres/omnipitr/log/omnipitr-^Y^m^d.log : Path to logfile,
+will be automatically rotated on date change.
+
+=item * -s /home/postgres/omnipitr/state : Directory to keep state information,
+internal stuff, not really interesting, small files only, but required it we
+have more than 1 destination
+
+=item * -dr gzip=rsync://slave/wal_archive/ : sends gzip compressed wal segments
+to slave to appropriate path
+
+=item * -dr gzip=rsync://backup/database/xlog/ : sends the same gzip compressed
+wal segments to backup server for long term storage
+
+=item * -db /var/tmp/omnipitr/dstbackup : it is important that this path
+shouldn't exist - it's a directory, that (if it exists) will be used as
+additional local destination - for the purposes of omnipitr-backup-master program
+
+=item * -t /var/tmp/omnipitr/ : where to keep temporary files (when needed)
+
+=item * -v : log verbose information - mostly timings.
+
+=back
+
+Afterwards you need to restart PostgreSQL (or reload if you changed only
+archive_command and/or archive_timeout).
+
+Archiving should work nicely now, which you can see after couple of minutes
+(assuming you set archive_timeout to 60 seconds, like I showed above).
+
+You should start seeing compressed files showing on slave and backup servers,
+and appropriate information in logfile.
+
+=head3 Creation of hot backup on master
+
+This is actually pretty simple - assuming you have working archiving (described
+in previous section of this howto.
+
+You simply run this command:
+
+    /opt/omnipitr/bin/omnipitr-backup-master -D /home/postgres/data -l /home/postgres/omnipitr/log/omnipitr-^Y^m^d.log -x /var/tmp/omnipitr/dstbackup -dr gzip=rsync://backup/database/hot_backup/ -t /var/tmp/omnipitr/ --pid-file /home/postgres/omnipitr/backup-master.pid -v
+
+Meaning of options:
+
+=over
+
+=item * -D /home/postgres/data : Where is data directory for PostgreSQL instance
+
+=item * -l /home/postgres/omnipitr/log/omnipitr-^Y^m^d.log : Where to log
+information - logfile will be daily rotated. Logfile can be shared between
+OmniPITR programs as each line contains identifier of program that wrote it
+
+=item * -x /var/tmp/omnipitr/dstbackup : Should be the same path as in I<-db>
+option to omnipitr-archive, and it shouldn't exist - omnipitr-backup-master will
+create it, and later on remove.
+
+=item * -dr gzip=rsync://backup/database/hot_backup/ : Will send gzip compressed
+backups to backup server to appropriate directory.
+
+=item * -t /var/tmp/omnipitr/ : Where to create temporary files
+
+=item * --pid-file /home/postgres/omnipitr/backup-master.pid : When running
+manually, it's not needed, but when the same command will be put in cronjob -
+it's nice to be sure that only 1 backup can run at the same time
+
+=item * -v : Log verbosely - mostly add timings.
+
+=back
+
+After running, on backup server you will get 2 files:
+
+=over
+
+=item * master-data-YYYY-MM-DD.tar.gz
+
+=item * master-xlog-YYYY-MM-DD.tar.gz
+
+=back
+
+which together form backup for master database.
+
+=head3 Starting up slave
+
+First you need to obtain master-data backup file from backup server. Xlog file
+is only used if you want to start the server as fully working r/w server and not
+replication slave.
+
+So, get the .tar.gz file to /home/postgres, and uncompress it.
+
+It will create /home/postgres/data directory which contains copy of PostgreSQL
+files from master.
+
+Now, edit /home/postgres/data/postgresql.conf (this, like any other file
+mentioned in this section - on slave), and change archive_command to:
+
+    archive_command = '/bin/true'
+
+To make sure that slave will not try to archive xlog files.
+
+Afterwards, in /home/postgres/data directory make I<recovery.conf> file with
+single line:
+
+    restore_command = ' /opt/omnipitr/bin/omnipitr-restore -l /var/tmp/omnipitr-^Y^m^d.log -s gzip=/home/postgres/wal_archive -f /home/postgres/omnipitr/finish.recovery -r -p /home/postgres/omnipitr/pause.removal -v -t /var/tmp/omnipitr/ -w 900 %f %p'
+
+Meaning of options:
+
+=over
+
+=item * -l /var/tmp/omnipitr-^Y^m^d.log : Where to log information - logfile
+will be daily rotated. Logfile can be shared between OmniPITR programs as each
+line contains identifier of program that wrote it
+
+=item * -s gzip=/home/postgres/wal_archive : Where to find xlog segments sent in
+from master, and how are they compressed
+
+=item * -f /home/postgres/omnipitr/finish.recovery : Trigger file - if it will
+exist - recovery will be stopped.
+
+=item * -r : remove no longer needed xlog segments - it's a bit more tricky than
+'segments that have been already applied', but we can be sure it's safe
+operation - even in cases like stopping slave recovery for days.
+
+=item * -p /home/postgres/omnipitr/pause.removal : trigger file - if it exists -
+segments will no longer be removed when no longer needed - this is useful for
+omnipitr-backup-slave
+
+=item * -v : log verbosely
+
+=item * -t /var/tmp/omnipitr/ : where to create temporary files, if needed.
+
+=item * -w 900 : wait 15 minutes between xlog arrival and application - this is
+to be able to stop recovery in case of catastrophic query being run on master
+(think: I<truncate table users>)
+
+=back
+
+Afterwards - just start PostgreSQL on slave, and check generated logs for
+information about progress, but everything should be working just fine now.
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2009 OmniTI. All rights reserved.
