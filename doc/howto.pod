@@ -202,7 +202,7 @@ In /home/postgres/data/postgresql.conf find section "WRITE AHEAD LOG" ->
 
 You need to enable archive_mode:
 
-    archive_mode = one
+    archive_mode = on
 
 (in older versions ( pre 8.2 ) there is no archive_mode. It's ok - just don't
 add it).
@@ -225,8 +225,8 @@ Meaning of options:
 will be automatically rotated on date change.
 
 =item * -s /home/postgres/omnipitr/state : Directory to keep state information,
-internal stuff, not really interesting, small files only, but required it we
-have more than 1 destination
+internal stuff, not really interesting, small files only, but it is required if
+we have more than 1 destination
 
 =item * -dr gzip=rsync://slave/wal_archive/ : sends gzip compressed wal segments
 to slave to appropriate path
