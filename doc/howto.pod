@@ -73,6 +73,9 @@ run PostgreSQL
 
 =back
 
+Also I assume that PostgreSQL itself, and OmniPITR programs work from postgres
+system account.
+
 =head2 PREPARATION
 
 To make everything working we need a way to copy files from master to slave and
@@ -101,7 +104,8 @@ trust for connection - i.e. using encrypted vpn and then plain rsync is (in my
 opinion) favorable over rsync-over-ssh, due to extra security steps we can have
 when using rsync as daemon.
 
-In any way, we need to make some extra directories:
+In any way, we need to make some extra directories (all this directories should
+be writable by postgres user, preferably also owned by it):
 
 =over
 
