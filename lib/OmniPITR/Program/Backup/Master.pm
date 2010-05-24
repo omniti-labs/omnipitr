@@ -40,7 +40,6 @@ sub run {
     $self->deliver_to_all_destinations();
 
     $self->log->log( 'All done%s.', $self->{ 'had_errors' } ? ' with errors' : '' );
-    rmtree( $self->{ 'xlogs' } . '.real' );
     exit( 1 ) if $self->{ 'had_errors' };
 
     return;
@@ -152,6 +151,7 @@ sub compress_xlogs {
         'tar_dir'  => basename( $self->{ 'data-dir' } ),
     );
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
+    rmtree( $self->{ 'xlogs' } . '.real' );
 
     return;
 }
