@@ -40,6 +40,7 @@ sub run {
     $self->deliver_to_all_destinations();
 
     $self->log->log( 'All done%s.', $self->{ 'had_errors' } ? ' with errors' : '' );
+    rmtree( $self->{ 'xlogs' } . '.real' );
     exit( 1 ) if $self->{ 'had_errors' };
 
     return;
