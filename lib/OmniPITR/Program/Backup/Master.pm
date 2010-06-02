@@ -201,6 +201,8 @@ sub tar_and_compress {
     my $self = shift;
     my %ARGS = @_;
 
+    $SIG{ 'PIPE' } = sub { $self->clean_and_die( 'Got SIGPIPE while tarring %s for %s', $ARGS{ 'tar_dir' }, $self->{ 'sigpipeinfo' } ); };
+
     my @compression_command = ( $self->{ 'nice-path' }, $self->{ 'tar-path' }, 'cf', '-' );
     if ( $ARGS{ 'excludes' } ) {
         push @compression_command, map { sprintf '--exclude=%s/%s', $ARGS{ 'tar_dir' }, $_ } @{ $ARGS{ 'excludes' } };
@@ -226,9 +228,10 @@ sub tar_and_compress {
     my $buffer;
     while ( my $len = sysread( $tar, $buffer, 8192 ) ) {
         while ( my ( $type, $fh ) = each %{ $self->{ 'writers' } } ) {
+            $self->{ 'sigpipeinfo' } = $type;
             my $written = syswrite( $fh, $buffer, $len );
             next if $written == $len;
-            $self->clean_and_die( "Writting %u bytes to filehandle for <%s> compression wrote only %u bytes ?!", $len, $written );
+            $self->clean_and_die( "Writting %u bytes to filehandle for <%s> compression wrote only %u bytes ?!", $len, $type, $written );
         }
     }
     close $tar;
@@ -383,6 +386,8 @@ sub start_pg_backup {
     $status->{ 'stdout' } =~ s/\s*\z//;
     $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $status->{ 'stdout' } );
 
+    $self->{ 'pg_start_backup_done' } = 1;
+
     return;
 }
 
@@ -395,7 +400,8 @@ Helper function called by other parts of code - removes temporary destination fo
 sub clean_and_die {
     my $self          = shift;
     my @msg_with_args = @_;
-    rmtree( $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' } );
+    rmtree( $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' }, { 'verbose' => 0 } );
+    $self->stop_pg_backup() if $self->{ 'pg_start_backup_done' };
     $self->log->fatal( @msg_with_args );
 }
 
