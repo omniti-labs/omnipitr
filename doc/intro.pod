@@ -46,6 +46,14 @@ General script for I<Nagios>/I<Cacti> type of systems - monitoring, graphing. Pr
 
 In most of the cases you can simply call the program you want to use with I<--help> option to get brief overview of command line options.
 
+=head2 SUPPORT
+
+Currently there is simply mailing list that you can subscribe, and post your
+questions/problems to.
+
+Maling list page (includes option to subscribe, and view archives) is available
+here: http://lists.omniti.com/mailman/listinfo/pgtreats-users/
+
 =head2 COPYRIGHT
 
 The OmniPITR project is Copyright (c) 2009 OmniTI. All rights reserved.
