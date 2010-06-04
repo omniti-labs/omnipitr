@@ -33,6 +33,31 @@ someplace in your system I<omnipitr> directory, which will contain I<bin/> and
 I<lib/> directories (just like it is distributed) - you don't have to set
 I<PERL5LIB> - scripts will automatically find their libs.
 
+=head2 REQUIREMENTS
+
+Standard Perl distribution should be enough. On some Linux systems (Debian,
+Ubuntu) core Perl modules have been packaged separately - in such case you need
+to install also perl-modules package.
+
+Additionally, you will need some programs installed:
+
+=over
+
+=item * nice
+
+=item * rsync
+
+=item * tar (it has to be GNU tar)
+
+=back
+
+Additionally, you might want to use compression, in which case you need I<gzip>,
+I<bzip2> or I<lzma> compression programs.
+
+Please note that you can use I<pigz> to get faster, but gzip-compatible,
+compression. To do so, specify all destinations/sources using I<gzip> prefix,
+but add --gzip-path option with value pointing to I<pigz> program.
+
 =head2 SANITY CHECK
 
 After installation it's good to run I<sanity-check.sh> script (from I<bin/>)
