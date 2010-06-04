@@ -1,0 +1,19 @@
+=head1 OmniPITR
+
+=head2 2010-06-05
+
+=over
+
+=item * Added documentation about requirements
+
+=item * Added workaround for PostgreSQL 8.2 and 8.3, which do not wait for .backup
+"wal segment" to be archived before returning control from pg_stop_backup()
+call.
+
+=item * Added changelog
+
+=back
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2009-2010 OmniTI. All rights reserved.
