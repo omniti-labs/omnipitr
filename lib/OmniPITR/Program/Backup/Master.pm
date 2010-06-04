@@ -35,6 +35,7 @@ sub run {
     $self->compress_pgdata();
 
     $self->stop_pg_backup();
+    $self->wait_for_final_xlog_and_remove_dst_backup();
     $self->compress_xlogs();
 
     $self->deliver_to_all_destinations();
@@ -43,6 +44,36 @@ sub run {
     exit( 1 ) if $self->{ 'had_errors' };
 
     return;
+}
+
+=head1 wait_for_final_xlog_and_remove_dst_backup()
+
+In PostgreSQL < 8.4 pg_stop_backup() finishes before .backup "wal segment" is archived.
+
+So we need to wait till it appears in backup xlog destination before we can remove symlink.
+
+=cut
+
+sub wait_for_final_xlog_and_remove_dst_backup {
+    my $self = shift;
+
+    my $search_in_dir = $self->{ 'xlogs' };
+
+    my $re     = $self->{ 'stop_backup_filename_re' };
+    my $waited = 0;
+    while ( 1 ) {
+        opendir( my $dir, $search_in_dir ) or $self->clean_and_die( 'Cannot open %s for scanning: %s', $search_in_dir, $OS_ERROR );
+        my @matching = grep { $_ =~ $re } readdir $dir;
+        closedir $dir;
+        last if 0 < scalar @matching;
+        $waited++;
+        $self->clean_and_die( 'Waited 10 minutes for file matching %s, but it did not appear. Something is wrong. No sense in waiting longer.', $re ) if 600 < $waited;
+        sleep 1;
+    }
+
+    $self->log->log( '.backup file arrived after %u seconds.', $waited ) if $self->verbose;
+
+    unlink( $self->{ 'xlogs' } );
 }
 
 =head1 deliver_to_all_destinations()
@@ -352,8 +383,6 @@ sub stop_pg_backup {
 
     my $subdir = basename( $self->{ 'data-dir' } );
 
-    unlink( $self->{ 'xlogs' } );
-
     return;
 }
 
@@ -385,8 +414,17 @@ sub start_pg_backup {
 
     $status->{ 'stdout' } =~ s/\s*\z//;
     $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $status->{ 'stdout' } );
+    $self->clean_and_die( 'Ouput from pg_start_backup is not parseable?!' ) unless $status->{ 'stdout' } =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
 
-    $self->{ 'pg_start_backup_done' } = 1;
+    my ( $part_1, $part_2 ) = ( $1, $2 );
+    $part_2 =~ s/(.{1,6})\z//;
+    my $part_3 = $1;
+
+    my $expected_filename_suffix = sprintf '%08s%08s.%08s.backup', $part_1, $part_2, $part_3;
+    my $backup_filename_re = qr{\A[0-9A-F]{8}\Q$expected_filename_suffix\E\z};
+
+    $self->{ 'stop_backup_filename_re' } = $backup_filename_re;
+    $self->{ 'pg_start_backup_done' }    = 1;
 
     return;
 }
