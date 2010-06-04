@@ -24,11 +24,13 @@ Quick list of programs:
 
 =item * omnipitr-archive
 
-This should be used on master server, as I<archive_command> command.
+This should be used on master server, as I<archive_command> command, setup in
+postgresql.conf.
 
 =item * omnipitr-restore
 
-This should be used on slave server/servers, as I<restore_command> command.
+This should be used on slave server/servers, as I<restore_command> command in
+recovery.conf file.
 
 =item * omnipitr-master-backup
 
