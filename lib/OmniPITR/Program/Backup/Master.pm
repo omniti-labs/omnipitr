@@ -182,7 +182,7 @@ sub compress_xlogs {
         'tar_dir'  => basename( $self->{ 'data-dir' } ),
     );
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
-    rmtree( $self->{ 'xlogs' } . '.real' );
+    rmtree( $self->{ 'xlogs' } . '.real', { 'verbose' => 0 } );
 
     return;
 }
@@ -487,7 +487,7 @@ Destroctor for object - removes temp directory on program exit.
 sub DESTROY {
     my $self = shift;
     return unless $self->{ 'temp-dir-prepared' };
-    rmtree( $self->{ 'temp-dir-prepared' } );
+    rmtree( $self->{ 'temp-dir-prepared' }, { 'verbose' => 0 }  );
     return;
 }
 
