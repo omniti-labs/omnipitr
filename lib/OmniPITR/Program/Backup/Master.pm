@@ -182,7 +182,7 @@ sub compress_xlogs {
         'tar_dir'  => basename( $self->{ 'data-dir' } ),
     );
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
-    rmtree( $self->{ 'xlogs' } . '.real', { 'verbose' => 0 } );
+    rmtree( $self->{ 'xlogs' }, 0 );
 
     return;
 }
@@ -438,7 +438,7 @@ Helper function called by other parts of code - removes temporary destination fo
 sub clean_and_die {
     my $self          = shift;
     my @msg_with_args = @_;
-    rmtree( $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' }, { 'verbose' => 0 } );
+    rmtree( [ $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' } ], 0, );
     $self->stop_pg_backup() if $self->{ 'pg_start_backup_done' };
     $self->log->fatal( @msg_with_args );
 }
@@ -487,7 +487,7 @@ Destroctor for object - removes temp directory on program exit.
 sub DESTROY {
     my $self = shift;
     return unless $self->{ 'temp-dir-prepared' };
-    rmtree( $self->{ 'temp-dir-prepared' }, { 'verbose' => 0 }  );
+    rmtree( [ $self->{ 'temp-dir-prepared' } ], 0 );
     return;
 }
 
