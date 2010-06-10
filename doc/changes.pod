@@ -1,5 +1,14 @@
 =head1 OmniPITR
 
+=head2 2010-06-10
+
+=over
+
+=item * Fix bug caused by silencing rm - destination-backup directory wasn't
+removed after successful exit of backup.
+
+=back
+
 =head2 2010-06-07
 
 =over

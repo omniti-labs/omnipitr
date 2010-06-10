@@ -182,7 +182,7 @@ sub compress_xlogs {
         'tar_dir'  => basename( $self->{ 'data-dir' } ),
     );
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
-    rmtree( $self->{ 'xlogs' }, 0 );
+    rmtree( $self->{ 'xlogs' } . '.real', 0 );
 
     return;
 }
