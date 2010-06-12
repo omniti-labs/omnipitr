@@ -46,6 +46,43 @@ sub run {
     return;
 }
 
+=head1 wait_for_file()
+
+Helper function which waits for file to appear.
+
+It will return only if the file appeared.
+
+Return value is name of file.
+
+=cut
+
+sub wait_for_file {
+    my $self = shift;
+    my ( $dir, $filename_regexp ) = @_;
+
+    my $max_wait = 3600;    # It's 1 hour. There is no technical need to wait longer.
+    for my $i ( 0 .. $max_wait ) {
+        $self->log->log( 'Waiting for file matching %s in directory %s', $filename_regexp, $dir ) if 10 == $i;
+
+        opendir( my $dh, $dir ) or $self->clean_and_die( 'Cannot open %s for scanning: %s', $dir, $OS_ERROR );
+        my @matching = grep { $_ =~ $filename_regexp } readdir $dh;
+        closedir $dh;
+
+        if ( 0 == scalar @matching ) {
+            sleep 1;
+            next;
+        }
+
+        my $reply_filename = shift @matching;
+        $self->log->log( 'File %s arrived after %u seconds.', $reply_filename, $i ) if $self->verbose;
+        return $reply_filename;
+    }
+
+    $self->clean_and_die( 'Waited 1 hour for file matching %s, but it did not appear. Something is wrong. No sense in waiting longer.', $filename_regexp );
+
+    return;
+}
+
 =head1 wait_for_final_xlog_and_remove_dst_backup()
 
 In PostgreSQL < 8.4 pg_stop_backup() finishes before .backup "wal segment" is archived.
@@ -57,21 +94,21 @@ So we need to wait till it appears in backup xlog destination before we can remo
 sub wait_for_final_xlog_and_remove_dst_backup {
     my $self = shift;
 
-    my $search_in_dir = $self->{ 'xlogs' };
+    my $backup_file = $self->wait_for_file( $self->{ 'xlogs' }, $self->{ 'stop_backup_filename_re' } );
 
-    my $re     = $self->{ 'stop_backup_filename_re' };
-    my $waited = 0;
-    while ( 1 ) {
-        opendir( my $dir, $search_in_dir ) or $self->clean_and_die( 'Cannot open %s for scanning: %s', $search_in_dir, $OS_ERROR );
-        my @matching = grep { $_ =~ $re } readdir $dir;
-        closedir $dir;
-        last if 0 < scalar @matching;
-        $waited++;
-        $self->clean_and_die( 'Waited 10 minutes for file matching %s, but it did not appear. Something is wrong. No sense in waiting longer.', $re ) if 600 < $waited;
-        sleep 1;
+    my $last_file = undef;
+
+    open my $fh, '<', File::Spec->catfile( $self->{ 'xlogs' }, $backup_file ) or $self->clean_and_die( 'Cannot open backup file %s for reading: %s', $backup_file, $OS_ERROR );
+    while ( my $line = <$fh> ) {
+        next unless $line =~ m{\A STOP \s+ WAL \s+ LOCATION: .* file \s+ ( [0-9A-f]{24} ) }x;
+        $last_file = qr{\A$1\z};
+        last;
     }
+    close $fh;
 
-    $self->log->log( '.backup file arrived after %u seconds.', $waited ) if $self->verbose;
+    $self->clean_and_die( '.backup file (%s) does not contain STOP WAL LOCATION line in recognizable format.', $backup_file ) unless $last_file;
+
+    $self->wait_for_file( $self->{ 'xlogs' }, $last_file );
 
     unlink( $self->{ 'xlogs' } );
 }

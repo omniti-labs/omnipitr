@@ -1,5 +1,14 @@
 =head1 OmniPITR
 
+=head2 2010-06-12
+
+=over
+
+=item * Fix ommission in workaround for PostgreSQL 8.2 and 8.3 - regarding order
+of xlog segments.
+
+=back
+
 =head2 2010-06-10
 
 =over
