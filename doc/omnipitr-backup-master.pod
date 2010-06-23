@@ -32,9 +32,10 @@ What username to use when connecting to database. Defaults to postgres.
 
 =item --xlogs (-x)
 
-Directory that (if doesn't exist) will be created. Then - will be used as source
-of xlogs to archive. Afterwards - it will be removed (if it didn't exist in the
-beginning).
+Directory that will be created. Then - will be used as source of xlogs to
+archive. Afterwards - it will be removed. This directory should be the same as
+--dst-backup for omnipitr-archive, and it shouldn't exist before running
+I<omnipitr-backup-master>.
 
 =item --dst-local (-dl)
 

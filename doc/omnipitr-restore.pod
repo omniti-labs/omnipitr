@@ -259,6 +259,9 @@ with optional new line character "\n"), I<omnipitr-restore> will enter
 "immediate finish" procedure. If the content is different, or the file is empty
 - it will proceed in smart finish mode.
 
+After OmniPITR will finish recovery, and PostgreSQL will enter normal mode of
+working, it's strongly advised to remove this file.
+
 =item * system signal
 
 This one works always, regardless of --finish-trigger switch. Generally you can
