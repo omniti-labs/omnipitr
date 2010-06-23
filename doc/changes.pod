@@ -1,5 +1,18 @@
 =head1 OmniPITR
 
+=head2 2010-06-28
+
+=over
+
+=item * Fix description of -x option for omnipitr-backup-master
+
+=item * Add information that one should remove finish recovery trigger after
+successfull finish of wal replication.
+
+=item * alpha version of omnipitr-backup-slave
+
+=back
+
 =head2 2010-06-12
 
 =over
