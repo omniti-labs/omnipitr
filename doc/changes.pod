@@ -9,6 +9,9 @@
 =item * Fix call to tar with 2 --transform options. Some tar versions don't
 handle it well, and it's required for omnipitr-backup-slave
 
+=item * Exclude whole pg_log and pg_xlog directories if these are symlinks - no
+point in restoring them on slave system, and it's pretty common to be symlinked.
+
 =back
 
 =head2 2010-06-23

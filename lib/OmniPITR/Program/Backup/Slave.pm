@@ -342,10 +342,15 @@ sub compress_pgdata {
     my $transform_to = basename( $self->{ 'data-dir' } );
     my $transform_command = sprintf 's#^%s/#%s/#', $transform_from, $transform_to;
 
+    my @excludes = qw( pg_log/* pg_xlog/0* pg_xlog/archive_status/* recovery.conf postmaster.pid );
+    for my $dir ( qw( pg_log pg_xlog ) ) {
+        push @excludes, $dir if -l File::Spec->catfile( $self->{ 'data-dir' }, $dir );
+    }
+
     $self->tar_and_compress(
         'work_dir'  => dirname( $self->{ 'data-dir' } ),
         'tar_dir'   => [ basename( $self->{ 'data-dir' } ), File::Spec->catfile( $self->{ 'temp-dir' }, 'backup_label' ) ],
-        'excludes'  => [ map { sprintf( '%s/%s', basename( $self->{ 'data-dir' } ), $_ ) } qw( pg_log/* pg_xlog/0* pg_xlog/archive_status/* recovery.conf postmaster.pid ) ],
+        'excludes'  => [ map { sprintf( '%s/%s', basename( $self->{ 'data-dir' } ), $_ ) } @excludes ],
         'transform' => [ $transform_command ],
     );
 

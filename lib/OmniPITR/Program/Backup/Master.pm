@@ -235,10 +235,15 @@ sub compress_pgdata {
     $self->log->time_start( 'Compressing $PGDATA' ) if $self->verbose;
     $self->start_writers( 'data' );
 
+    my @excludes = qw( pg_log/* pg_xlog/0* pg_xlog/archive_status/* postmaster.pid );
+    for my $dir ( qw( pg_log pg_xlog ) ) {
+        push @excludes, $dir if -l File::Spec->catfile( $self->{ 'data-dir' }, $dir );
+    }
+
     $self->tar_and_compress(
         'work_dir' => dirname( $self->{ 'data-dir' } ),
         'tar_dir'  => basename( $self->{ 'data-dir' } ),
-        'excludes' => [ qw( pg_log/* pg_xlog/0* pg_xlog/archive_status/* postmaster.pid ) ],
+        'excludes' => \@excludes,
     );
 
     $self->log->time_finish( 'Compressing $PGDATA' ) if $self->verbose;
