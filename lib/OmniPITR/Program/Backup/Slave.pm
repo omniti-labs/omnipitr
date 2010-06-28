@@ -138,19 +138,18 @@ sub compress_xlogs {
     my $source_transform_from = basename( $self->{ 'source' }->{ 'path' } );
     $source_transform_from =~ s{^/*}{};
     $source_transform_from =~ s{/*$}{};
-    my $source_transform_to = basename( $self->{ 'data-dir' } ) . '/pg_xlog';
-    my $source_transform_command = sprintf 's#^%s#%s#', $source_transform_from, $source_transform_to;
 
-    my $dot_backup_transform_from = File::Spec->catfile( $self->{ 'temp-dir' }, $self->{ 'dot_backup_filename' } );
+    my $dot_backup_transform_from = $self->{ 'temp-dir' };
     $dot_backup_transform_from =~ s{^/*}{};
     $dot_backup_transform_from =~ s{/*$}{};
-    my $dot_backup_transform_to = basename( $self->{ 'data-dir' } ) . '/pg_xlog/' . $self->{ 'dot_backup_filename' };
-    my $dot_backup_transform_command = sprintf 's#^%s#%s#', $dot_backup_transform_from, $dot_backup_transform_to;
+
+    my $transform_to = basename( $self->{ 'data-dir' } ) . '/pg_xlog';
+    my $transform_command = sprintf 's#^\(%s\|%s\)#%s#', $source_transform_from, $dot_backup_transform_from, $transform_to;
 
     $self->tar_and_compress(
-        'work_dir' => dirname( $self->{'source'}->{'path'} ),
-        'tar_dir'  => [ basename( $self->{ 'source' }->{ 'path' } ), File::Spec->catfile( $self->{ 'temp-dir' }, $self->{ 'dot_backup_filename' } ), ],
-        'transform' => [ $source_transform_command, $dot_backup_transform_command ],
+        'work_dir'  => dirname( $self->{ 'source' }->{ 'path' } ),
+        'tar_dir'   => [ basename( $self->{ 'source' }->{ 'path' } ), File::Spec->catfile( $self->{ 'temp-dir' }, $self->{ 'dot_backup_filename' } ), ],
+        'transform' => [ $transform_command ],
     );
 
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
@@ -179,8 +178,8 @@ sub uncompress_wal_archive_segments {
         my $old_file = File::Spec->catfile( $old_source, $segment );
         my $new_file = File::Spec->catfile( $new_source, $segment );
         copy( $old_file, $new_file ) or $self->log->fatal( 'Cannot copy %s to %s: %s', $old_file, $new_file, $OS_ERROR );
-        $self->log->log('File copied: %s -> %s', $old_file, $new_file);
-        my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'nice-path' }, $self->{ $self->{'source'}->{'compression'} . '-path' }, '-d', $new_file );
+        $self->log->log( 'File copied: %s -> %s', $old_file, $new_file );
+        my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'nice-path' }, $self->{ $self->{ 'source' }->{ 'compression' } . '-path' }, '-d', $new_file );
         if ( $response->{ 'error_code' } ) {
             $self->log->fatal( 'Error while uncompressing wal segment %s: %s', $new_file, $response );
         }
@@ -733,7 +732,7 @@ sub validate_args {
     $self->log->fatal( "Filename template does not contain __FILETYPE__ placeholder!" ) unless $self->{ 'filename-template' } =~ /__FILETYPE__/;
     $self->log->fatal( "Filename template cannot contain / or \\ characters!" ) if $self->{ 'filename-template' } =~ m{[/\\]};
 
-    $self->log->fatal( 'Source of WAL files was not provided!' ) unless defined $self->{ 'source' };
+    $self->log->fatal( 'Source of WAL files was not provided!' ) unless defined $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Provided source of wal files (%s) does not exist!',   $self->{ 'source' }->{ 'path' } ) unless -e $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Provided source of wal files (%s) is not directory!', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Provided source of wal files (%s) is not readable!',  $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };

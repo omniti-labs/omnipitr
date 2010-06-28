@@ -4,6 +4,17 @@
 
 =over
 
+=item * Fix type in changelog (28 -> 23)
+
+=item * Fix call to tar with 2 --transform options. Some tar versions don't
+handle it well, and it's required for omnipitr-backup-slave
+
+=back
+
+=head2 2010-06-23
+
+=over
+
 =item * Fix description of -x option for omnipitr-backup-master
 
 =item * Add information that one should remove finish recovery trigger after
