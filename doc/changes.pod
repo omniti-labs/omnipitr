@@ -4,6 +4,16 @@
 
 =over
 
+=item * Refactoring done.
+
+=item * omnipitr-backup-slave in beta
+
+=back
+
+=head2 2010-06-29
+
+=over
+
 =item * First part of refactoring the code
 
 =back

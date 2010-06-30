@@ -2,11 +2,10 @@ package OmniPITR::Program::Backup::Slave;
 use strict;
 use warnings;
 
-use base qw( OmniPITR::Program );
+use base qw( OmniPITR::Program::Backup );
 
 use File::Spec;
 use File::Basename;
-use Cwd;
 use English qw( -no_match_vars );
 use File::Copy;
 use File::Path;
@@ -16,115 +15,42 @@ use POSIX qw( strftime );
 use Sys::Hostname;
 use OmniPITR::Tools qw( run_command ext_for_compression );
 
-sub run {
-    my $self = shift;
-    $self->get_list_of_all_necessary_compressions();
-    $self->choose_base_local_destinations();
+=head1 make_data_archive()
 
+Wraps all work necessary to make local .tar files (optionally compressed)
+with content of PGDATA
+
+=cut
+
+sub make_data_archive {
+    my $self = shift;
     $self->pause_xlog_removal();
-
-    $self->get_initial_pg_control_data();
-
+    $self->{ 'CONTROL' }->{ 'initial' } = $self->get_control_data();
     $self->compress_pgdata();
+    return;
+}
 
+=head1 make_xlog_archive()
+
+Wraps all work necessary to make local .tar files (optionally compressed)
+with xlogs required to start PostgreSQL from backup.
+
+=cut
+
+sub make_xlog_archive {
+    my $self = shift;
     $self->wait_for_checkpoint_location_change();
-
     $self->compress_xlogs();
-
     $self->unpause_xlog_removal();
-
-    $self->deliver_to_all_destinations();
-}
-
-=head1 deliver_to_all_destinations()
-
-Simple wrapper to have single point to call to deliver backups to all requested backups.
-
-=cut
-
-sub deliver_to_all_destinations {
-    my $self = shift;
-
-    $self->deliver_to_all_local_destinations();
-
-    $self->deliver_to_all_remote_destinations();
-
     return;
 }
 
-=head1 deliver_to_all_local_destinations()
+=head1 compress_xlogs()
 
-Copies backups to all local destinations which are not also base destinations for their respective compressions.
-
-=cut
-
-sub deliver_to_all_local_destinations {
-    my $self = shift;
-    return unless $self->{ 'destination' }->{ 'local' };
-    for my $dst ( @{ $self->{ 'destination' }->{ 'local' } } ) {
-        next if $dst->{ 'path' } eq $self->{ 'base' }->{ $dst->{ 'compression' } };
-
-        my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
-
-        for my $type ( qw( data xlog ) ) {
-
-            my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
-            my $source_filename = File::Spec->catfile( $B, $filename );
-            my $destination_filename = File::Spec->catfile( $dst->{ 'path' }, $filename );
-
-            my $time_msg = sprintf 'Copying %s to %s', $source_filename, $destination_filename;
-            $self->log->time_start( $time_msg ) if $self->verbose;
-
-            my $rc = copy( $source_filename, $destination_filename );
-
-            $self->log->time_finish( $time_msg ) if $self->verbose;
-
-            unless ( $rc ) {
-                $self->log->error( 'Cannot copy %s to %s : %s', $source_filename, $destination_filename, $OS_ERROR );
-                $self->{ 'had_errors' } = 1;
-            }
-
-        }
-    }
-    return;
-}
-
-=head1 deliver_to_all_remote_destinations()
-
-Delivers backups to remote destinations using rsync program.
+Wrapper function which encapsulates all work required to compress xlog
+segments that accumulated during backup of data directory.
 
 =cut
-
-sub deliver_to_all_remote_destinations {
-    my $self = shift;
-    return unless $self->{ 'destination' }->{ 'remote' };
-    for my $dst ( @{ $self->{ 'destination' }->{ 'remote' } } ) {
-
-        my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
-
-        for my $type ( qw( data xlog ) ) {
-
-            my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
-            my $source_filename = File::Spec->catfile( $B, $filename );
-            my $destination_filename = $dst->{ 'path' };
-            $destination_filename =~ s{/*\z}{/};
-            $destination_filename .= $filename;
-
-            my $time_msg = sprintf 'Copying %s to %s', $source_filename, $destination_filename;
-            $self->log->time_start( $time_msg ) if $self->verbose;
-
-            my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'rsync-path' }, $source_filename, $destination_filename );
-
-            $self->log->time_finish( $time_msg ) if $self->verbose;
-
-            if ( $response->{ 'error_code' } ) {
-                $self->log->error( 'Cannot send archive %s to %s: %s', $source_filename, $destination_filename, $response );
-                $self->{ 'had_errors' } = 1;
-            }
-        }
-    }
-    return;
-}
 
 sub compress_xlogs {
     my $self = shift;
@@ -149,13 +75,23 @@ sub compress_xlogs {
     $self->tar_and_compress(
         'work_dir'  => dirname( $self->{ 'source' }->{ 'path' } ),
         'tar_dir'   => [ basename( $self->{ 'source' }->{ 'path' } ), File::Spec->catfile( $self->{ 'temp-dir' }, $self->{ 'dot_backup_filename' } ), ],
-        'transform' => [ $transform_command ],
+        'transform' => $transform_command,
     );
 
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
 
     return;
 }
+
+=head1 uncompress_wal_archive_segments()
+
+In case walarchive (--source option) is compressed, L<omnipitr-backup-slave>
+needs to uncompress files to temp directory before making archive - so that
+the archive will be easier to use.
+
+This work is being done in this function.
+
+=cut
 
 sub uncompress_wal_archive_segments {
     my $self = shift;
@@ -187,6 +123,15 @@ sub uncompress_wal_archive_segments {
     return;
 }
 
+=head make_dot_backup_file()
+
+Make I<SEGMENT>.I<OFFSET>.backup file that will be included in xlog archive.
+
+This file contains vital information like start and end position of WAL
+reply that is required to get consistent state.
+
+=cut
+
 sub make_dot_backup_file {
     my $self = shift;
 
@@ -215,6 +160,15 @@ sub make_dot_backup_file {
     $self->log->fatal( 'Cannot write .backup file file %s : %s', $output_filename, $OS_ERROR );
 }
 
+=head1 wait_for_checkpoint_location_change()
+
+Just like the name suggests - this function periodically (every 5 seconds,
+hardcoded, as there is not much sense in parametrizing it) checks
+pg_controldata of PGDATA, and finishes if value in B<Latest checkpoint
+location> will change.
+
+=cut
+
 sub wait_for_checkpoint_location_change {
     my $self     = shift;
     my $pre_wait = $self->get_control_data()->{ 'Latest checkpoint location' };
@@ -227,6 +181,19 @@ sub wait_for_checkpoint_location_change {
     $self->log->log( 'Checkpoint .' ) if $self->verbose;
     return;
 }
+
+=head1 make_backup_label_temp_file()
+
+Normal hot backup contains file named 'backup_label' in PGDATA archive.
+
+Since this is not normal hot backup - PostgreSQL will not create this file,
+and it has to be created separately by I<omnipitr-backup-slave>.
+
+This file is created in temp directory (it is B<not> created in PGDATA), and
+is included in tar in such a way that, on uncompressing, it will get to
+unarchived PGDATA.
+
+=cut
 
 sub make_backup_label_temp_file {
     my $self = shift;
@@ -253,6 +220,13 @@ sub make_backup_label_temp_file {
     $self->log->fatal( 'Cannot write backup_label file %s : %s', $filename, $OS_ERROR );
 }
 
+=head1 convert_wal_location_and_timeline_to_filename()
+
+Helper function which converts WAL location and timeline number into
+filename that given location will be in.
+
+=cut
+
 sub convert_wal_location_and_timeline_to_filename {
     my $self = shift;
     my ( $location, $timeline ) = @_;
@@ -266,67 +240,12 @@ sub convert_wal_location_and_timeline_to_filename {
     return $location_filename;
 }
 
-=head1 get_archive_filename()
+=head1 compress_pgdata()
 
-Helper function, which takes filetype and compression schema to use, and returns generated filename (based on filename-template command line option).
-
-=cut
-
-sub get_archive_filename {
-    my $self = shift;
-    my ( $type, $compression ) = @_;
-
-    my $ext = $compression eq 'none' ? '' : ext_for_compression( $compression );
-
-    my $filename = $self->{ 'filename-template' };
-    $filename =~ s/__FILETYPE__/$type/g;
-    $filename =~ s/__CEXT__/$ext/g;
-
-    return $filename;
-}
-
-=head1 start_writers()
-
-Starts set of filehandles, which write to file, or to compression program, to create final archives.
-
-Each compression schema gets its own filehandle, and printing data to it, will pass it to file directly or through compression program that has been chosen based on command line arguments.
+Wrapper function which encapsulates all work required to compress data
+directory.
 
 =cut
-
-sub start_writers {
-    my $self      = shift;
-    my $data_type = shift;
-
-    my %writers = ();
-
-    COMPRESSION:
-    while ( my ( $type, $dst_path ) = each %{ $self->{ 'base' } } ) {
-        my $filename = $self->get_archive_filename( $data_type, $type );
-
-        my $full_file_path = File::Spec->catfile( $dst_path, $filename );
-
-        if ( $type eq 'none' ) {
-            if ( open my $fh, '>', $full_file_path ) {
-                $writers{ $type } = $fh;
-                $self->log->log( "Starting \"none\" writer to $full_file_path" ) if $self->verbose;
-                next COMPRESSION;
-            }
-            $self->clean_and_die( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
-        }
-
-        my @command = map { quotemeta $_ } ( $self->{ 'nice-path' }, $self->{ $type . '-path' }, '--stdout', '-' );
-        push @command, ( '>', quotemeta( $full_file_path ) );
-
-        $self->log->log( "Starting \"%s\" writer to %s", $type, $full_file_path ) if $self->verbose;
-        if ( open my $fh, '|-', join( ' ', @command ) ) {
-            $writers{ $type } = $fh;
-            next COMPRESSION;
-        }
-        $self->clean_and_die( 'Cannot open command. Error: %s, Command: %s', $OS_ERROR, \@command );
-    }
-    $self->{ 'writers' } = \%writers;
-    return;
-}
 
 sub compress_pgdata {
     my $self = shift;
@@ -351,156 +270,19 @@ sub compress_pgdata {
         'work_dir'  => dirname( $self->{ 'data-dir' } ),
         'tar_dir'   => [ basename( $self->{ 'data-dir' } ), File::Spec->catfile( $self->{ 'temp-dir' }, 'backup_label' ) ],
         'excludes'  => [ map { sprintf( '%s/%s', basename( $self->{ 'data-dir' } ), $_ ) } @excludes ],
-        'transform' => [ $transform_command ],
+        'transform' => $transform_command,
     );
 
     $self->log->time_finish( 'Compressing $PGDATA' ) if $self->verbose;
     return;
 }
 
-=head1 tar_and_compress()
+=head1 pause_xlog_removal()
 
-Worker function which does all of the actual tar, and sending data to compression filehandles.
-
-Takes hash (not hashref) as argument, and uses following keys from it:
-
-=over
-
-=item * tar_dir - arrayref with list of directories to compress
-
-=item * work_dir - what should be current working directory when executing tar
-
-=item * excludes - optional key, that (if exists) is treated as arrayref of shell globs (tar dir) of items to exclude from backup
-
-=item * transform - optional key, that (if exists) is treated as arrayref of values for --transform option for tar
-
-=back
-
-If tar will print anything to STDERR it will be logged. Error status code is ignored, as it is expected that tar will generate errors (due to files modified while archiving).
+Creates trigger file that will pause removal of old segments by
+I<omnipitr-restore>.
 
 =cut
-
-sub tar_and_compress {
-    my $self = shift;
-    my %ARGS = @_;
-
-    $SIG{ 'PIPE' } = sub { $self->clean_and_die( 'Got SIGPIPE while tarring %s for %s', $ARGS{ 'tar_dir' }, $self->{ 'sigpipeinfo' } ); };
-
-    my @compression_command = ( $self->{ 'nice-path' }, $self->{ 'tar-path' }, 'cf', '-' );
-    if ( $ARGS{ 'excludes' } ) {
-        push @compression_command, map { '--exclude=' . $_ } @{ $ARGS{ 'excludes' } };
-    }
-    if ( $ARGS{ 'transform' } ) {
-        push @compression_command, map { '--transform=' . $_ } @{ $ARGS{ 'transform' } };
-    }
-    push @compression_command, @{ $ARGS{ 'tar_dir' } };
-
-    my $compression_str = join ' ', map { quotemeta $_ } @compression_command;
-
-    $self->prepare_temp_directory();
-    my $tar_stderr_filename = File::Spec->catfile( $self->{ 'temp-dir' }, 'tar.stderr' );
-    $compression_str .= ' 2> ' . quotemeta( $tar_stderr_filename );
-
-    my $previous_dir = getcwd;
-    chdir $ARGS{ 'work_dir' } if $ARGS{ 'work_dir' };
-
-    my $tar;
-    unless ( open $tar, '-|', $compression_str ) {
-        $self->clean_and_die( 'Cannot start tar (%s) : %s', $compression_str, $OS_ERROR );
-    }
-
-    chdir $previous_dir if $ARGS{ 'work_dir' };
-
-    my $buffer;
-    while ( my $len = sysread( $tar, $buffer, 8192 ) ) {
-        while ( my ( $type, $fh ) = each %{ $self->{ 'writers' } } ) {
-            $self->{ 'sigpipeinfo' } = $type;
-            my $written = syswrite( $fh, $buffer, $len );
-            next if $written == $len;
-            $self->clean_and_die( "Writting %u bytes to filehandle for <%s> compression wrote only %u bytes ?!", $len, $type, $written );
-        }
-    }
-    close $tar;
-
-    for my $fh ( values %{ $self->{ 'writers' } } ) {
-        close $fh;
-    }
-
-    delete $self->{ 'writers' };
-
-    my $stderr_output;
-    my $stderr;
-    unless ( open $stderr, '<', $tar_stderr_filename ) {
-        $self->log->log( 'Cannot open tar stderr file (%s) for reading: %s', $tar_stderr_filename );
-        return;
-    }
-    {
-        local $/;
-        $stderr_output = <$stderr>;
-    };
-    close $stderr;
-    return unless $stderr_output;
-    $self->log->log( 'Tar (%s) generated these output on stderr:', $compression_str );
-    $self->log->log( '==============================================' );
-    $self->log->log( '%s', $stderr_output );
-    $self->log->log( '==============================================' );
-    unlink $tar_stderr_filename;
-    return;
-}
-
-=head1 get_control_data()
-
-Calls pg_controldata, and parses its output.
-
-Verifies that output contains 2 critical pieces of information:
-
-=over
-
-=item * Latest checkpoint's REDO location
-
-=item * Latest checkpoint's TimeLineID
-
-=back
-
-=cut
-
-sub get_control_data {
-    my $self = shift;
-
-    $self->prepare_temp_directory();
-
-    my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'pgcontroldata-path' }, $self->{ 'data-dir' } );
-    if ( $response->{ 'error_code' } ) {
-        $self->log->fatal( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, $response );
-    }
-
-    my $control_data = {};
-
-    my @lines = split( /\s*\n/, $response->{ 'stdout' } );
-    for my $line ( @lines ) {
-        unless ( $line =~ m{\A([^:]+):\s*(.*)\z} ) {
-            $self->log->fatal( 'Pg_controldata for %s contained unparseable line: [%s]', $self->{ 'data-dir' }, $line );
-        }
-        $control_data->{ $1 } = $2;
-    }
-
-    unless ( $control_data->{ "Latest checkpoint's REDO location" } ) {
-        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint redo location', $self->{ 'data-dir' } );
-    }
-    unless ( $control_data->{ "Latest checkpoint's TimeLineID" } ) {
-        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint timeline ID', $self->{ 'data-dir' } );
-    }
-
-    return $control_data;
-}
-
-sub get_initial_pg_control_data {
-    my $self = shift;
-
-    $self->{ 'CONTROL' }->{ 'initial' } = $self->get_control_data();
-
-    return;
-}
 
 sub pause_xlog_removal {
     my $self = shift;
@@ -518,64 +300,37 @@ sub pause_xlog_removal {
     );
 }
 
+=head1 unpause_xlog_removal()
+
+Removed trigger file, effectively unpausing removal of old, obsolete log
+segments in I<omnipitr-restore>.
+
+=cut
+
 sub unpause_xlog_removal {
     my $self = shift;
-    unlink( $self->{ 'removal-pause-trigger' } ) if $self->{ 'removal-pause-trigger-created' };
+    unlink( $self->{ 'removal-pause-trigger' } );
     delete $self->{ 'removal-pause-trigger-created' };
     return;
 }
 
 =head1 DESTROY()
 
-Destroctor for object - removes temp directory on program exit.
+Destructor for object - removes created pause trigger;
 
 =cut
 
 sub DESTROY {
     my $self = shift;
     unlink( $self->{ 'removal-pause-trigger' } ) if $self->{ 'removal-pause-trigger-created' };
-    rmtree( [ $self->{ 'temp-dir-prepared' } ], 0 ) if $self->{ 'temp-dir-prepared' };
-    return;
-}
-
-=head1 choose_base_local_destinations()
-
-Chooses single local destination for every compression schema required by destinations specifications.
-
-In case some compression schema exists only for remote destination, local temp directory is created in --temp-dir location.
-
-=cut
-
-sub choose_base_local_destinations {
-    my $self = shift;
-
-    my $base = { map { ( $_ => undef ) } @{ $self->{ 'compressions' } } };
-    $self->{ 'base' } = $base;
-
-    for my $dst ( @{ $self->{ 'destination' }->{ 'local' } } ) {
-        my $type = $dst->{ 'compression' };
-        next if defined $base->{ $type };
-        $base->{ $type } = $dst->{ 'path' };
-    }
-
-    my @unfilled = grep { !defined $base->{ $_ } } keys %{ $base };
-
-    return if 0 == scalar @unfilled;
-    $self->log->log( 'These compression(s) were given only for remote destinations. Usually this is not desired: %s', join( ', ', @unfilled ) );
-
-    $self->prepare_temp_directory();
-    for my $type ( @unfilled ) {
-        my $tmp_dir = File::Spec->catfile( $self->{ 'temp-dir' }, $type );
-        mkpath( $tmp_dir );
-        $base->{ $type } = $tmp_dir;
-    }
-
+    $self->SUPER::DESTROY();
     return;
 }
 
 =head1 read_args()
 
-Function which does all the parsing, and transformation of command line arguments.
+Function which does all the parsing, and transformation of command line
+arguments.
 
 =cut
 
@@ -675,8 +430,11 @@ sub read_args {
 
 Does all necessary validation of given command line arguments.
 
-One exception is for compression programs paths - technically, it could be validated in here, but benefit would be pretty limited, and code to do so relatively complex, as compression program path
-might, but doesn't have to be actual file path - it might be just program name (without path), which is the default.
+One exception is for compression programs paths - technically, it could be
+validated in here, but benefit would be pretty limited, and code to do so
+relatively complex, as compression program path might, but doesn't have to
+be actual file path - it might be just program name (without path), which is
+the default.
 
 =cut
 

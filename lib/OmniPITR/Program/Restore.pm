@@ -235,52 +235,22 @@ sub get_last_redo_segment {
 
 =head1 get_control_data()
 
-Calls pg_controldata, and parses its output.
+Wraps SUPER::get_control_data in such way that it will not die in case of problems.
 
-Verifies that output contains 2 critical pieces of information:
-
-=over
-
-=item * Latest checkpoint's REDO location
-
-=item * Latest checkpoint's TimeLineID
-
-=back
+Reason: errors with parsin pg_controldata cannot cause die from omnipitr-restore, to avoid bringing
+PostgreSQL from WAL-slave to Standalone.
 
 =cut
 
 sub get_control_data {
     my $self = shift;
 
-    $self->prepare_temp_directory();
-
-    my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'pgcontroldata-path' }, $self->{ 'data-dir' } );
-    if ( $response->{ 'error_code' } ) {
-        $self->log->error( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, $response );
-        return;
-    }
-
-    my $control_data = {};
-
-    my @lines = split( /\s*\n/, $response->{ 'stdout' } );
-    for my $line ( @lines ) {
-        unless ( $line =~ m{\A([^:]+):\s*(.*)\z} ) {
-            $self->log->error( 'Pg_controldata for %s contained unparseable line: [%s]', $self->{ 'data-dir' }, $line );
-            $self->exit_with_status( 1 );
-        }
-        $control_data->{ $1 } = $2;
-    }
-
-    unless ( $control_data->{ "Latest checkpoint's REDO location" } ) {
-        $self->log->error( 'Pg_controldata for %s did not contain latest checkpoint redo location', $self->{ 'data-dir' } );
-        return;
-    }
-    unless ( $control_data->{ "Latest checkpoint's TimeLineID" } ) {
-        $self->log->error( 'Pg_controldata for %s did not contain latest checkpoint timeline ID', $self->{ 'data-dir' } );
-        return;
-    }
-
-    return $control_data;
+    my $ret;
+    eval {
+        $ret = $self->SUPER::get_control_data();
+    };
+    return if $EVAL_ERROR;
+    return $ret;
 }
 
 =head1 try_to_restore_and_exit()
@@ -302,8 +272,7 @@ sub try_to_restore_and_exit {
     my $self = shift;
 
     if ( $self->{ 'finish' } eq 'immediate' ) {
-        $self->log->error( 'Got immediate finish request. Dying.' );
-        $self->exit_with_status( 1 );
+        $self->log->fatal( 'Got immediate finish request. Dying.' );
     }
 
     my $wanted_file = File::Spec->catfile( $self->{ 'source' }->{ 'path' }, $self->{ 'segment' } );
@@ -311,12 +280,11 @@ sub try_to_restore_and_exit {
 
     unless ( -e $wanted_file ) {
         if ( $self->{ 'finish' } ) {
-            $self->log->error( 'Got finish request. Dying.' );
-            $self->exit_with_status( 1 );
+            $self->log->fatal( 'Got finish request. Dying.' );
         }
         if ( $self->{ 'segment' } =~ m{\A[a-fA-f0-9]{8}\.history\z} ) {
             $self->log->log( 'Requested history file (%s) that does not exist. Returning error.', $self->{ 'segment' } );
-            $self->exit_with_status( 1 );
+            exit( 1 );
         }
         return;
     }
@@ -346,12 +314,11 @@ sub try_to_restore_and_exit {
     $self->log->time_finish( $comment ) if $self->verbose;
 
     if ( $response ) {
-        $self->log->error( $response );
-        $self->exit_with_status( 1 );
+        $self->log->fatal( $response );
     }
 
     $self->log->log( 'Segment %s restored', $self->{ 'segment' } );
-    $self->exit_with_status( 0 );
+    exit( 0 );
 }
 
 =head1 copy_segment_to()
@@ -410,21 +377,6 @@ sub check_for_trigger_file {
         return;
     }
     $self->log->fatal( 'Finish trigger (%s) exists, but cannot be open?! : %s', $self->{ 'finish-trigger' }, $OS_ERROR );
-}
-
-=head1 exit_with_status()
-
-Exit function, doing cleanup (remove temp-dir), and exiting with given status.
-
-=cut
-
-sub exit_with_status {
-    my $self = shift;
-    my $code = shift;
-
-    rmtree( $self->{ 'temp-dir' } ) if $self->{ 'temp-dir-prepared' };
-
-    exit( $code );
 }
 
 =head1 read_args()

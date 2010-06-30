@@ -5,8 +5,9 @@ use English qw( -no_match_vars );
 
 use OmniPITR::Log;
 use OmniPITR::Pidfile;
+use OmniPITR::Tools qw( run_command );
 use File::Basename;
-use File::Path qw( mkpath );
+use File::Path qw( mkpath rmtree );
 use File::Spec;
 use Carp;
 
@@ -105,7 +106,22 @@ sub prepare_temp_directory {
     my $full_temp_dir = File::Spec->catfile( $self->{ 'temp-dir' }, basename( $PROGRAM_NAME ), @sub_elements );
     mkpath( $full_temp_dir );
     $self->{ 'temp-dir' }          = $full_temp_dir;
-    $self->{ 'temp-dir-prepared' } = $full_temp_dir;
+    $self->{ 'temp-dir-prepared' } = 1;
+    return;
+}
+
+=head1 DESTROY()
+
+Destructor for object - removes temp directory on program exit.
+
+=cut
+
+sub DESTROY {
+    my $self = shift;
+    if ( $self->{ 'temp-dir-prepared' } ) {
+        rmtree( [ $self->{ 'temp-dir' } ], 0 );
+        delete $self->{ 'temp-dir-prepared' };
+    }
     return;
 }
 
@@ -136,6 +152,52 @@ sub get_list_of_all_necessary_compressions {
     $self->{ 'compressions' } = [ keys %compression ];
 
     return;
+}
+
+=head1 get_control_data()
+
+Calls pg_controldata, and parses its output.
+
+Verifies that output contains 2 critical pieces of information:
+
+=over
+
+=item * Latest checkpoint's REDO location
+
+=item * Latest checkpoint's TimeLineID
+
+=back
+
+=cut
+
+sub get_control_data {
+    my $self = shift;
+
+    $self->prepare_temp_directory();
+
+    my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'pgcontroldata-path' }, $self->{ 'data-dir' } );
+    if ( $response->{ 'error_code' } ) {
+        $self->log->fatal( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, $response );
+    }
+
+    my $control_data = {};
+
+    my @lines = split( /\s*\n/, $response->{ 'stdout' } );
+    for my $line ( @lines ) {
+        unless ( $line =~ m{\A([^:]+):\s*(.*)\z} ) {
+            $self->log->fatal( 'Pg_controldata for %s contained unparseable line: [%s]', $self->{ 'data-dir' }, $line );
+        }
+        $control_data->{ $1 } = $2;
+    }
+
+    unless ( $control_data->{ "Latest checkpoint's REDO location" } ) {
+        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint redo location', $self->{ 'data-dir' } );
+    }
+    unless ( $control_data->{ "Latest checkpoint's TimeLineID" } ) {
+        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint timeline ID', $self->{ 'data-dir' } );
+    }
+
+    return $control_data;
 }
 
 1;
