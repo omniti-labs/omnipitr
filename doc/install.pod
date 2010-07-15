@@ -47,7 +47,7 @@ Additionally, you will need some programs installed:
 
 =item * rsync
 
-=item * tar (it has to be GNU tar)
+=item * tar (it has to be GNU tar version 1.20 or newer)
 
 =back
 

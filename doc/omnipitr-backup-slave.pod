@@ -286,6 +286,25 @@ and modified filenames
 
     /.../omnipitr-backup-slave -D /mnt/data/ -l /var/log/omnipitr/backup-^Y-^m-^d.log -dr bzip2=rsync://slave/postgres/backups/ -dr gzip=backups:/mnt/hotbackups/ -dl /mnt/backups/ -f "main-__FILETYPE__-^Y^m^d_^H^M^S.tar__CEXT__"
 
+=head2 IMPORTANT NOTICES
+
+=over
+
+=item * If you're using compressed source dir (wal archive) -
+I<omnipitr-backup-slave> has to uncompress all of xlogs before putting them in
+.tar.XX. This means that you should have enough free disk space for this purpose
+in the place where you create temporary directories. Alternarively - do not use
+compression for sending WAL segments to standby server - in this case -
+decompression will not be necessary.
+
+=item * I<omnipitr-backup-slave> compresses whole source directory - i.e. all
+files from there. This means that if you're using delay recovery (-w option to
+I<omnipitr-restore>) - there will be more files there, and backup will be
+larger. This is especially important if you're using compressed wal archive
+(please see note above)
+
+=back
+
 =head2 COPYRIGHT
 
 The OmniPITR project is Copyright (c) 2009-2010 OmniTI. All rights reserved.

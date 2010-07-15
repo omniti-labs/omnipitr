@@ -305,6 +305,19 @@ and modified filenames
 
     /.../omnipitr-backup-master -D /mnt/data/ -l /var/log/omnipitr/backup-^Y-^m-^d.log -dr bzip2=rsync://slave/postgres/backups/ -dr gzip=backups:/mnt/hotbackups/ -dl /mnt/backups/ -f "main-__FILETYPE__-^Y^m^d_^H^M^S.tar__CEXT__"
 
+=head2 IMPORTANT NOTICES
+
+=over
+
+=item * It I<omnipitr-backup-master> will get stopped in B<hard> way (kill -9,
+or multiple ctrl-c - it is possible that it will leave database with backup mode
+still enabled. So, to prevent future problems with it, if you had to B<hard>
+stop it - remember to connect to postgresql and issue:
+
+    SELECT pg_stop_backup();
+
+=back
+
 =head2 COPYRIGHT
 
 The OmniPITR project is Copyright (c) 2009-2010 OmniTI. All rights reserved.

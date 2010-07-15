@@ -1,5 +1,17 @@
 =head1 OmniPITR
 
+=head2 2010-07-15
+
+=over
+
+=item * Added "IMPORTANT NOTICES" part to documents for omnipitr programs with
+additional info that might not be obvious always.
+
+=item * Added information about reuiring at least gnu tar 1.20 (earlier version
+didn't have --transform option which is required by omnipitr-backup-slave)
+
+=back
+
 =head2 2010-06-30
 
 =over

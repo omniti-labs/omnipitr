@@ -247,6 +247,23 @@ For details - please consult manual to your choosen compression tool.
 
     archive_command='/.../omnipitr-archive -D /mnt/data/ -l /var/log/omnipitr/archive-^Y-^m-^d.log -dr gzip=rsync://slave/postgres/wal_archive/ -dr bzip2=backups@backupserver:/mnt/backups/wal_archive/ -dl /mnt/wal_archive/ -s /var/lib/postgres/.omnipitr/ "%p"'
 
+=head2 IMPORTANT NOTICES
+
+=over
+
+=item * You need to provide state dir in case you have > 1 destination. This is
+crucial, as if you're using "-dr ... -db" - your number of destinations changes
+from 1 to 2 (depending on whether -db directory exists) - i.e. not all runs of
+I<omnipitr-archive> will catch lack of state-dir as error!
+
+=item * It is generally good to provide 2 destination - one used by slave system
+to keep warm standby, and another to be handy in case (for example) backup files
+get corrupted. This second set of xlogs should be cleared with cronjob that
+removes too old files. As for what is too old - 2x your backup schedule. I.e. if
+you're doing daily hot backups - you should keep 2 days worth of backup xlogs.
+
+=back
+
 =head2 COPYRIGHT
 
 The OmniPITR project is Copyright (c) 2009-2010 OmniTI. All rights reserved.
