@@ -142,7 +142,10 @@ sub make_all_necessary_compressions {
 
         my $compressor_binary = $self->{ $compression . '-path' } || $compression;
 
-        my $compression_command = sprintf 'nice %s --stdout %s > %s', $compressor_binary, quotemeta( $self->{ 'segment' } ), quotemeta( $compressed_filename );
+        my $compression_command = sprintf '%s --stdout %s > %s', $compressor_binary, quotemeta( $self->{ 'segment' } ), quotemeta( $compressed_filename );
+        unless ( $self->{ 'not-nice' } ) {
+            $compression_command = quotemeta( $self->{ 'nice-path' } ) . ' ' . $compression_command;
+        }
 
         $self->log->time_start( 'Compressing with ' . $compression ) if $self->verbose;
         my $response = run_command( $self->{ 'temp-dir' }, 'bash', '-c', $compression_command );
@@ -256,6 +259,7 @@ sub read_args {
         'bzip2-path' => 'bzip2',
         'lzma-path'  => 'lzma',
         'rsync-path' => 'rsync',
+        'nice-path'  => 'nice',
     );
 
     croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
@@ -274,13 +278,15 @@ sub read_args {
         'pid-file=s',
         'state-dir|s=s',
         'temp-dir|t=s',
+        'nice-path|np=s',
         'verbose|v',
+        'not-nice|nn',
         );
 
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
     $args{ 'log' } =~ tr/^/%/;
 
-    for my $key ( qw( data-dir dst-backup temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path force-data-dir rsync-path ) ) {
+    for my $key ( qw( data-dir dst-backup temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path nice-path force-data-dir rsync-path not-nice ) ) {
         $self->{ $key } = $args{ $key };
     }
 

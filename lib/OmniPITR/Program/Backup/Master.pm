@@ -305,6 +305,7 @@ sub read_args {
         'psql-path|pp=s',
         'tar-path|tp=s',
         'rsync-path|rp=s',
+        'not-nice|nn',
         );
 
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };

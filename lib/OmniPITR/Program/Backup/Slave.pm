@@ -115,7 +115,9 @@ sub uncompress_wal_archive_segments {
         my $new_file = File::Spec->catfile( $new_source, $segment );
         copy( $old_file, $new_file ) or $self->log->fatal( 'Cannot copy %s to %s: %s', $old_file, $new_file, $OS_ERROR );
         $self->log->log( 'File copied: %s -> %s', $old_file, $new_file );
-        my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'nice-path' }, $self->{ $self->{ 'source' }->{ 'compression' } . '-path' }, '-d', $new_file );
+        my @uncompress = ( $self->{ $self->{ 'source' }->{ 'compression' } . '-path' }, '-d', $new_file );
+        unshift @uncompress, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
+        my $response = run_command( $self->{ 'temp-dir' }, @uncompress );
         if ( $response->{ 'error_code' } ) {
             $self->log->fatal( 'Error while uncompressing wal segment %s: %s', $new_file, $response );
         }
@@ -371,6 +373,7 @@ sub read_args {
         'tar-path|tp=s',
         'rsync-path|rp=s',
         'pgcontroldata-path|pp=s',
+        'not-nice|nn',
         );
 
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };

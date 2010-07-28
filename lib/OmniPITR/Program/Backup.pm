@@ -108,7 +108,8 @@ sub start_writers {
             $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
         }
 
-        my @command = map { quotemeta $_ } ( $self->{ 'nice-path' }, $self->{ $type . '-path' }, '--stdout', '-' );
+        my @command = map { quotemeta $_ } ( $self->{ $type . '-path' }, '--stdout', '-' );
+        unshift @command, quotemeta( $self->{ 'nice-path' } ) unless $self->{ 'not-nice' };
         push @command, ( '>', quotemeta( $full_file_path ) );
 
         $self->log->log( "Starting \"%s\" writer to %s", $type, $full_file_path ) if $self->verbose;
@@ -188,7 +189,8 @@ sub tar_and_compress {
 
     $SIG{ 'PIPE' } = sub { $self->log->fatal( 'Got SIGPIPE while tarring %s for %s', $ARGS{ 'tar_dir' }, $self->{ 'sigpipeinfo' } ); };
 
-    my @compression_command = ( $self->{ 'nice-path' }, $self->{ 'tar-path' }, 'cf', '-' );
+    my @compression_command = ( $self->{ 'tar-path' }, 'cf', '-' );
+    unshift @compression_command, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
 
     if ( $ARGS{ 'excludes' } ) {
         push @compression_command, map { '--exclude=' . $_ } @{ $ARGS{ 'excludes' } };

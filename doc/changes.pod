@@ -1,5 +1,16 @@
 =head1 OmniPITR
 
+=head2 2010-07-28
+
+=over
+
+=item * Add forgotten --nice-path to omnipitr-archive
+
+=item * Add option not to use nice for omnipitr-archive, and both
+omnipitr-backup-* programs
+
+=back
+
 =head2 2010-07-15
 
 =over

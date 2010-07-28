@@ -86,6 +86,10 @@ Trying to run second copy of I<omnipitr-backup-master> will result in an error.
 
 Log verbosely what is happening.
 
+=item --not-nice (-nn)
+
+Do not use nice for compressions.
+
 =item --gzip-path (-gp)
 
 Full path to gzip program - in case you can't set proper PATH environment
