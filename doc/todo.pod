@@ -26,6 +26,11 @@ Well, it can be helpful to avoid having to type another command to get to docs
 This has the benefit over command line options that it lets you change the
 options without Pg restart (in omnipitr-restore case at least).
 
+=item * Deliver to multiple destinations in parallel
+
+When delivering wal segments to slave server, and to backup destination - we can
+reduce the time it takes, by delivering it in parallel.
+
 =back
 
 =head2 COPYRIGHT
