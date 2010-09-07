@@ -1,5 +1,13 @@
 =head1 OmniPITR
 
+=head2 2010-09-07
+
+=over
+
+=item * Log whole response from pg_controldata in case there are problems with it
+
+=back
+
 =head2 2010-07-28
 
 =over

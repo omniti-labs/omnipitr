@@ -185,16 +185,16 @@ sub get_control_data {
     my @lines = split( /\s*\n/, $response->{ 'stdout' } );
     for my $line ( @lines ) {
         unless ( $line =~ m{\A([^:]+):\s*(.*)\z} ) {
-            $self->log->fatal( 'Pg_controldata for %s contained unparseable line: [%s]', $self->{ 'data-dir' }, $line );
+            $self->log->fatal( 'Pg_controldata for %s contained unparseable line: [%s]. Full response: %s', $self->{ 'data-dir' }, $line, $response );
         }
         $control_data->{ $1 } = $2;
     }
 
     unless ( $control_data->{ "Latest checkpoint's REDO location" } ) {
-        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint redo location', $self->{ 'data-dir' } );
+        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint redo location. Full response: %s', $self->{ 'data-dir' }, $response );
     }
     unless ( $control_data->{ "Latest checkpoint's TimeLineID" } ) {
-        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint timeline ID', $self->{ 'data-dir' } );
+        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint timeline ID. Full response: %s', $self->{ 'data-dir' }, $response );
     }
 
     return $control_data;
