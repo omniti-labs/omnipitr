@@ -1,5 +1,14 @@
 =head1 OmniPITR
 
+=head2 2010-09-08
+
+=over
+
+=item * Add option to handle various ways of dealing with problems with calls to
+pg_controldata (--error-pgcontroldata) to omnipitr-restore
+
+=back
+
 =head2 2010-09-07
 
 =over

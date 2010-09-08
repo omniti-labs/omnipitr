@@ -245,12 +245,21 @@ PostgreSQL from WAL-slave to Standalone.
 sub get_control_data {
     my $self = shift;
 
+    if ( $self->{ 'pause-removal-till' } ) {
+        return if time() < $self->{ 'pause-removal-till' };
+        delete $self->{ 'pause-removal-till' };
+    }
+
     my $ret;
-    eval {
-        $ret = $self->SUPER::get_control_data();
-    };
-    return if $EVAL_ERROR;
-    return $ret;
+    eval { $ret = $self->SUPER::get_control_data(); };
+    if (   ( !$EVAL_ERROR )
+        && ( $ret ) )
+    {
+        return $ret;
+    }
+
+    $self->{ 'pause-removal-till' } = time() + 5 * 60;
+    return;
 }
 
 =head1 try_to_restore_and_exit()
@@ -399,13 +408,14 @@ sub read_args {
     my @argv_copy = @ARGV;
 
     my %args = (
-        'bzip2-path'         => 'bzip2',
-        'data-dir'           => '.',
-        'gzip-path'          => 'gzip',
-        'lzma-path'          => 'lzma',
-        'pgcontroldata-path' => 'pg_controldata',
-        'remove-at-a-time'   => 3,
-        'temp-dir'           => $ENV{ 'TMPDIR' } || '/tmp',
+        'bzip2-path'          => 'bzip2',
+        'data-dir'            => '.',
+        'gzip-path'           => 'gzip',
+        'lzma-path'           => 'lzma',
+        'pgcontroldata-path'  => 'pg_controldata',
+        'error-pgcontroldata' => 'break',
+        'remove-at-a-time'    => 3,
+        'temp-dir'            => $ENV{ 'TMPDIR' } || '/tmp',
     );
 
     croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-restore.pod' )
@@ -426,6 +436,7 @@ sub read_args {
         'remove-unneeded|r',
         'source|s=s',
         'temp-dir|t=s',
+        'error-pgcontroldata|ep=s',
         'verbose|v',
         );
 
@@ -483,6 +494,8 @@ sub validate_args {
     $self->log->fatal( 'Given source (%s) is not a directory', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Given source (%s) is not readable',    $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Given source (%s) is not writable',    $self->{ 'source' }->{ 'path' } ) unless -w $self->{ 'source' }->{ 'path' };
+
+    $self->log->fatal( 'Invalid error-pgcontroldata: %s.', $self->{ 'error-pgcontroldata' } ) unless $self->{ 'error-pgcontroldata' } =~ m{\A (?: break | ignore | hang ) \z}x;
 
     return;
 }

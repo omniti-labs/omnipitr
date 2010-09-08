@@ -173,6 +173,28 @@ Verifies that output contains 2 critical pieces of information:
 sub get_control_data {
     my $self = shift;
 
+    my $control_data = {};
+
+    my $handle;
+    if (   ( !defined $self->{ 'error-pgcontroldata' } )
+        || ( 'break' eq $self->{ 'error-pgcontroldata' } ) )
+    {
+        $handle = sub {
+            $self->log->fatal( @_ );
+        };
+    }
+    elsif ( 'ignore' eq $self->{ 'error-pgcontroldata' } ) {
+        $handle = sub {
+            $self->log->error( @_ );
+        };
+    }
+    else {
+        $handle = sub {
+            $self->log->error( @_ );
+            sleep 600 while 1;
+        };
+    }
+
     $self->prepare_temp_directory();
 
     my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'pgcontroldata-path' }, $self->{ 'data-dir' } );
@@ -180,21 +202,22 @@ sub get_control_data {
         $self->log->fatal( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, $response );
     }
 
-    my $control_data = {};
-
     my @lines = split( /\s*\n/, $response->{ 'stdout' } );
     for my $line ( @lines ) {
         unless ( $line =~ m{\A([^:]+):\s*(.*)\z} ) {
-            $self->log->fatal( 'Pg_controldata for %s contained unparseable line: [%s]. Full response: %s', $self->{ 'data-dir' }, $line, $response );
+            $handle->( 'Pg_controldata for %s contained unparseable line: [%s]. Full response: %s', $self->{ 'data-dir' }, $line, $response );
+            return undef;
         }
         $control_data->{ $1 } = $2;
     }
 
     unless ( $control_data->{ "Latest checkpoint's REDO location" } ) {
-        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint redo location. Full response: %s', $self->{ 'data-dir' }, $response );
+        $handle->( 'Pg_controldata for %s did not contain latest checkpoint redo location. Full response: %s', $self->{ 'data-dir' }, $response );
+        return undef;
     }
     unless ( $control_data->{ "Latest checkpoint's TimeLineID" } ) {
-        $self->log->fatal( 'Pg_controldata for %s did not contain latest checkpoint timeline ID. Full response: %s', $self->{ 'data-dir' }, $response );
+        $handle->( 'Pg_controldata for %s did not contain latest checkpoint timeline ID. Full response: %s', $self->{ 'data-dir' }, $response );
+        return undef;
     }
 
     return $control_data;
