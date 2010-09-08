@@ -110,6 +110,25 @@ variable.
 Full path to pg_controldata program - in case you can't set proper PATH
 environment variable.
 
+=item --error-pgcontroldata (-ep)
+
+Sets handler for errors with pgcontroldata. Possible options:
+
+=over
+
+=item * ignore - warn in logs, but nothing else to be done - after some time,
+recheck if pg_controldata works
+
+=item * hang - enter infinite loop, waiting for admin interaction, but not
+finishing recovery
+
+=item * break - breaks recovery, and returns error status to PostgreSQL
+(default)
+
+=back
+
+Please check L<ERRORS> section below for more details.
+
 =back
 
 =head2 DESCRIPTION
@@ -297,6 +316,70 @@ omnipitr-restore will remove segments chronologically - oldest segments first.
 
 One useful idea for pre-removal-processing, is using L<omnipitr-archive> for
 processing - to send xlog segments to some permanent storage place.
+
+=head2 ERRORS
+
+=head3 pg_controldata
+
+Sometimes, for not yet known reason, pg_controldata fails (doesn't print
+anything, exits with status -1).
+
+In such situation, omnipitr-restore died too, with error, but it had one bad
+consequence: it made PostreSQL assume that it should stop recovery and go
+directly into standalone mode, and start accepting connections.
+
+Because this solution is not so good, there is now switch to change the
+behaviour in case of such error.
+
+It has 3 possible values.
+
+=head4 break
+
+"Break" means break recovery, and return to PostgreSQL error. This is default
+behaviour to make it backward compatible.
+
+=head4 ignore
+
+With this error handling, omnipitr-restore will simply ignore all errors from
+pg_controldata - i.e. it will simply print information about error to logs, but
+it will not change anythin - it will still try to work on next wal segments, and
+after 5 minutes - it will retry to get pg_controldata.
+
+This is the most transparent setting, but also kind of dangerous. It means that
+if there is non-permanent problem leading to pg_controldata failing not 100%, it
+might simply get overlooked - replication will work just fine.
+
+And this can mean that the real source of the error can propagate and do more
+harm.
+
+=head4 hang
+
+With "hang" error handling, in case of pg_controldata failure, omnipitr-restore
+will basically hang - i.e. enter infinite loop, not doing anything.
+
+Of course before entering infinite loop, it will log information about the
+problem.
+
+While it might seem like pointless, it has two benefits:
+
+=over
+
+=item * It will not cause slave server to become standalone
+
+=item * It is easily detactable, as long as you're checking size of wal archive
+directory, or wal replication lag, or any other metric about replication - as
+replication will be 100% stoppped.
+
+=back
+
+To recover from hanged recovery, you have to restart PostgreSQL, i.e. run this
+sequence of commands (or something similar depending on what you're using to
+start/stop your PostgreSQL):
+
+    pg_ctl -D /path/to/pgdata -m fast stop
+    pg_ctl -D /path/to/pgdata start
+
+Of course when next pg_controldata error will happen - it will hang again.
 
 =head2 EXAMPLES
 
