@@ -172,7 +172,6 @@ Verifies that output contains 2 critical pieces of information:
 
 sub get_control_data {
     my $self = shift;
-
     my $control_data = {};
 
     my $handle;
@@ -199,7 +198,8 @@ sub get_control_data {
 
     my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'pgcontroldata-path' }, $self->{ 'data-dir' } );
     if ( $response->{ 'error_code' } ) {
-        $self->log->fatal( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, $response );
+        $handle->( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, $response );
+        return undef;
     }
 
     my @lines = split( /\s*\n/, $response->{ 'stdout' } );
