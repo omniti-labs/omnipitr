@@ -374,6 +374,7 @@ sub validate_args {
     my $self = shift;
 
     $self->log->fatal( 'Data-dir was not provided!' ) unless defined $self->{ 'data-dir' };
+    $self->{'data-dir'} =~ s{/+$}{};
     $self->log->fatal( 'Provided data-dir (%s) does not exist!',   $self->{ 'data-dir' } ) unless -e $self->{ 'data-dir' };
     $self->log->fatal( 'Provided data-dir (%s) is not directory!', $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' };
     $self->log->fatal( 'Provided data-dir (%s) is not readable!',  $self->{ 'data-dir' } ) unless -r $self->{ 'data-dir' };
