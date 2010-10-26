@@ -320,6 +320,10 @@ stop it - remember to connect to postgresql and issue:
 
     SELECT pg_stop_backup();
 
+=item * I<omnipitr-backup-master> should be running from the same system account
+as PostgreSQL. It is technically possible to make it work with running from
+another account, but it will definitely be more complicated and error-prone.
+
 =back
 
 =head2 COPYRIGHT
