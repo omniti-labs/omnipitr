@@ -37,6 +37,12 @@ programs
 This is required in case we are running in situation where rsync is not in PATH
 on B<remote> end of replication.
 
+=item * Add a way to specify "primary" destination for wal segments.
+
+This would be useful if you have WAL-slave in the same network, and additional
+slave, on a network link that can be down. Problems with non-primary
+destinations wouldn't stop replication to primary destinations.
+
 =back
 
 =head2 COPYRIGHT
