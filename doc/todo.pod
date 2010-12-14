@@ -46,6 +46,8 @@ destinations wouldn't stop replication to primary destinations.
 =item * Make temp directories inside given temp-dir, based on pid and/or random
 values - to allow easy running (for example) 2 slaves on the same machine.
 
+=item * Make it possible to provide multiple sources for omnipitr-restore
+
 =back
 
 =head2 COPYRIGHT
