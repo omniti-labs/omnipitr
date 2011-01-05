@@ -1,5 +1,14 @@
 =head1 OmniPITR
 
+=head2 2011-01-05
+
+=over
+
+=item * Add proper stub for make_xlog_archive in OmniPITR::Program::Backup, that
+enforces reimplementation in child classes.
+
+=back
+
 =head2 2010-09-28
 
 =over
@@ -8,7 +17,6 @@
 trailing / character
 
 =back
-
 
 =head2 2010-09-10
 

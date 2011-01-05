@@ -39,6 +39,17 @@ sub run {
     return;
 }
 
+=head1 make_xlog_archive()
+
+Just a stub method, that has to be overriden in subclasses.
+
+=cut
+
+sub make_xlog_archive {
+    my $self = shift;
+    croak( "make_xlog_archive() method in OmniPITR::Program::Backup was not overridden!" );
+}
+
 =head1 choose_base_local_destinations()
 
 Chooses single local destination for every compression schema required by
