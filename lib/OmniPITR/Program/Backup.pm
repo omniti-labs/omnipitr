@@ -198,7 +198,7 @@ sub tar_and_compress {
     my $self = shift;
     my %ARGS = @_;
 
-    $SIG{ 'PIPE' } = sub { $self->log->fatal( 'Got SIGPIPE while tarring %s for %s', $ARGS{ 'tar_dir' }, $self->{ 'sigpipeinfo' } ); };
+    local $SIG{ 'PIPE' } = sub { $self->log->fatal( 'Got SIGPIPE while tarring %s for %s', $ARGS{ 'tar_dir' }, $self->{ 'sigpipeinfo' } ); };
 
     my @compression_command = ( $self->{ 'tar-path' }, 'cf', '-' );
     unshift @compression_command, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
