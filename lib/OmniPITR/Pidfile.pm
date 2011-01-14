@@ -5,47 +5,41 @@ use Fcntl qw( :flock );
 use File::Basename qw( basename );
 require File::Spec;
 
-sub new
-{
+sub new {
     my $class = shift;
-    my %args = @_;
-    my $self = bless \%args, $class;
-    unless ( $self->{pidfile} )
-    {
+    my %args  = @_;
+    my $self  = bless \%args, $class;
+    unless ( $self->{ pidfile } ) {
         my $basename = basename( $0 );
         my $dir = -w "/var/run" ? "/var/run" : File::Spec->tmpdir();
         die "Can't write to $dir\n" unless -w $dir;
         $pidfile = "$dir/$basename.pid";
         $self->_verbose( "pidfile: $pidfile\n" );
-        $self->{pidfile} = $pidfile;
+        $self->{ pidfile } = $pidfile;
     }
     $self->_create_pidfile();
     return $self;
 }
 
-sub DESTROY
-{
+sub DESTROY {
     my $self = shift;
     $self->_destroy_pidfile();
 }
 
-sub pidfile
-{
+sub pidfile {
     my $self = shift;
-    return $self->{pidfile};
+    return $self->{ pidfile };
 }
 
-sub _verbose
-{
+sub _verbose {
     my $self = shift;
-    return unless $self->{verbose};
+    return unless $self->{ verbose };
     print STDERR @_;
 }
 
-sub _get_pid
-{
-    my $self = shift;
-    my $pidfile = $self->{pidfile};
+sub _get_pid {
+    my $self    = shift;
+    my $pidfile = $self->{ pidfile };
     $self->_verbose( "get pid from $pidfile\n" );
     open( PID, $pidfile ) or die "can't read pid file $pidfile\n";
     flock( PID, LOCK_SH );
@@ -57,42 +51,34 @@ sub _get_pid
     return $pid;
 }
 
-sub _is_running
-{
+sub _is_running {
     my $pid = shift;
-    return kill(0, $pid);
+    return kill( 0, $pid );
 }
 
-sub _create_pidfile
-{
-    my $self = shift;
-    my $pidfile = $self->{pidfile};
-    if ( -e $pidfile )
-    {
+sub _create_pidfile {
+    my $self    = shift;
+    my $pidfile = $self->{ pidfile };
+    if ( -e $pidfile ) {
         $self->_verbose( "pidfile $pidfile exists\n" );
         my $pid = $self->_get_pid();
         $self->_verbose( "pid in pidfile $pidfile = $pid\n" );
-        if ( _is_running( $pid ) )
-        {
-            if ( $self->{silent} )
-            {
+        if ( _is_running( $pid ) ) {
+            if ( $self->{ silent } ) {
                 exit;
             }
-            else
-            {
+            else {
                 die "$0 already running: $pid ($pidfile)\n";
             }
         }
-        else
-        {
+        else {
             $self->_verbose( "$pid has died - replacing pidfile\n" );
             open( PID, ">$pidfile" ) or die "Can't write to $pidfile\n";
             print PID "$$\n";
             close( PID );
         }
     }
-    else
-    {
+    else {
         $self->_verbose( "no pidfile $pidfile\n" );
         open( PID, ">$pidfile" ) or die "Can't write to $pidfile\n";
         flock( PID, LOCK_EX );
@@ -101,34 +87,29 @@ sub _create_pidfile
         close( PID );
         $self->_verbose( "pidfile $pidfile created\n" );
     }
-    $self->{created} = 1;
+    $self->{ created } = 1;
 }
 
-sub _destroy_pidfile
-{
+sub _destroy_pidfile {
     my $self = shift;
 
-    return unless $self->{created};
-    my $pidfile = $self->{pidfile};
+    return unless $self->{ created };
+    my $pidfile = $self->{ pidfile };
     $self->_verbose( "destroy $pidfile\n" );
-    unless ( $pidfile and -e $pidfile )
-    {
+    unless ( $pidfile and -e $pidfile ) {
         die "pidfile $pidfile doesn't exist\n";
     }
     my $pid = $self->_get_pid();
     $self->_verbose( "pid in $pidfile = $pid\n" );
-    if ( $pid == $$ )
-    {
+    if ( $pid == $$ ) {
         $self->_verbose( "remove pidfile: $pidfile\n" );
         unlink( $pidfile ) if $pidfile and -e $pidfile;
     }
-    else
-    {
-        $self->_verbose(  "$pidfile not my pidfile - maybe my parents?\n" );
+    else {
+        $self->_verbose( "$pidfile not my pidfile - maybe my parents?\n" );
         my $ppid = getppid();
-        $self->_verbose(  "parent pid = $ppid\n" );
-        if ( $ppid != $pid )
-        {
+        $self->_verbose( "parent pid = $ppid\n" );
+        if ( $ppid != $pid ) {
             die "pid $pid in $pidfile is not mine ($$) - I am $0 - or my parents ($ppid)\n";
         }
     }
@@ -211,7 +192,6 @@ itself.
 # End of POD
 #
 #------------------------------------------------------------------------------
-
 
 #------------------------------------------------------------------------------
 #

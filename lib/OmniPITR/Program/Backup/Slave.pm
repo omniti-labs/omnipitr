@@ -268,7 +268,7 @@ sub compress_pgdata {
         push @excludes, $dir if -l File::Spec->catfile( $self->{ 'data-dir' }, $dir );
     }
 
-    my ($tablespaces, $transforms) = $self->get_tablespaces_and_transforms();
+    my ( $tablespaces, $transforms ) = $self->get_tablespaces_and_transforms();
     push @{ $tablespaces }, basename( $self->{ 'data-dir' } ), File::Spec->catfile( $self->{ 'temp-dir' }, 'backup_label' );
     push @{ $transforms }, $transform_command;
 

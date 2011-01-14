@@ -171,7 +171,7 @@ Verifies that output contains 2 critical pieces of information:
 =cut
 
 sub get_control_data {
-    my $self = shift;
+    my $self         = shift;
     my $control_data = {};
 
     my $handle;

@@ -6,7 +6,7 @@
 
 =item * Locate any tablespaces in the data dir and include them in the backup
 for both masters and slaves.  In the tar file these will be placed under the
-'tablespace' directory.
+'tablespaces' directory.
 
 =back
 

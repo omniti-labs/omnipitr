@@ -153,14 +153,14 @@ sub compress_pgdata {
         push @excludes, $dir if -l File::Spec->catfile( $self->{ 'data-dir' }, $dir );
     }
 
-    my ($tablespaces, $transforms) = $self->get_tablespaces_and_transforms();
+    my ( $tablespaces, $transforms ) = $self->get_tablespaces_and_transforms();
     push @{ $tablespaces }, basename( $self->{ 'data-dir' } );
 
     $self->tar_and_compress(
-        'work_dir' => dirname( $self->{ 'data-dir' } ),
-        'tar_dir'  => $tablespaces,
-        'excludes' => \@excludes,
-        'transform'=> $transforms,
+        'work_dir'  => dirname( $self->{ 'data-dir' } ),
+        'tar_dir'   => $tablespaces,
+        'excludes'  => \@excludes,
+        'transform' => $transforms,
     );
 
     $self->log->time_finish( 'Compressing $PGDATA' ) if $self->verbose;
@@ -378,7 +378,7 @@ sub validate_args {
     my $self = shift;
 
     $self->log->fatal( 'Data-dir was not provided!' ) unless defined $self->{ 'data-dir' };
-    $self->{'data-dir'} =~ s{/+$}{};
+    $self->{ 'data-dir' } =~ s{/+$}{};
     $self->log->fatal( 'Provided data-dir (%s) does not exist!',   $self->{ 'data-dir' } ) unless -e $self->{ 'data-dir' };
     $self->log->fatal( 'Provided data-dir (%s) is not directory!', $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' };
     $self->log->fatal( 'Provided data-dir (%s) is not readable!',  $self->{ 'data-dir' } ) unless -r $self->{ 'data-dir' };
