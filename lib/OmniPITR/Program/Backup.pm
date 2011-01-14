@@ -134,6 +134,46 @@ sub start_writers {
     return;
 }
 
+=head1 get_tablespaces_and_transforms()
+
+Helper function.  Takes no arguments.  Uses pg_tblspc directory and returns
+a listref of the physical locations for tar to include in the backup as well
+as a listref of the transform regexs that it will need to apply in order for
+those directories to get untarred to the correct location from pg_tblspc's
+perspective.
+
+=cut
+
+sub get_tablespaces_and_transforms {
+    my $self = shift;
+
+    # Identify any tablespaces and get those
+    my $tablespace_dir = File::Spec->catfile( $self->{ 'data-dir' }, "pg_tblspc" );
+    my (%tablespaces, @transform_regexs);
+    if( -e $tablespace_dir ) {
+        my @pgfiles;
+        opendir( my $dh, $tablespace_dir ) or $self->log->fatal( "Unable to open tablespace directory $tablespace_dir" );
+        # Push onto our list the locations that are pointed to by the pg_tblspc symlinks
+        foreach my $filename ( readdir $dh ) {
+            next if $filename !~ /^\d+$/; # Filename should be all numeric
+            my $full_name = File::Spec->catfile( $tablespace_dir, $filename );
+            next if ! -l $full_name;  # It should be a symbolic link
+            my $link = readlink $full_name;
+            push @pgfiles, $link if $link;  # If it's a valid link, put it onto the list
+        }
+        closedir $dh;
+        # At this point pgfiles contains a list of the destinations.  Some of THOSE might be links however and need
+        # to be identified since we need to pass the actual location bottom location to tar
+        %tablespaces = map { $_ => Cwd::abs_path($_) } @pgfiles;
+        # Populate the regexes to put these directories under tablespaces with transforms so that the actual physical location
+        # is transformed into the 1-level deep link that the pg_tblspc files are pointing at.  We substr becase tar strips leading /
+        push @transform_regexs, map {"s,^" . substr($tablespaces{$_},1) . ",tablespaces$_," } keys %tablespaces ;
+    }
+    $self->log->log("Including tablespaces: " . (join ", ",(keys %tablespaces))  . "\n") if $self->verbose && keys %tablespaces;
+
+    return ( [ values %tablespaces ], \@transform_regexs );
+}
+
 =head1 get_archive_filename()
 
 Helper function, which takes filetype and compression schema to use, and
@@ -208,7 +248,11 @@ sub tar_and_compress {
     }
 
     if ( $ARGS{ 'transform' } ) {
-        push @compression_command, '--transform=' . $ARGS{ 'transform' };
+        if( ref $ARGS{ 'transform' } ) {
+            push @compression_command, map { '--transform=' . $_ } @{ $ARGS{ 'transform' } };
+        } else {
+            push @compression_command, '--transform=' . $ARGS{ 'transform' };
+        }
     }
 
     push @compression_command, @{ $ARGS{ 'tar_dir' } };

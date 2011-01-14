@@ -268,11 +268,15 @@ sub compress_pgdata {
         push @excludes, $dir if -l File::Spec->catfile( $self->{ 'data-dir' }, $dir );
     }
 
+    my ($tablespaces, $transforms) = $self->get_tablespaces_and_transforms();
+    push @{ $tablespaces }, basename( $self->{ 'data-dir' } ), File::Spec->catfile( $self->{ 'temp-dir' }, 'backup_label' );
+    push @{ $transforms }, $transform_command;
+
     $self->tar_and_compress(
         'work_dir'  => dirname( $self->{ 'data-dir' } ),
-        'tar_dir'   => [ basename( $self->{ 'data-dir' } ), File::Spec->catfile( $self->{ 'temp-dir' }, 'backup_label' ) ],
+        'tar_dir'   => $tablespaces,
         'excludes'  => [ map { sprintf( '%s/%s', basename( $self->{ 'data-dir' } ), $_ ) } @excludes ],
-        'transform' => $transform_command,
+        'transform' => $transforms,
     );
 
     $self->log->time_finish( 'Compressing $PGDATA' ) if $self->verbose;

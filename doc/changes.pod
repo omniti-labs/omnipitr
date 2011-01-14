@@ -1,5 +1,15 @@
 =head1 OmniPITR
 
+=head2 2011-01-14
+
+=over
+
+=item * Locate any tablespaces in the data dir and include them in the backup
+for both masters and slaves.  In the tar file these will be placed under the
+'tablespace' directory.
+
+=back
+
 =head2 2011-01-12
 
 =over
