@@ -296,15 +296,15 @@ relate to date/time of beginning of backup process.
 
 =head2 TABLESPACES
 
-If I<omnipitr-backup-master> will detect additional tablespaces, they will be
+If I<omnipitr-backup-master> detects additional tablespaces, they will be
 also compressed to generated tarball.
 
-Since full path to tablespace directory is important, and should be preserved,
+Since the full path to the tablespace directory is important, and should be preserved,
 and normally tar doesn't let you store files which path starts with "/" (as it
-would be dangerous), I<omnipitr-backup-master> uses following approach:
+would be dangerous), I<omnipitr-backup-master> uses the following approach:
 
 all tablespaces will be stored in tar, and upon extraction they will be put in
-directory "tablespaces", and under it - there will be full path to tablespace
+the directory "tablespaces", and under it - there will be the full path to the tablespace
 directory.
 
 For example:
@@ -342,7 +342,7 @@ generated DATA tarball will contain 2 directories:
 
 Thanks to this approach, if you'll create symlink "tablespaces" pointing to root
 directory (I<ln -s / tablespaces>) B<before> exploding tarball - all tablespace
-files will be created already in correct places. This is of course not
+files will be created already in the correct places. This is of course not
 necessary, but will help if you'd ever need to recover from such backup.
 
 =head2 EXAMPLES
