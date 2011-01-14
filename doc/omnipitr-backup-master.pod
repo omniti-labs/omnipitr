@@ -294,6 +294,57 @@ like in L<strftime(3)> call, but ^ will be changed to % first.
 Filename template is evaluated at start, so any timestamp (^? markers) will
 relate to date/time of beginning of backup process.
 
+=head2 TABLESPACES
+
+If I<omnipitr-backup-master> will detect additional tablespaces, they will be
+also compressed to generated tarball.
+
+Since full path to tablespace directory is important, and should be preserved,
+and normally tar doesn't let you store files which path starts with "/" (as it
+would be dangerous), I<omnipitr-backup-master> uses following approach:
+
+all tablespaces will be stored in tar, and upon extraction they will be put in
+directory "tablespaces", and under it - there will be full path to tablespace
+directory.
+
+For example:
+
+Assuming PostgreSQL PGDATA is in /var/lib/pgsql/data, and it has 3 extra
+tablespaces placed in:
+
+=over
+
+=item * /mnt/san/tablespace
+
+=item * /home/whatever/xxx
+
+=item * /media/ssd
+
+=back
+
+generated DATA tarball will contain 2 directories:
+
+=item * data - copy of /var/lib/pgsql/data
+
+=item * tablespaces - which contains full directory structure leading to:
+
+=over
+
+=item * tablespaces/mnt/san/tablespace - copy of /mnt/san/tablespace
+
+=item * tablespaces/home/whatever/xxx - copy of /home/whatever/xxx
+
+=item * tablespaces/media/ssd - copy of /media/ssd
+
+=back
+
+=back
+
+Thanks to this approach, if you'll create symlink "tablespaces" pointing to root
+directory (I<ln -s / tablespaces>) B<before> exploding tarball - all tablespace
+files will be created already in correct places. This is of course not
+necessary, but will help if you'd ever need to recover from such backup.
+
 =head2 EXAMPLES
 
 =head3 Minimal setup, with copying file to local directory:
