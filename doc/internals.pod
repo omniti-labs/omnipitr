@@ -1,0 +1,367 @@
+=head1 OmniPITR
+
+=head2 OVERVIEW
+
+This document describes how the OmniPITR internally works, why given switches
+exist, what they are for, and generally - why it works the way it works.
+
+If you're looking for developer docs - just run perldoc on individual modules in
+omnipitr/lib directory.
+
+Since the replication setup involves 3 distinct types of activities:
+
+=over
+
+=item * segment archival
+
+=item * segment recovery
+
+=item * database backup
+
+=back
+
+These will be major parts of this document.
+
+Before I will go further - backup, as described in here, is filesystem level
+backup - that is copy of PostgreSQL data files (commonly described as
+I<$PGDATA>), and not something comparable with pg_dump. The biggest difference
+is that pg_dump can be easily (usually) loaded to any version of PostgreSQL,
+while filesystem level backup requires recovery on the same version (major), and
+the same architecture as the system the backup was made on.
+
+=head2 Segment archival
+
+=head3 Technical background
+
+When PostgreSQL has to write any specific data to database, it doesn't actually
+write it to table or index files. It stores the modified data (up to ~
+I<shared_buffers>) in memory, and writes to actual tables and indexes on (so
+called) I<CHECKPOINTS>. Checkpoints usually happen automatically, every 5
+minutes (default interval), or you can invoke them manually issuing
+I<CHECKPOINT> SQL command.
+
+This creates potential for problems - what will happen if we will have
+modification done by transaction that did commit, but server crashed (power
+outage) before there was checkpoint? For such situations - there is WAL - Write
+Ahead Log. As soon as there is any data to be written - there is information
+about this fact written to this I<log>. Even before transaction commits - its
+all there. WAL should be seen as a single, very long "area", which (for various
+reasons) has been split into multiple files, each file containing exactly 16MB
+of data.
+
+So, when there is any write, it gets logged to WAL and stored in memory. When
+commit happens, WAL file is being I<fsync>'ed, to be sure that it's on disk, and
+then commit returns. This is very important - that commit returns correctly only
+after changes in WAL have been fully saved to disk (as long as disk doesn't lie
+about results of fsync, and you didn't disable fsync in configuration).
+
+If power outage happens, next time PostgreSQL will start, it will simply read
+from WAL what should be applied to data files, and apply it.
+
+Now, for B<very, very important> information:
+
+WAL segments are reused.
+
+This is to avoid requirement to create 16MB file when we've used all previous
+segments.
+
+Let me explain this in example.
+
+In PGDATA/pg_xlog there is set of files, which could be named like this:
+
+=over
+
+=item * 000000010000000000000051
+
+=item * 000000010000000000000052
+
+=item * 000000010000000000000053
+
+=item * 000000010000000000000054
+
+=item * 000000010000000000000055
+
+=item * 000000010000000000000056
+
+=item * 000000010000000000000057
+
+=back
+
+Usually (I'll write about it later) PostgreSQL writes to first file
+(0000000100000000000000B<51> in this case).
+
+When it will write 16MB data there, it switches to 0000000100000000000000B<52>, and
+so on. And after checkpoint - all segments that are "before" current one, will
+get renamed to be at the end of list.
+
+So, if there will be CHECKPOINT while PostgreSQL writes to
+0000000100000000000000B<52>, segment 0000000100000000000000B<51> will get
+renamed to 0000000100000000000000B<58>.
+
+PostgreSQL (since version 8.0, but OmniPITR has been tested only with 8.2
+and newer) supports WAL Segments Archiving.
+
+What it really is, is that you can define a command, that will be run as soon as
+given segment is full, and this command can do copy of it (WAL segment file) to
+any place it wants, using any method it wants.
+
+What's more - even if there will be checkpoint - WAL segment file cannot be
+renamed (and thus reused and overwritten) unless archive_command succeeded, and
+PostgreSQL will not start working on archive on next segment if previous hasn't
+finished with success.
+
+This fact has couple of important consequences:
+
+=over
+
+=item * we can be sure that when archive_command is called, WAL segment is full,
+and will not be changed anymore (i.e. until it will get renamed, and reused, but
+this will be under different name, so it doesn't matter)
+
+=item * archive_command will be called sequentially, in order of WAL segments.
+
+=item * if, for whatever reason, archiving will fail - your pg_xlog directory
+will get bigger and bigger - as PostgreSQL will be creating new WAL segments to
+accomodate new writes to database, but it will not reuse old segments because
+archiving is failing (until it will stop failing, where PostgreSQL will quickly
+call the archiving command for every WAL segment that should be archived).
+
+=back
+
+Now, with some technical background being explained we can move to explaining
+how I<omnipitr-archive> handles the task.
+
+=head3 How does it work?
+
+Upon configuring (by providing command line switches), admin can choose to
+archive wal segments to any number of locations, using one of supported
+compression schemas:
+
+=over
+
+=item * no compression - wal segment takes 16MB, but is immediately available to
+anything that needs it (compare this to description of I<omnipitr-backup-slave>
+in later part of this document)
+
+=item * gzip - quick, and very portable
+
+=item * bzip2 - slower, quite portable, and compresses better than gzip
+
+=item * lzma - very slow, not very common, but best compression ratio
+
+=back
+
+When choosing which compression method to use, you have to remember that
+segments are processed sequentially - so if compression of segment takes more
+than it takes PostgreSQL to fill new one - you will create backlog, and the
+whole replication/archiving will fail.
+
+On top of choosing compression, admin can also setup so called "destinations" -
+which are basically paths to where to store the files.
+
+Some of the destinations are local - i.e. it's a directory mounted on the
+database server that is running I<omnipitr-archive>, and some are remote - for
+example on slave server.
+
+In the case of remote destination you have to provide paswordless access via
+rsync (using rsync:// protocol) or rsync-over-ssh.
+
+For performance reasons, it's better to use rsync://, but since it's far less
+common, most admins prefer well known rsync-over-ssh with authentication using
+passwordless ssh keys.
+
+The important thing is that when having multiple compressed destinations - you
+don't actually have to compress them multiple times.
+
+To avoid having to do multiple compressions, I<omnipitr-archive> first checks
+list of all required compressions. For example - if one chose uncompressed
+local destionation, gzip compressed local destination, and two bzip2
+destinations - one local and one remote, we need to make two compressions - to
+gzip and then to bzip2.
+
+I<omnipitr-archive> tries to limit the work it has to do, so when choosing what
+to do it follow basically this logic:
+
+=over
+
+=item * iterate over local destinations
+
+=over
+
+=item * if given destination doesn't use compression - use simple copy from
+pg_xlog/ directory (source of wal segments) to final destination
+
+=item * if given destination requires compression that wasn't done before -
+compress source wal segment (without modifying source file, as it will be used
+by PostgreSQL), and save to destination
+
+=item * if given destination requires compression that was previously used -
+copy the compressed file from the first local destination that used the same
+compression schema
+
+=back
+
+=item * iterate over remote destinations
+
+=over
+
+=item * if given destination doesn't use compression - send the file from source
+directory to remote destination with rsync
+
+=item * if given destination requires compression that was used for any previous
+destination - send already compressed version of the file to remote destination
+
+=item * if given destination requires compression that was not used for any
+previous destination - compress it to temporary, local, directory, and then send
+from there. The temporary file will be removed only after all destination will
+be handled.
+
+=back
+
+=back
+
+There is a problem though - what will happen if I<omnipitr-archive> was called
+with two remote destinations, and second one would fail.
+
+By definition - archive-command cannot return "success" if it didn't deliver the
+wal segments to all required locations.
+
+So. In case that there would be potentially "partial success" -
+I<omnipitr-archive> has to return failure to PostgreSQL (so that it will be
+called next time), but it shouldn't deliver the already delivered file again to
+destinations that already got it!
+
+This is why there is a notion of I<state dir>. This is special directory, that
+contains information about deliveries of given wal segment - but only until it
+will be delivered to all places.
+
+So, if there are 3 destinations, after delivering to first of them,
+I<omnipitr-archive> will write to state-dir file, saying that given wal segment
+was delivered to first destination. After second destination - new info will be
+added. And after successfully sending wal segment to final destination - the
+state file will be removed, and I<omnipitr-archive> will return "success" to
+PostgreSQL.
+
+Thanks to this, if delivery to third destination would fail, upon next run,
+I<omnipitr-archive> will be able to skip delivering to first and second
+destinations, which already had the file delivered to them.
+
+There is also third possible destination type - backup destination. For
+explanation what it's for please check below in part about
+I<omnipitr-backup-master>, but the summary is very simple: backup destination is
+a local destination, that cannot be compressed, and generally shouldn't exist
+(i.e. the directory to which --dst-backup points, shouldn't exist, usually).
+
+As for options - we aleady covered the most important of them - state-dir and
+various dst-*
+
+temp-dir is used to specify where to create temp files - which is used if you
+have remote destination that uses compression that wasn't used for any local
+destination.
+
+Since I'm big fan of logging - there is logging support with --log option, which
+is also mandatory. You have to have log, at the very least to know where to look
+in if anything would go wrong.
+
+Logging from OmniPITR supports automatic rotation of logs (based on time), but
+not archival - this has to be handled by some other tool.
+
+Standard when dealing with time based formats is %x notation - as in
+L<strftime()> call. Unfortunately, PostgreSQL also uses %x (%f, %p and %r
+actually) for it's own purposes, so, to avoid clashing with its options, I
+decided to use ^x notation - where "x" is the same as in %x notation of
+L<strftime()>.
+
+So, L<strftime()> format "%Y-%m-%d" has to be written as "^Y-^m-^d" in omnipitr
+--log path. But aside from this small difference - you can use full power of
+time based rotations, including auto-generated directories, like in case of:
+
+    --log "/some/path/^Y/^m/^d/OmniPITR-^Y-^m-^d_^H.log"
+
+There are also switches for letting I<omnipitr-archive> know where is $PGDATA
+(as it expects path to wal segment to be relative to it), but this virtually
+always not needed, as when using normally I<omnipitr-archive> as
+"archive_command" - current working directory is set to $PGDATA, and so the
+--data-dir defaults to sane ".". If you're interested as of - when it would be
+useful - please check below in section on I<omnipitr-restore>.
+
+There is also option to set pid-file, but this was only added for completness,
+as PostgreSQL will never run two copies of archive_command, so it shouldn't be
+a problem at any time.
+
+Please also note that there is "--verbose" option, which makes logs that are a
+bit larger, but B<a lot> more useful.
+
+For example. This is snippet of log, about two WAL files being archived,
+without --verbose:
+
+    2011-01-20 20:25:40.079230 +0000 : 28544 : omnipitr-archive : LOG : Segment ./pg_xlog/00000001000000DE00000092 successfully sent to all destinations.
+    2011-01-20 20:27:05.547792 +0000 : 28770 : omnipitr-archive : LOG : Segment ./pg_xlog/00000001000000DE00000093 successfully sent to all destinations.
+
+Simple and to the point. But with --verbose, it looks like this:
+
+    2011-01-20 20:25:37.359384 +0000 : 28544 : omnipitr-archive : LOG : Called with parameters: -v -l /var/log/omnipitr/omnipitr-^Y-^m-^d.log -s /var/lib/pgsql/omnipitr/state/ -t /var/tmp/ -dr gzip=db2:/mnt/db/prod/walarchive/ -dr db2:/mnt/db/prod/db2-walarchive/ -db /var/lib/pgsql/omnipitr/backup.xlogs pg_xlog/00000001000000DE00000092
+    2011-01-20 20:25:38.705074 +0000 : 28544 : omnipitr-archive : LOG : Timer [Compressing with gzip] took: 1.299s
+    2011-01-20 20:25:39.418690 +0000 : 28544 : omnipitr-archive : LOG : Timer [Sending /var/tmp/omnipitr-archive/00000001000000DE00000092/00000001000000DE00000092.gz to db2:/mnt/db/prod/walarchive/00000001000000DE00000092.gz] took: 0.657s
+    2011-01-20 20:25:40.033344 +0000 : 28544 : omnipitr-archive : LOG : Timer [Sending ./pg_xlog/00000001000000DE00000092 to db2:/mnt/db/prod/db2-walarchive/00000001000000DE00000092] took: 0.573s
+    2011-01-20 20:25:40.079230 +0000 : 28544 : omnipitr-archive : LOG : Segment ./pg_xlog/00000001000000DE00000092 successfully sent to all destinations.
+    2011-01-20 20:27:03.014960 +0000 : 28770 : omnipitr-archive : LOG : Called with parameters: -v -l /var/log/omnipitr/omnipitr-^Y-^m-^d.log -s /var/lib/pgsql/omnipitr/state/ -t /var/tmp/ -dr gzip=db2:/mnt/db/prod/walarchive/ -dr db2:/mnt/db/prod/db2-walarchive/ -db /var/lib/pgsql/omnipitr/backup.xlogs pg_xlog/00000001000000DE00000093
+    2011-01-20 20:27:04.350370 +0000 : 28770 : omnipitr-archive : LOG : Timer [Compressing with gzip] took: 1.279s
+    2011-01-20 20:27:04.889989 +0000 : 28770 : omnipitr-archive : LOG : Timer [Sending /var/tmp/omnipitr-archive/00000001000000DE00000093/00000001000000DE00000093.gz to db2:/mnt/db/prod/walarchive/00000001000000DE00000093.gz] took: 0.481s
+    2011-01-20 20:27:05.503586 +0000 : 28770 : omnipitr-archive : LOG : Timer [Sending ./pg_xlog/00000001000000DE00000093 to db2:/mnt/db/prod/db2-walarchive/00000001000000DE00000093] took: 0.563s
+    2011-01-20 20:27:05.547792 +0000 : 28770 : omnipitr-archive : LOG : Segment ./pg_xlog/00000001000000DE00000093 successfully sent to all destinations.
+
+as you can see we now see exact command line that was used to run the
+omnipitr-archive, and we see times of all important operations: compressing
+with gzip, and two remote deliveries (rsync over ssh).
+
+This timing information can be later used for debugging or tuning.
+
+Aside from all of this, I<omnipitr-archive>, like any other OmniPITR program,
+lets you point to programs that it uses. That is - nice, gzip, bzip2, lzma and
+rsync.
+
+It is important to note that if path to given program is not provided,
+I<omnipitr-archive> (like any program from OmniPITR) simply lets shell find it
+using $PATH environment variable.
+
+What's more - using of the --I<program>-path options is suggested, and
+supported, way of passing non-standard options to various programs.
+
+If one would want to pass "--rsync-path" option to rsync program (because on
+remote location rsync binary is not in $PATH), the suggested approach is to
+write simple shell wrapper:
+
+    #!/bin/sh
+    exec rsync --rsync-path "$@"
+
+then make it executable, and pass it's location to I<omnipitr-archive> with
+--rsync-path option.
+
+For some time I have been playing with idea of adding special --I<program>-opts
+options that would be used to pass additional parameters to programs, but
+finally decided against it for couple of reasons:
+
+=over
+
+=item * it gets tricky to make it work reliably in case some parameters would
+need to contain white space (quoting problem)
+
+=item * wrapper has much more power, and can do much nicer things
+
+=item * we need to provide --I<program>-path anyway, but generally
+--I<program>-opts is much less often needed/useful
+
+=item * I'm lazy.
+
+=back
+
+The only thing to remember is that when writing custom compressor wrappers
+(adding new compressors themselves is not trivial, as it requires also changes
+in L<OmniPITR::Tools> module in L<ext_for_compression()> function), is that they
+are called by I<omnipitr-archive> with --stdout option, so the wrapper should
+either handle it, or pass to underlying compressor.
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2009-2010 OmniTI. All rights reserved.
