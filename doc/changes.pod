@@ -1,5 +1,14 @@
 =head1 OmniPITR
 
+=head2 2011-01-20
+
+=over
+
+=item * Add internals.pod with first part of documentation of "how it works, and
+why this way"
+
+=back
+
 =head2 2011-01-14
 
 =over
