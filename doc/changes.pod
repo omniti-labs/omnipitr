@@ -1,5 +1,13 @@
 =head1 OmniPITR
 
+=head2 2011-01-24
+
+=over
+
+=item * Add detection of tar version to sanity-check.sh
+
+=back
+
 =head2 2011-01-20
 
 =over
