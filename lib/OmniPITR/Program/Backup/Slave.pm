@@ -408,7 +408,7 @@ sub read_args {
         }
     }
 
-    if ( $args{ 'source' } =~ s/\A(gzip|bzip2|lzma)=// ) {
+    if ( defined $args{ 'source' } && $args{ 'source' } =~ s/\A(gzip|bzip2|lzma)=// ) {
         $self->{ 'source' } = {
             'compression' => $1,
             'path'        => $args{ 'source' },
