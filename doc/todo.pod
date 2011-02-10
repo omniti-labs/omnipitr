@@ -51,10 +51,6 @@ values - to allow easy running (for example) 2 slaves on the same machine.
 =item * Add specialized program to serve as archive_cleanup_command - with
 support for compressed walarchive, and pausing removal
 
-=item * Add option for omnipitr-restore to let it be used for
-streaming-replication setups (i.e. fail on missing file, instead of waiting for
-next one)
-
 =back
 
 =head2 COPYRIGHT
