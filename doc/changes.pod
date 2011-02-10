@@ -6,6 +6,9 @@
 
 =item * Make the IMMEDIATE finish of recovery actually work.
 
+=item * Make omnipitr-backup-slave compatible with Streaming Replication in
+PostgreSQL 9.0
+
 =back
 
 =head2 2011-01-27

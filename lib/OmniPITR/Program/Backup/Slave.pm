@@ -137,17 +137,29 @@ reply that is required to get consistent state.
 sub make_dot_backup_file {
     my $self = shift;
 
-    my $redo_location  = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's REDO location" };
+    my $redo_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's REDO location" };
+    my $timeline      = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's TimeLineID" };
+
     my $final_location = $self->{ 'CONTROL' }->{ 'final' }->{ "Latest checkpoint location" };
-    my $timeline       = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's TimeLineID" };
-    my $offset         = $redo_location;
+    if (   ( defined $self->{ 'CONTROL' }->{ 'final' }->{ 'Minimum recovery ending location' } )
+        && ( $self->{ 'CONTROL' }->{ 'final' }->{ 'Minimum recovery ending location' } =~ m{\A[a-f0-9]+/[a-f0-9]+\z}i )
+        && ( '0/0' ne $self->{ 'CONTROL' }->{ 'final' }->{ 'Minimum recovery ending location' } ) )
+    {
+        $final_location = $self->{ 'CONTROL' }->{ 'final' }->{ 'Minimum recovery ending location' };
+    }
+    my $final_wal_filename = $self->convert_wal_location_and_timeline_to_filename( $final_location, $timeline );
+
+    my $final_wal_filename_re = qr{\A$final_wal_filename};
+    $self->wait_for_file( $self->{ 'source' }->{ 'path' }, $final_wal_filename_re );
+
+    my $offset = $redo_location;
     $offset =~ s#.*/##;
     $offset =~ s/^.*?(.{0,6})$/$1/;
 
     my $output_filename = sprintf '%s.%08s.backup', $self->convert_wal_location_and_timeline_to_filename( $redo_location, $timeline ), $offset;
 
     my @content_lines = @{ $self->{ 'backup_file_data' } };
-    splice( @content_lines, 1, 0, sprintf 'STOP WAL LOCATION: %s (file %s)', $final_location, $self->convert_wal_location_and_timeline_to_filename( $final_location, $timeline ) );
+    splice( @content_lines, 1, 0, sprintf 'STOP WAL LOCATION: %s (file %s)', $final_location, $final_wal_filename );
     splice( @content_lines, 4, 0, sprintf 'START TIME: %s', strftime( '%Y-%m-%d %H:%M:%S %Z', localtime time ) );
 
     my $content = join( "\n", @content_lines ) . "\n";

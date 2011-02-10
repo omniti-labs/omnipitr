@@ -45,43 +45,6 @@ sub make_xlog_archive {
     return;
 }
 
-=head1 wait_for_file()
-
-Helper function which waits for file to appear.
-
-It will return only if the file appeared.
-
-Return value is name of file.
-
-=cut
-
-sub wait_for_file {
-    my $self = shift;
-    my ( $dir, $filename_regexp ) = @_;
-
-    my $max_wait = 3600;    # It's 1 hour. There is no technical need to wait longer.
-    for my $i ( 0 .. $max_wait ) {
-        $self->log->log( 'Waiting for file matching %s in directory %s', $filename_regexp, $dir ) if 10 == $i;
-
-        opendir( my $dh, $dir ) or $self->log->fatal( 'Cannot open %s for scanning: %s', $dir, $OS_ERROR );
-        my @matching = grep { $_ =~ $filename_regexp } readdir $dh;
-        closedir $dh;
-
-        if ( 0 == scalar @matching ) {
-            sleep 1;
-            next;
-        }
-
-        my $reply_filename = shift @matching;
-        $self->log->log( 'File %s arrived after %u seconds.', $reply_filename, $i ) if $self->verbose;
-        return $reply_filename;
-    }
-
-    $self->log->fatal( 'Waited 1 hour for file matching %s, but it did not appear. Something is wrong. No sense in waiting longer.', $filename_regexp );
-
-    return;
-}
-
 =head1 wait_for_final_xlog_and_remove_dst_backup()
 
 In PostgreSQL < 8.4 pg_stop_backup() finishes before .backup "wal segment"
