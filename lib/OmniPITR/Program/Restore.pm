@@ -39,11 +39,10 @@ sub run {
     };
 
     while ( 1 ) {
-        $self->try_to_restore_and_exit();
-        sleep 1;
-        next if $self->{ 'finish' };
         $self->check_for_trigger_file();
+        $self->try_to_restore_and_exit();
         next if $self->{ 'finish' };
+        sleep 1;
         $self->do_some_removal();
     }
 }

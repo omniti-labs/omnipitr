@@ -1,12 +1,28 @@
 =head1 OmniPITR
 
+=head2 2011-02-10
+
+=over
+
+=item * Make the IMMEDIATE finish of recovery actually work.
+
+=back
+
 =head2 2011-01-27
 
 =over
 
 =item * Silence warning if source is not defined on the command line
 
-=back 
+=back
+
+=head2 2011-01-27
+
+=over
+
+=item * Silence warning if source is not defined on the command line
+
+=back
 
 =head2 2011-01-24
 
