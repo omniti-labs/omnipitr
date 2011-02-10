@@ -31,12 +31,6 @@ options without Pg restart (in omnipitr-restore case at least).
 When delivering wal segments to slave server, and to backup destination - we can
 reduce the time it takes, by delivering it in parallel.
 
-=item * Add option to provide custom options to rsync and other external
-programs
-
-This is required in case we are running in situation where rsync is not in PATH
-on B<remote> end of replication.
-
 =item * Add a way to specify "primary" destination for wal segments.
 
 This would be useful if you have WAL-slave in the same network, and additional
