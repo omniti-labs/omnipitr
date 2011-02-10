@@ -79,6 +79,12 @@ markers. Unfortunately due to the %x usage by PostgreSQL, We cannot use %%
 macros directly. Instead - any occurence of ^ character in log dir will be first
 changed to %, and later on passed to strftime.
 
+=item --streaming-replication (-sr)
+
+This option should be used if you're setting streaming replication slave. It
+causes I<omnipitr-restore> to die as soon as it will be called for WAL segment
+that is not in walarchive.
+
 =item --pid-file
 
 Name of file to use for pidfile. If it is specified, than only one copy of

@@ -294,6 +294,9 @@ sub try_to_restore_and_exit {
             $self->log->log( 'Requested history file (%s) that does not exist. Returning error.', $self->{ 'segment' } );
             exit( 1 );
         }
+        if ( $self->{ 'streaming-replication' } ) {
+            $self->log->fatal( 'Requested file does not exist, and it is streaming replication environment. Dying.' );
+        }
         return;
     }
 
@@ -422,6 +425,7 @@ sub read_args {
         \%args,
         'bzip2-path|bp=s',
         'data-dir|D=s',
+        'error-pgcontroldata|ep=s',
         'finish-trigger|f=s',
         'gzip-path|gp=s',
         'log|l=s',
@@ -429,13 +433,13 @@ sub read_args {
         'pgcontroldata-path|pp=s',
         'pid-file=s',
         'pre-removal-processing|h=s',
-        'remove-at-a-time|rt=i',
         'recovery-delay|w=i',
         'removal-pause-trigger|p=s',
+        'remove-at-a-time|rt=i',
         'remove-unneeded|r',
         'source|s=s',
+        'streaming-replication|sr',
         'temp-dir|t=s',
-        'error-pgcontroldata|ep=s',
         'verbose|v',
         );
 

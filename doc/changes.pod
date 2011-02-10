@@ -9,6 +9,9 @@
 =item * Make omnipitr-backup-slave compatible with Streaming Replication in
 PostgreSQL 9.0
 
+=item * Add option (--streaming-replication) to make it possible to use
+omnipitr-restore in 9.0 Streaming Replication environment.
+
 =back
 
 =head2 2011-01-27
