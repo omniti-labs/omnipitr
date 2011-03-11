@@ -380,7 +380,7 @@ sub read_args {
         'log|l=s',
         'filename-template|f=s',
         'removal-pause-trigger|p=s',
-        'pid-file',
+        'pid-file=s',
         'verbose|v',
         'gzip-path|gp=s',
         'bzip2-path|bp=s',

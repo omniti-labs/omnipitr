@@ -263,7 +263,7 @@ sub read_args {
         'temp-dir|t=s',
         'log|l=s',
         'filename-template|f=s',
-        'pid-file',
+        'pid-file=s',
         'verbose|v',
         'gzip-path|gp=s',
         'bzip2-path|bp=s',

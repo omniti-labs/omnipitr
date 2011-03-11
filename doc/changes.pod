@@ -1,5 +1,14 @@
 =head1 OmniPITR
 
+=head2 2011-03-11
+
+=over
+
+=item * Fix handling of pidfile in backup-master and backup-slave programs. Bug
+spotted by Albert Czarnecki
+
+=back
+
 =head2 2011-02-10
 
 =over
