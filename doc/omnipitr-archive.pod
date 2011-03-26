@@ -134,7 +134,7 @@ to specify where to send the WAL segments to
 If you'll specify more than 1 destination, you will also need to specify
 I<--state-dir>
 
-Of couse you can provide many --dst-local or many --dst-remote or many mix of
+Of course you can provide many --dst-local or many --dst-remote or many mix of
 these.
 
 Generally omnipitr-archive will try to deliver WAL segment to all destinations,
