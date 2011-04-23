@@ -9,7 +9,7 @@ use File::Basename;
 use English qw( -no_match_vars );
 use File::Copy;
 use File::Path;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Carp;
 use POSIX qw( strftime );
 use Sys::Hostname;
