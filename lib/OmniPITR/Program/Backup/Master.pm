@@ -146,18 +146,11 @@ omnipitr-archive).
 sub stop_pg_backup {
     my $self = shift;
 
-    $self->prepare_temp_directory();
+    my $stop_backup_output = $self->psql( 'SELECT pg_stop_backup()' );
 
-    my @command = ( @{ $self->{ 'psql' } }, "SELECT pg_stop_backup()" );
+    $stop_backup_output =~ s/\s*\z//;
 
-    $self->log->time_start( 'pg_stop_backup()' ) if $self->verbose && $self->log;
-    my $status = run_command( $self->{ 'temp-dir' }, @command );
-    $self->log->time_finish( 'pg_stop_backup()' ) if $self->verbose && $self->log;
-
-    $self->log->fatal( 'Running pg_stop_backup() failed: %s', $status ) if $status->{ 'error_code' };
-
-    $status->{ 'stdout' } =~ s/\s*\z//;
-    $self->log->log( q{pg_stop_backup('omnipitr') returned %s.}, $status->{ 'stdout' } );
+    $self->log->log( q{pg_stop_backup('omnipitr') returned %s.}, $stop_backup_output );
 
     my $subdir = basename( $self->{ 'data-dir' } );
     delete $self->{ 'pg_start_backup_done' };
@@ -182,19 +175,11 @@ sub start_pg_backup {
     $self->log->fatal( 'Cannot symlink %s to %s: %s', $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' }, $OS_ERROR )
         unless symlink( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' } );
 
-    $self->prepare_temp_directory();
+    my $start_backup_output = $self->psql( "SELECT pg_start_backup('omnipitr')" );
 
-    my @command = ( @{ $self->{ 'psql' } }, "SELECT pg_start_backup('omnipitr')" );
-
-    $self->log->time_start( 'pg_start_backup()' ) if $self->verbose;
-    my $status = run_command( $self->{ 'temp-dir' }, @command );
-    $self->log->time_finish( 'pg_start_backup()' ) if $self->verbose;
-
-    $self->log->fatal( 'Running pg_start_backup() failed: %s', $status ) if $status->{ 'error_code' };
-
-    $status->{ 'stdout' } =~ s/\s*\z//;
-    $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $status->{ 'stdout' } );
-    $self->log->fatal( 'Ouput from pg_start_backup is not parseable?!' ) unless $status->{ 'stdout' } =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
+    $start_backup_output =~ s/\s*\z//;
+    $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $start_backup_output );
+    $self->log->fatal( 'Output from pg_start_backup is not parseable?!' ) unless $start_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
 
     my ( $part_1, $part_2 ) = ( $1, $2 );
     $part_2 =~ s/(.{1,6})\z//;
