@@ -337,19 +337,19 @@ did when pg_start_backup() was called.
 sub wait_for_checkpoint_from_backup_label {
     my $self = shift;
 
-    my @checkpoint_lines = grep { m{\ACHECKPOINT\s+LOCATION:\s+[a-f0-9]+/[0-9a-f]{8}\s*\z} } @{ $self->{ 'backup_file_data' } };
+    my @checkpoint_lines = grep { m{\ACHECKPOINT\s+LOCATION:\s+[a-f0-9]+/[0-9a-f]{8}\s*\z}i } @{ $self->{ 'backup_file_data' } };
 
     $self->log->fatal( 'Cannot get checkpoint lines from: %s', $self->{ 'backup_file_data' } ) if 1 != scalar @checkpoint_lines;
 
-    my ( $major, $minor ) = $checkpoint_lines[ 0 ] =~ m{ \s+ ( [a-f0-9]+ ) / ( [a-f0-9]{8} ) \s* \z }xms;
+    my ( $major, $minor ) = $checkpoint_lines[ 0 ] =~ m{ \s+ ( [a-f0-9]+ ) / ( [a-f0-9]{8} ) \s* \z }xmsi;
     $major = hex $major;
     $minor = hex $minor;
 
-    $self->log->log( 'Waiting for checkpoint (based on backup_label from master)' ) if $self->verbose;
+    $self->log->log( 'Waiting for checkpoint (based on backup_label from master) - %s', $checkpoint_lines[ 0 ] ) if $self->verbose;
     while ( 1 ) {
         my $temp = $self->get_control_data();
 
-        my ( $c_major, $c_minor ) = $temp->{ 'Latest checkpoint location' } =~ m{ \s+ ( [a-f0-9]+ ) / ( [a-f0-9]{8} ) \s* \z }xms;
+        my ( $c_major, $c_minor ) = $temp->{ 'Latest checkpoint location' } =~ m{ \A ( [a-f0-9]+ ) / ( [a-f0-9]{8} ) \s* \z }xmsi;
         $c_major = hex $c_major;
         $c_minor = hex $c_minor;
 
