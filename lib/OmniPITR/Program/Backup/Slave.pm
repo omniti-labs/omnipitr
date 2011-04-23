@@ -45,7 +45,7 @@ sub finish_pgdata_backup {
     my $stop_backup_output = $self->psql( 'SELECT pg_stop_backup()' );
 
     $stop_backup_output =~ s/\s*\z//;
-    $self->log->log( q{pg_start_backup() returned %s.}, $stop_backup_output );
+    $self->log->log( q{pg_stop_backup() returned %s.}, $stop_backup_output );
     $self->log->fatal( 'Output from pg_stop_backup is not parseable?!' ) unless $stop_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
 
     my ( $part_1, $part_2 ) = ( $1, $2 );
