@@ -48,21 +48,6 @@ sub finish_pgdata_backup {
     $self->log->log( q{pg_stop_backup() returned %s.}, $stop_backup_output );
     $self->log->fatal( 'Output from pg_stop_backup is not parseable?!' ) unless $stop_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
 
-    my ( $part_1, $part_2 ) = ( $1, $2 );
-    $part_2 =~ s/(.{1,6})\z//;
-    my $part_3 = $1;
-
-    my $expected_filename_suffix = sprintf '%08s%08s.%08s.backup', $part_1, $part_2, $part_3;
-
-    if ( 'none' ne $self->{ 'source' }->{ 'compression' } ) {
-        my $extension = ext_for_compression( $self->{ 'source' }->{ 'compression' } );
-        $expected_filename_suffix .= $extension;
-    }
-
-    my $backup_filename_re = qr{\A[0-9A-F]{8}\Q$expected_filename_suffix\E\z};
-
-    $self->{ 'stop_backup_filename_re' } = $backup_filename_re;
-
     return;
 
 }
@@ -315,6 +300,21 @@ sub get_backup_label_from_master {
     $start_backup_output =~ s/\s*\z//;
     $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $start_backup_output );
     $self->log->fatal( 'Output from pg_start_backup is not parseable?!' ) unless $start_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
+
+    my ( $part_1, $part_2 ) = ( $1, $2 );
+    $part_2 =~ s/(.{1,6})\z//;
+    my $part_3 = $1;
+
+    my $expected_filename_suffix = sprintf '%08s%08s.%08s.backup', $part_1, $part_2, $part_3;
+
+    if ( 'none' ne $self->{ 'source' }->{ 'compression' } ) {
+        my $extension = ext_for_compression( $self->{ 'source' }->{ 'compression' } );
+        $expected_filename_suffix .= $extension;
+    }
+
+    my $backup_filename_re = qr{\A[0-9A-F]{8}\Q$expected_filename_suffix\E\z};
+
+    $self->{ 'stop_backup_filename_re' } = $backup_filename_re;
 
     my $backup_label_content = $self->psql(
         "select pg_read_file( 'backup_label', 0, ( pg_stat_file( 'backup_label' ) ).size )",
