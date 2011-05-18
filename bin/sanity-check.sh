@@ -131,4 +131,5 @@ then
 else
     echo -n "${ERRORS_COUNT} errors."
 fi
+
 echo
