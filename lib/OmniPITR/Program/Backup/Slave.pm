@@ -13,6 +13,7 @@ use Getopt::Long;
 use Carp;
 use POSIX qw( strftime );
 use Sys::Hostname;
+use Cwd qw(abs_path);
 use OmniPITR::Tools qw( run_command ext_for_compression );
 
 =head1 make_data_archive()
@@ -464,6 +465,8 @@ sub validate_args {
     $self->log->fatal( 'Provided data-dir (%s) does not exist!',   $self->{ 'data-dir' } ) unless -e $self->{ 'data-dir' };
     $self->log->fatal( 'Provided data-dir (%s) is not directory!', $self->{ 'data-dir' } ) unless -d $self->{ 'data-dir' };
     $self->log->fatal( 'Provided data-dir (%s) is not readable!',  $self->{ 'data-dir' } ) unless -r $self->{ 'data-dir' };
+
+    $self->{ 'data-dir' } = abs_path( $self->{ 'data-dir' } );
 
     my $dst_count = scalar( @{ $self->{ 'destination' }->{ 'local' } } ) + scalar( @{ $self->{ 'destination' }->{ 'remote' } } );
     $self->log->fatal( "No --dst-* has been provided!" ) if 0 == $dst_count;
