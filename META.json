@@ -13,12 +13,6 @@
          }
       }
    },
-   "provides": {
-     "omnipitr": {
-       "abstract": "Advanced WAL File / Backup Management Tools"
-       "version": "0.0.5"
-     }
-   },
    "resources":{
     "repository":{
       "url":"git://github.com/omniti-labs/omnipitr.git",
