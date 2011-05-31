@@ -337,7 +337,7 @@ did when pg_start_backup() was called.
 sub wait_for_checkpoint_from_backup_label {
     my $self = shift;
 
-    my @checkpoint_lines = grep { m{\ACHECKPOINT\s+LOCATION:\s+[a-f0-9]+/[0-9a-f]{8}\s*\z}i } @{ $self->{ 'backup_file_data' } };
+    my @checkpoint_lines = grep { m{\ACHECKPOINT\s+LOCATION:\s+[a-f0-9]+/[0-9a-f]{1,8}\s*\z}i } @{ $self->{ 'backup_file_data' } };
 
     $self->log->fatal( 'Cannot get checkpoint lines from: %s', $self->{ 'backup_file_data' } ) if 1 != scalar @checkpoint_lines;
 
