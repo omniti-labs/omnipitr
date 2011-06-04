@@ -341,7 +341,7 @@ sub wait_for_checkpoint_from_backup_label {
 
     $self->log->fatal( 'Cannot get checkpoint lines from: %s', $self->{ 'backup_file_data' } ) if 1 != scalar @checkpoint_lines;
 
-    my ( $major, $minor ) = $checkpoint_lines[ 0 ] =~ m{ \s+ ( [a-f0-9]+ ) / ( [a-f0-9]{8} ) \s* \z }xmsi;
+    my ( $major, $minor ) = $checkpoint_lines[ 0 ] =~ m{ \s+ ( [a-f0-9]+ ) / ( [a-f0-9]{1,8} ) \s* \z }xmsi;
     $major = hex $major;
     $minor = hex $minor;
 
@@ -349,7 +349,7 @@ sub wait_for_checkpoint_from_backup_label {
     while ( 1 ) {
         my $temp = $self->get_control_data();
 
-        my ( $c_major, $c_minor ) = $temp->{ 'Latest checkpoint location' } =~ m{ \A ( [a-f0-9]+ ) / ( [a-f0-9]{8} ) \s* \z }xmsi;
+        my ( $c_major, $c_minor ) = $temp->{ 'Latest checkpoint location' } =~ m{ \A ( [a-f0-9]+ ) / ( [a-f0-9]{1,8} ) \s* \z }xmsi;
         $c_major = hex $c_major;
         $c_minor = hex $c_minor;
 
