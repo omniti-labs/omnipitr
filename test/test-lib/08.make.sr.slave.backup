@@ -1,0 +1,40 @@
+#!/bin/bash
+
+make_sr_slave_backup() {
+
+    generate_load 5
+
+    mkdir /home/depesz/omnipitr/tmp/backup-sr-slave
+
+    /opt/omnipitr/bin/omnipitr-backup-slave -P 54001 -cm -p /home/depesz/omnipitr/pause.master-slave -s gzip=/home/depesz/omnipitr/longarchive -t /home/depesz/omnipitr/tmp/backup-sr-slave/ -D /home/depesz/data-master-sr-slave/ -dl gzip=/home/depesz/omnipitr/backup/ -f "master-sr-slave-__FILETYPE__.tar__CEXT__" -l /home/depesz/omnipitr/log-backup-sr-slave -v
+
+    stop_load_generators
+
+    if [[ ! -e /home/depesz/omnipitr/backup/master-sr-slave-data.tar.gz ]]
+    then
+        echo "/home/depesz/omnipitr/backup/master-sr-slave-data.tar.gz does not exist?!" >&2
+        exit 1
+    fi
+
+    if [[ ! -e /home/depesz/omnipitr/backup/master-sr-slave-xlog.tar.gz ]]
+    then
+        echo "/home/depesz/omnipitr/backup/master-sr-slave-xlog.tar.gz does not exist?!" >&2
+        exit 1
+    fi
+
+
+    data_size="$( du -k /home/depesz/omnipitr/backup/master-sr-slave-data.tar.gz | awk '{print $1}')"
+    xlog_size="$( du -k /home/depesz/omnipitr/backup/master-sr-slave-xlog.tar.gz | awk '{print $1}')"
+
+    if (( $data_size < 1024 ))
+    then
+        echo "/home/depesz/omnipitr/backup/master-sr-slave-data.tar.gz exists but looks too small to be sensible!" >&2
+        exit 1
+    fi
+    if (( $xlog_size < 8 ))
+    then
+        echo "/home/depesz/omnipitr/backup/master-sr-slave-xlog.tar.gz exists but looks too small to be sensible!" >&2
+        exit 1
+    fi
+
+}

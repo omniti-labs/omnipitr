@@ -1,0 +1,60 @@
+#!/bin/bash
+
+tail_n_grep_with_timeout() {
+    timeout=$1 match=$2 tail=$3 perl -e '
+    $SIG{ALRM} = sub { exit; };
+    alarm $ENV{timeout};
+    my $m = $ENV{match};
+    my $re = qr{$m};
+    my $pid = open my $fh, q{-|}, $ENV{tail} or die "Cannot run tail: $!\n";
+    while ( <$fh> ) {
+        next unless $_ =~ $re;
+        print;
+        kill 15, $pid;
+        close $fh;
+        exit;
+    }'
+}
+
+identify_current_pg_version() {
+    pg_version="$( postgres -V | grep -E 'PostgreSQL.* [0-9]+\.[0-9]+\.[0-9]+[[:space:]]*$' | awk '{print $NF}' | cut -d. -f 1,2 )"
+    if [[ -z "$pg_version" ]]
+    then
+        echo "Unknown PG version!" >&2
+        exit 1
+    fi
+    pg_major_version=${pg_version%%.*}
+}
+
+prepare_test_environment() {
+    killall postgres postmaster omnipitr-restore &>/dev/null
+    killall -9 postgres postmaster omnipitr-restore &>/dev/null
+    rm -rf data-* omnipitr
+}
+
+setup_output_formatting() {
+    exec > >( perl -MPOSIX=strftime -pe 'print strftime("%Y-%m-%d %H:%M:%S %Z : ", localtime time)' )
+}
+
+generate_load() {
+    count="$1"
+    sql="$( seq 1 100 | sed 's/.*/select fill_me_in(0.05);/'; echo "select remove_some_rows();"; echo "vacuum;" )"
+    load_generator_pids=''
+    ps_ppids=''
+    for i in $( seq 1 $count )
+    do
+        while true
+        do
+            psql -p 54001 -qAtX <<< "$sql"
+        done &> /dev/null &
+        load_generator_pids="$load_generator_pids $!"
+        ps_ppids="$ps_ppids --ppid $!"
+    done &> /dev/null
+    disown $load_generator_pids
+}
+
+stop_load_generators() {
+    psql_pids="$( ps $ps_ppids o pid= )"
+    kill $load_generator_pids $psql_pids &> /dev/null
+    kill -9 $load_generator_pids $psql_pids &> /dev/null
+}

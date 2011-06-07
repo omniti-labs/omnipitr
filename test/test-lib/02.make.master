@@ -1,0 +1,113 @@
+#!/bin/bash
+make_master_mkdirs() {
+    mkdir data-master omnipitr
+    mkdir omnipitr/{longarchive,archive,state,backup,tmp}
+    mkdir omnipitr/tmp/{archive,backup-master,backup-slave,restore}
+    chmod 700 data-master
+}
+
+make_master_initdb() {
+    initdb -A trust -E UTF8 -D data-master > /dev/null
+    perl -pi -e '
+    s/\A \s* (?: [#] \s* )? listen_addresses \s* = \s*.*/listen_addresses = \047*\047/x;
+    s/\A \s* (?: [#] \s* )? port \s* = \s*.*/port = \04754001\047/x;
+    s/\A \s* (?: [#] \s* )? log_destination \s* = \s*.*/log_destination = \047stderr\047/x;
+    s/\A \s* (?: [#] \s* )? log_filename \s* = \s*.*/log_filename = \047pg.log\047/x;
+    s/\A \s* (?: [#] \s* )? silent_mode \s* = \s*.*/silent_mode = on/x;
+    s/\A \s* (?: [#] \s* )? logging_collector \s* = \s*.*/logging_collector = on/x;
+    s/\A \s* (?: [#] \s* )? redirect_stderr \s* = \s*.*/redirect_stderr = on/x;
+    s/\A \s* (?: [#] \s* )? log_min_duration_statement \s* = \s*.*/log_min_duration_statement = 0/x;
+    s/\A \s* (?: [#] \s* )? log_line_prefix \s* = \s*.*/log_line_prefix = \047\%m \%u\@\%d \%p \%r \047/x;
+    s/\A \s* (?: [#] \s* )? log_temp_files \s* = \s*.*/log_temp_files = 0/x;
+    s/\A \s* (?: [#] \s* )? (log_checkpoints|log_connections|log_disconnections|log_lock_waits|archive_mode) \s* = \s*.*/$1 = on/x;
+    s{\A \s* (?: [#] \s* )? archive_command \s* = \s*.*}{archive_command = \047/opt/omnipitr/bin/omnipitr-archive -t /home/depesz/omnipitr/tmp/archive/ -l /home/depesz/omnipitr/log.master -dl gzip=/home/depesz/omnipitr/archive -dl gzip=/home/depesz/omnipitr/longarchive -db /home/depesz/omnipitr/backup-archive/ -s /home/depesz/omnipitr/state/ -v "\%p"\047}x;
+    s/\A \s* (?: [#] \s* )? max_wal_senders \s* = \s*.*/max_wal_senders = 30/x;
+    s/\A \s* (?: [#] \s* )? wal_level \s* = \s*.*/wal_level = \047hot_standby\047/x;
+    s/\A \s* (?: [#] \s* )? archive_timeout \s* = \s*.*/archive_timeout = 60/x;
+    ' data-master/postgresql.conf
+
+    echo "local   replication all trust
+host   replication all 127.0.0.1/32 trust" >> data-master/pg_hba.conf
+}
+
+make_master_add_plpgsql() {
+    if (( ${pg_version%%.*} < 9 ))
+    then
+        psql -d postgres -d template1 -p 54001 -qAtX -c "create language plpgsql"
+    fi
+}
+
+make_master_make_load_generator_structs() {
+    echo "\set VERBOSITY terse
+    set client_min_messages = warning;
+    create user postgres with superuser;
+    create user replication with superuser;
+    create database depesz with owner depesz;
+    \c depesz
+    \set VERBOSITY terse
+    set client_min_messages = warning;
+    create table t0 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create table t1 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create table t2 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create table t3 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create table t4 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create table t5 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create table t6 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create table t7 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create table t8 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create table t9 (id serial primary key, when_tsz timestamptz default now(), payload text);
+    create function fill_me_in(float8) returns void as \$\$
+    begin
+    insert into t0 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    insert into t1 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    insert into t2 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    insert into t3 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    insert into t4 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    insert into t5 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    insert into t6 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    insert into t7 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    insert into t8 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    insert into t9 (payload) values ( repeat('payload', 1000 ) );
+    perform pg_sleep( \$1 * random() );
+    end;
+    \$\$ language plpgsql;
+    create function remove_some_rows() returns void as \$\$
+    begin
+    delete from t0 where when_tsz < now() - '10 minutes'::interval;
+    delete from t1 where when_tsz < now() - '10 minutes'::interval;
+    delete from t2 where when_tsz < now() - '10 minutes'::interval;
+    delete from t3 where when_tsz < now() - '10 minutes'::interval;
+    delete from t4 where when_tsz < now() - '10 minutes'::interval;
+    delete from t5 where when_tsz < now() - '10 minutes'::interval;
+    delete from t6 where when_tsz < now() - '10 minutes'::interval;
+    delete from t7 where when_tsz < now() - '10 minutes'::interval;
+    delete from t8 where when_tsz < now() - '10 minutes'::interval;
+    delete from t9 where when_tsz < now() - '10 minutes'::interval;
+    end;
+    \$\$ language plpgsql;
+    SELECT fill_me_in(0);
+        " | psql -p 54001 -d template1 -qAtX | ( grep -v '^[[:space:]]*$' || true )
+
+}
+
+make_master() {
+    make_master_mkdirs
+
+    make_master_initdb
+
+    pg_ctl -D data-master -s -w start
+
+    make_master_add_plpgsql
+
+    make_master_make_load_generator_structs
+}
+

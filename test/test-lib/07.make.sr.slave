@@ -1,0 +1,106 @@
+#!/bin/bash
+
+get_slave_receiver_location() {
+    ps ww o cmd= --ppid "$slave_postmaster_pid" | awk '$0~/^postgres: wal receiver process.*[0-9A-F]+\/[0-9A-F]+[[:space:]]*$/ {split($NF, f, "/"); printf "%08s%08s\n", f[1], f[2]}'
+}
+
+get_master_sender_location() {
+    ps ww o cmd= --ppid "$( head -n 1 data-master/postmaster.pid )" | awk '$0~/^postgres: wal sender process.*[0-9A-F]+\/[0-9A-F]+[[:space:]]*$/ {split($NF, f, "/"); printf "%08s%08s\n", f[1], f[2]}' | LC_ALL=C sort | tail -n 1
+}
+
+make_sr_slave () {
+    export codename="$1"
+    backup_source="$2"
+    export use_port="$3"
+    directory="data-$codename"
+
+    mkdir "$directory"
+    chmod 700 "$directory"
+
+    tar xzf omnipitr/backup/"$backup_source"-data.tar.gz -C "$directory/"
+
+    mv "$directory/data-$backup_source"/* "$directory/"
+    rmdir "$directory/data-$backup_source"
+
+    perl -pi -e '
+    s/\A \s* (?: [#] \s* )? port \s* = \s*.*/port = \047$ENV{use_port}\047/x;
+    s{\A \s* (?: [#] \s* )? archive_command \s* = \s*.*}{archive_command = \047/bin/true\047}x;
+    s{\A \s* (?: [#] \s* )? hot_standby \s* = \s*.*}{hot_standby = on}x;
+    ' "$directory/postgresql.conf"
+
+    echo "restore_command = '/opt/omnipitr/bin/omnipitr-restore -sr -t /home/depesz/omnipitr/tmp/sr-restore/ -l /home/depesz/omnipitr/log.${codename} -p /home/depesz/omnipitr/pause.${codename} -s gzip=/home/depesz/omnipitr/archive -v -f /home/depesz/${directory}.finish %f %p'" >> "$directory"/recovery.conf
+    echo "standby_mode = 'on'" >> "$directory"/recovery.conf
+    echo "primary_conninfo = 'port=54001 user=depesz'" >> "$directory"/recovery.conf
+    echo "trigger_file = '/home/depesz/${directory}.finish'" >> "$directory"/recovery.conf
+
+    touch omnipitr/log.${codename}
+
+    pg_ctl -D "$directory/" -w -s start
+
+    if [[ ! -e "${directory}/postmaster.pid" ]]
+    then
+        echo "$codename Pg didn't start?" >&2
+        exit 1
+    fi
+    slave_postmaster_pid="$( head -n 1 "${directory}/postmaster.pid" )"
+
+    i=0
+    while true
+    do
+        location="$( get_slave_receiver_location )"
+        if [[ "" != "$location" ]]
+        then
+            break
+        fi
+        i=$(( $i + 1 ))
+        if (( $i > 360 ))
+        then
+            echo "There is no wal receiver process in $directory after 60 seconds?!" >&2
+            exit 1
+        fi
+        sleep 1
+    done
+
+    generate_load 5
+
+    sleep 5
+
+    i=0
+    while true
+    do
+        new_location="$( get_slave_receiver_location )"
+        if [[ "$new_location" != "$location" ]]
+        then
+            break
+        fi
+        i=$(( $i + 1 ))
+        if (( $i > 360 ))
+        then
+            echo "Wal receiver location didn't change in 60 seconds of load generation!" >&2
+            exit 1
+        fi
+        sleep 1
+    done
+
+    sleep 5
+
+    stop_load_generators
+
+    i=0
+    while true
+    do
+        master_location="$( get_master_sender_location )"
+        slave_location="$( get_slave_receiver_location )"
+        if [[ "$master_location" == "$slave_location" ]]
+        then
+            break
+        fi
+        i=$(( $i + 1 ))
+        if (( $i > 720 ))
+        then
+            echo "Slave didn't catchup to master in 720 seconds!" >&2
+            exit 1
+        fi
+        sleep 1
+    done
+}
