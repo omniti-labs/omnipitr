@@ -9,6 +9,8 @@ use Data::Dumper;
 use POSIX qw(strftime floor);
 use IO::File;
 
+our $VERSION = '0.0.5';
+
 BEGIN {
     eval { use Time::HiRes qw( time ); };
 }

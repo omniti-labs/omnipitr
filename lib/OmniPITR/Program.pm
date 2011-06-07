@@ -11,6 +11,8 @@ use File::Path qw( mkpath rmtree );
 use File::Spec;
 use Carp;
 
+our $VERSION = '0.0.5';
+
 =head1 new()
 
 Object contstructor.

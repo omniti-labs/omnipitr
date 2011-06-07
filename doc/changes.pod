@@ -1,5 +1,20 @@
 =head1 OmniPITR
 
+=head2 2011-06-08
+
+=over
+
+=item * Fix slave backup on 9.0 systems (new option, -cm)
+
+=item * Add test system, not really configurable now, but works, and lets me
+easily verify that OmniPITR still works.
+
+=item * Add (finally) versions. So far only to libraries. Can be read with:
+
+    perl -I/opt/omnipitr/lib -le 'use OmniPITR::Program; print $OmniPITR::Program::VERSION'
+
+=back
+
 =head2 2011-05-18
 
 =over
