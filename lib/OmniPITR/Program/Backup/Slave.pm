@@ -9,7 +9,7 @@ use File::Basename;
 use English qw( -no_match_vars );
 use File::Copy;
 use File::Path;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Carp;
 use POSIX qw( strftime );
 use Sys::Hostname;
@@ -26,9 +26,31 @@ with content of PGDATA
 sub make_data_archive {
     my $self = shift;
     $self->pause_xlog_removal();
-    $self->{ 'CONTROL' }->{ 'initial' } = $self->get_control_data();
+    $self->make_backup_label_temp_file();
     $self->compress_pgdata();
+    $self->finish_pgdata_backup();
     return;
+}
+
+=head1 finish_pgdata_backup()
+
+Calls pg_stop_backup on master (if necessary), and waits for xlogs to be
+ready
+
+=cut
+
+sub finish_pgdata_backup {
+    my $self = shift;
+    return unless $self->{ 'call-master' };
+
+    my $stop_backup_output = $self->psql( 'SELECT pg_stop_backup()' );
+
+    $stop_backup_output =~ s/\s*\z//;
+    $self->log->log( q{pg_stop_backup() returned %s.}, $stop_backup_output );
+    $self->log->fatal( 'Output from pg_stop_backup is not parseable?!' ) unless $stop_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
+
+    return;
+
 }
 
 =head1 make_xlog_archive()
@@ -40,9 +62,23 @@ with xlogs required to start PostgreSQL from backup.
 
 sub make_xlog_archive {
     my $self = shift;
-    $self->wait_for_checkpoint_location_change();
+    $self->wait_for_xlog_archive_to_be_ready();
     $self->compress_xlogs();
     $self->unpause_xlog_removal();
+    return;
+}
+
+=head1 wait_for_xlog_archive_to_be_ready()
+
+Waits till all necessary xlogs will be in archive, or (in case --call-master
+was not given) - for checkpoint on slave.
+
+=cut
+
+sub wait_for_xlog_archive_to_be_ready {
+    my $self = shift;
+    return $self->wait_for_checkpoint_location_change() unless $self->{ 'call-master' };
+    $self->wait_for_file( $self->{ 'source' }->{ 'path' }, $self->{ 'stop_backup_filename_re' } );
     return;
 }
 
@@ -73,9 +109,12 @@ sub compress_xlogs {
     my $transform_to = basename( $self->{ 'data-dir' } ) . '/pg_xlog';
     my $transform_command = sprintf 's#^\(%s\|%s\)#%s#', $source_transform_from, $dot_backup_transform_from, $transform_to;
 
+    my @stuff_to_compress = ( basename( $self->{ 'source' }->{ 'path' } ) );
+    push @stuff_to_compress, File::Spec->catfile( $self->{ 'temp-dir' }, $self->{ 'dot_backup_filename' } ) if $self->{ 'dot_backup_filename' };
+
     $self->tar_and_compress(
         'work_dir'  => dirname( $self->{ 'source' }->{ 'path' } ),
-        'tar_dir'   => [ basename( $self->{ 'source' }->{ 'path' } ), File::Spec->catfile( $self->{ 'temp-dir' }, $self->{ 'dot_backup_filename' } ), ],
+        'tar_dir'   => \@stuff_to_compress,
         'transform' => $transform_command,
     );
 
@@ -137,6 +176,8 @@ reply that is required to get consistent state.
 
 sub make_dot_backup_file {
     my $self = shift;
+
+    return if $self->{ 'call-master' };
 
     my $redo_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's REDO location" };
     my $timeline      = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's TimeLineID" };
@@ -208,23 +249,33 @@ This file is created in temp directory (it is B<not> created in PGDATA), and
 is included in tar in such a way that, on uncompressing, it will get to
 unarchived PGDATA.
 
+If --call-master was given, it will run pg_start_backup() on master, and
+retrieve generated backup_label file.
+
 =cut
 
 sub make_backup_label_temp_file {
     my $self = shift;
 
-    my $redo_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's REDO location" };
-    my $last_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint location" };
-    my $timeline      = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's TimeLineID" };
+    $self->{ 'CONTROL' }->{ 'initial' } = $self->get_control_data();
 
-    my @content_lines = ();
-    push @content_lines, sprintf 'START WAL LOCATION: %s (file %s)', $redo_location, $self->convert_wal_location_and_timeline_to_filename( $redo_location, $timeline );
-    push @content_lines, sprintf 'CHECKPOINT LOCATION: %s', $last_location;
-    push @content_lines, sprintf 'START TIME: %s', strftime( '%Y-%m-%d %H:%M:%S %Z', localtime time );
-    push @content_lines, 'LABEL: OmniPITR_Slave_Hot_Backup';
+    if ( $self->{ 'call-master' } ) {
+        $self->get_backup_label_from_master();
+    }
+    else {
+        my $redo_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's REDO location" };
+        my $last_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint location" };
+        my $timeline      = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's TimeLineID" };
 
-    $self->{ 'backup_file_data' } = \@content_lines;
-    my $content = join( "\n", @content_lines ) . "\n";
+        my @content_lines = ();
+        push @content_lines, sprintf 'START WAL LOCATION: %s (file %s)', $redo_location, $self->convert_wal_location_and_timeline_to_filename( $redo_location, $timeline );
+        push @content_lines, sprintf 'CHECKPOINT LOCATION: %s', $last_location;
+        push @content_lines, sprintf 'START TIME: %s', strftime( '%Y-%m-%d %H:%M:%S %Z', localtime time );
+        push @content_lines, 'LABEL: OmniPITR_Slave_Hot_Backup';
+
+        $self->{ 'backup_file_data' } = \@content_lines;
+    }
+    my $content = join( "\n", @{ $self->{ 'backup_file_data' } } ) . "\n";
 
     my $filename = File::Spec->catfile( $self->{ 'temp-dir' }, 'backup_label' );
     if ( open my $fh, '>', $filename ) {
@@ -233,6 +284,83 @@ sub make_backup_label_temp_file {
         return;
     }
     $self->log->fatal( 'Cannot write backup_label file %s : %s', $filename, $OS_ERROR );
+}
+
+=head1 get_backup_label_from_master()
+
+Wraps logic required to call pg_start_backup(), get response, and
+backup_label file content .
+
+=cut
+
+sub get_backup_label_from_master {
+    my $self = shift;
+
+    my $start_backup_output = $self->psql( "SELECT pg_start_backup('omnipitr_slave_backup_with_master_callback')" );
+
+    $start_backup_output =~ s/\s*\z//;
+    $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $start_backup_output );
+    $self->log->fatal( 'Output from pg_start_backup is not parseable?!' ) unless $start_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
+
+    my ( $part_1, $part_2 ) = ( $1, $2 );
+    $part_2 =~ s/(.{1,6})\z//;
+    my $part_3 = $1;
+
+    my $expected_filename_suffix = sprintf '%08s%08s.%08s.backup', $part_1, $part_2, $part_3;
+
+    if ( 'none' ne $self->{ 'source' }->{ 'compression' } ) {
+        my $extension = ext_for_compression( $self->{ 'source' }->{ 'compression' } );
+        $expected_filename_suffix .= $extension;
+    }
+
+    my $backup_filename_re = qr{\A[0-9A-F]{8}\Q$expected_filename_suffix\E\z};
+
+    $self->{ 'stop_backup_filename_re' } = $backup_filename_re;
+
+    my $backup_label_content = $self->psql(
+        "select pg_read_file( 'backup_label', 0, ( pg_stat_file( 'backup_label' ) ).size )",
+    );
+
+    $self->{ 'backup_file_data' } = [ split( /\n/, $backup_label_content ) ];
+
+    $self->wait_for_checkpoint_from_backup_label();
+
+    return;
+}
+
+=head1 wait_for_checkpoint_from_backup_label()
+
+Waits till slave will do checkpoint in at least the same location as master
+did when pg_start_backup() was called.
+
+=cut
+
+sub wait_for_checkpoint_from_backup_label {
+    my $self = shift;
+
+    my @checkpoint_lines = grep { m{\ACHECKPOINT\s+LOCATION:\s+[a-f0-9]+/[0-9a-f]{1,8}\s*\z}i } @{ $self->{ 'backup_file_data' } };
+
+    $self->log->fatal( 'Cannot get checkpoint lines from: %s', $self->{ 'backup_file_data' } ) if 1 != scalar @checkpoint_lines;
+
+    my ( $major, $minor ) = $checkpoint_lines[ 0 ] =~ m{ \s+ ( [a-f0-9]+ ) / ( [a-f0-9]{1,8} ) \s* \z }xmsi;
+    $major = hex $major;
+    $minor = hex $minor;
+
+    $self->log->log( 'Waiting for checkpoint (based on backup_label from master) - %s', $checkpoint_lines[ 0 ] ) if $self->verbose;
+    while ( 1 ) {
+        my $temp = $self->get_control_data();
+
+        my ( $c_major, $c_minor ) = $temp->{ 'Latest checkpoint location' } =~ m{ \A ( [a-f0-9]+ ) / ( [a-f0-9]{1,8} ) \s* \z }xmsi;
+        $c_major = hex $c_major;
+        $c_minor = hex $c_minor;
+
+        last if $c_major > $major;
+        last if ( $c_major == $major ) && ( $c_minor >= $minor );
+
+        sleep 5;
+    }
+    $self->log->log( 'Checkpoint .' ) if $self->verbose;
+    return;
 }
 
 =head1 convert_wal_location_and_timeline_to_filename()
@@ -264,8 +392,6 @@ directory.
 
 sub compress_pgdata {
     my $self = shift;
-
-    $self->make_backup_label_temp_file();
 
     $self->log->time_start( 'Compressing $PGDATA' ) if $self->verbose;
     $self->start_writers( 'data' );
@@ -365,6 +491,7 @@ sub read_args {
         'lzma-path'          => 'lzma',
         'tar-path'           => 'tar',
         'nice-path'          => 'nice',
+        'psql-path'          => 'psql',
         'rsync-path'         => 'rsync',
         'pgcontroldata-path' => 'pg_controldata',
         'filename-template'  => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__',
@@ -373,6 +500,10 @@ sub read_args {
     croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-backup-slave.pod' )
         unless GetOptions(
         \%args,
+        'database|d=s',
+        'host|h=s',
+        'port|P=i',
+        'username|U=s',
         'data-dir|D=s',
         'source|s=s',
         'dst-local|dl=s@',
@@ -387,10 +518,12 @@ sub read_args {
         'bzip2-path|bp=s',
         'lzma-path|lp=s',
         'nice-path|np=s',
+        'psql-path|pp=s',
         'tar-path|tp=s',
         'rsync-path|rp=s',
         'pgcontroldata-path|pp=s',
         'not-nice|nn',
+        'call-master|cm',
         );
 
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
@@ -440,6 +573,16 @@ sub read_args {
     # We do it here so it will actually work for reporing problems in validation
     $self->{ 'log_template' } = $args{ 'log' };
     $self->{ 'log' }          = OmniPITR::Log->new( $self->{ 'log_template' } );
+
+    my @psql = ();
+    push @psql, $self->{ 'psql-path' };
+    push @psql, '-qAtX';
+    push @psql, ( '-U', $self->{ 'username' } ) if $self->{ 'username' };
+    push @psql, ( '-d', $self->{ 'database' } ) if $self->{ 'database' };
+    push @psql, ( '-h', $self->{ 'host' } )     if $self->{ 'host' };
+    push @psql, ( '-p', $self->{ 'port' } )     if $self->{ 'port' };
+    push @psql, '-c';
+    $self->{ 'psql' } = \@psql;
 
     $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
 

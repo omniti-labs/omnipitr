@@ -1,0 +1,63 @@
+#!/bin/bash
+
+make_normal_slave() {
+    export codename="$1"
+    backup_source="$2"
+    export use_port="$3"
+    directory="data-$codename"
+
+    mkdir "$directory"
+    chmod 700 "$directory"
+
+    tar xzf omnipitr/backup/"$backup_source"-data.tar.gz -C "$directory/"
+
+    mv "$directory/data-$backup_source"/* "$directory/"
+    rmdir "$directory/data-$backup_source"
+
+    perl -pi -e '
+    s/\A \s* (?: [#] \s* )? port \s* = \s*.*/port = \047$ENV{use_port}\047/x;
+    s{\A \s* (?: [#] \s* )? archive_command \s* = \s*.*}{archive_command = \047/bin/true\047}x;
+    s{\A \s* (?: [#] \s* )? hot_standby \s* = \s*.*}{hot_standby = off}x;
+    ' "$directory/postgresql.conf"
+
+    echo "restore_command = '/opt/omnipitr/bin/omnipitr-restore -t /home/depesz/omnipitr/tmp/restore/ -l /home/depesz/omnipitr/log.${codename} -p /home/depesz/omnipitr/pause.${codename} -s gzip=/home/depesz/omnipitr/archive -v -f /home/depesz/${directory}.finish %f %p'" >> "$directory"/recovery.conf
+
+    touch omnipitr/log.${codename}
+
+    pg_ctl -D "$directory/" -s start
+
+    last_archived_segment="$( tac omnipitr/log.master | grep -E -o -m 1 'Segment ./pg_xlog/[0-9A-F]{24} successfully sent to all destinations.' | tr ' ' / | cut -d/ -f4 )"
+
+    response="$( tail_n_grep_with_timeout 100 "Segment $last_archived_segment restored" "tail -n 50 -f omnipitr/log.${codename}" )"
+
+    if ! ( echo "$response" | grep -q "Segment $last_archived_segment restored" )
+    then
+        echo "Replication didn't start properly! ($last_archived_segment)" >&2
+        exit 1
+    fi
+
+    # echo "Replication looks like working ($last_archived_segment restored), checking if it catches new segments"
+
+    psql -p 54001 -qAtX -c "SELECT fill_me_in(1)" > /dev/null &
+    psql_pid=$!
+
+    next_segment="$( tail_n_grep_with_timeout 100 'Segment.*successfully sent to all destinations.' "tail -n 0 -f omnipitr/log.master" | sed 's/.*Segment/Segment/' | tr ' ' / 2>&1 | cut -d/ -f4 2>&1 )"
+    kill $psql_pid 2> /dev/null
+
+    if ! ( echo "$next_segment" | grep -Eq "^[0-9A-Fa-f]{24}$" )
+    then
+        echo "Archiving doesn't work on master?!" >&2
+        exit 1
+    fi
+
+    response="$( tail_n_grep_with_timeout 100 "Segment $next_segment restored" "tail -n 50 -f omnipitr/log.${codename}" )"
+
+    if ! ( echo "$response" | grep -q "Segment $next_segment restored" )
+    then
+        echo "Hmm .. 100 seconds and $next_segment is not restored? Something is wrong!" >&2
+        exit 1
+    fi
+
+    # echo "Segment $next_segment also restored."
+
+}

@@ -12,6 +12,32 @@ Options:
 
 Where PostgreSQL datadir is located (path)
 
+=item --database (-d)
+
+Which database to connect to to issue required SQL queries. Defaults to
+template1.
+
+This is used only when --call-master is given.
+
+=item --host (-h)
+
+Which host to connect to when connecting to database to backup. Shouldn't really
+be changed in 99% of cases. Defaults to empty string - i.e. use UNIX sockets.
+
+This is used only when --call-master is given.
+
+=item --port (-P)
+
+Which port to connect to when connecting to database. Defaults to 5432.
+
+This is used only when --call-master is given.
+
+=item --username (-U)
+
+What username to use when connecting to database. Defaults to postgres.
+
+This is used only when --call-master is given.
+
 =item --source (-s)
 
 Where are WAL files delivered by L<omnipitr-archive> and used by
@@ -65,6 +91,21 @@ Trying to run second copy of I<omnipitr-backup-slave> will result in an error.
 name of file to be created to pause removal of old/obsolete segments. Should be
 the same as condigured removal-pause-trigger for L<omnipitr-restore>. 
 
+=item --call-master (-cm)
+
+If this option is given, L<omnipitr-backup-slave> will issue
+
+    SELECT pg_start_backup( '...' );
+
+and
+
+    SELECT pg_stop_backup()
+
+on master database.
+
+Backups on PostgreSQL 9.0+, on slave, without --call-master can fail when later
+used.
+
 =item --verbose (-v)
 
 Log verbosely what is happening.
@@ -96,6 +137,11 @@ variable.
 =item --tar-path (-tp)
 
 Full path to tar program - in case you can't set proper PATH environment
+variable.
+
+=item --psql-path (-pp)
+
+Full path to psql program - in case you can't set proper PATH environment
 variable.
 
 =item --rsync-path (-rp)
@@ -357,6 +403,10 @@ files from there. This means that if you're using delay recovery (-w option to
 I<omnipitr-restore>) - there will be more files there, and backup will be
 larger. This is especially important if you're using compressed wal archive
 (please see note above)
+
+=item * If you're using L<omnipitr-backup-slave> on PostgreSQL 9.0+ you have to
+use --call-master. Otherwise created backup might fail when used as base for
+another replication slave that later on is promoted to standalone.
 
 =back
 

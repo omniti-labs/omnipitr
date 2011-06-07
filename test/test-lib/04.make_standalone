@@ -1,0 +1,55 @@
+#!/bin/bash
+
+
+
+make_standalone() {
+    source_codename="$1"
+    use_port="$2"
+
+    mkdir "data-${source_codename}-restored"
+    chmod 700 "data-${source_codename}-restored"
+
+    tar xzf omnipitr/backup/"${source_codename}"-data.tar.gz -C "data-${source_codename}-restored"/
+    tar xzf omnipitr/backup/"${source_codename}"-xlog.tar.gz -C "data-${source_codename}-restored"/
+
+    mv "data-${source_codename}-restored/data-${source_codename}"/* "data-${source_codename}-restored"/
+    rmdir "data-${source_codename}-restored/data-${source_codename}"/
+
+    export use_port
+    perl -pi -e '
+    s/\A \s* (?: [#] \s* )? port \s* = \s*.*/port = \047$ENV{use_port}\047/x;
+    s{\A \s* (?: [#] \s* )? archive_command \s* = \s*.*}{archive_command = \047/bin/true\047}x;
+    ' "data-${source_codename}-restored"/postgresql.conf
+
+    pg_ctl -D "data-${source_codename}-restored"/ -s -w start
+
+    verification="$( psql -F, -qAtX -p $use_port -c '
+        select min(count), count(distinct count) from (
+        select r, count(*) from (
+        select distinct t0.when_tsz as r from t0
+        union all
+        select distinct t1.when_tsz as r from t1
+        union all
+        select distinct t2.when_tsz as r from t2
+        union all
+        select distinct t3.when_tsz as r from t3
+        union all
+        select distinct t4.when_tsz as r from t4
+        union all
+        select distinct t5.when_tsz as r from t5
+        union all
+        select distinct t6.when_tsz as r from t6
+        union all
+        select distinct t7.when_tsz as r from t7
+        union all
+        select distinct t8.when_tsz as r from t8
+        union all
+        select distinct t9.when_tsz as r from t9
+            ) x group by r) y;' )"
+
+    if [[ "$verification" != "10,1" ]]
+    then
+        echo "Something is wrong with standalone from $source_codename backup ($verification)" >&2
+        exit 1
+    fi
+}
