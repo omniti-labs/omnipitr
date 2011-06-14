@@ -2,14 +2,14 @@
    "name": "omnipitr",
    "abstract": "Advanced WAL File / Backup Management Tools",
    "description": "OmniPITR provides a set of tools for managing PITR, including archive_commands, restore_commands, and creating backups from either the master or slave server",
-   "version": "0.0.5",
+   "version": "0.1.0",
    "maintainer": "Robert Treat <rob@xzilla.net>",
    "license": "postgres",
    "status": "stable",
    "prereqs": {
       "runtime": {
          "requires": {
-            "PostgreSQL": "8.4.0"
+            "PostgreSQL": "8.2.0"
          }
       }
    },
@@ -25,6 +25,6 @@
       "url": "http://pgxn.org/meta/spec.txt"
    },
    "tags": [
-     "pitr","backups"
+     "pitr","backups","replication"
    ]
 }
