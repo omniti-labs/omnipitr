@@ -139,7 +139,7 @@ variable.
 Full path to tar program - in case you can't set proper PATH environment
 variable.
 
-=item --psql-path (-pp)
+=item --psql-path (-sp)
 
 Full path to psql program - in case you can't set proper PATH environment
 variable.

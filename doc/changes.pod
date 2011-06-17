@@ -1,5 +1,16 @@
 =head1 OmniPITR
 
+=head2 2011-06-17
+
+=over
+
+=item * Release version 0.1.1
+
+=item * Changed short version of --psql-path from -pp to -sp - -pp was already
+taken by --pgcontrol-path. Bug reported by luoyi.
+
+=back
+
 =head2 2011-06-14
 
 =over

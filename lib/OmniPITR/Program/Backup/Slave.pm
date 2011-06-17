@@ -2,7 +2,7 @@ package OmniPITR::Program::Backup::Slave;
 use strict;
 use warnings;
 
-our $VERSION = '0.1.0';
+our $VERSION = '0.1.1';
 use base qw( OmniPITR::Program::Backup );
 
 use File::Spec;
@@ -519,7 +519,7 @@ sub read_args {
         'bzip2-path|bp=s',
         'lzma-path|lp=s',
         'nice-path|np=s',
-        'psql-path|pp=s',
+        'psql-path|sp=s',
         'tar-path|tp=s',
         'rsync-path|rp=s',
         'pgcontroldata-path|pp=s',
