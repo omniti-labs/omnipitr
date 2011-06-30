@@ -1,5 +1,15 @@
 =head1 OmniPITR
 
+=head2 2011-06-30
+
+=over
+
+=item * Release version 0.1.2
+
+=item * Fixed bug with handling multiple local destinations for backups.
+
+=back
+
 =head2 2011-06-17
 
 =over
