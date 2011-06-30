@@ -7,6 +7,7 @@ use base qw( OmniPITR::Program );
 
 use File::Spec;
 use File::Path qw( mkpath rmtree );
+use File::Copy;
 use English qw( -no_match_vars );
 use OmniPITR::Tools qw( ext_for_compression run_command );
 use Cwd;
