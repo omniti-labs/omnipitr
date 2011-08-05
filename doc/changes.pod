@@ -1,5 +1,15 @@
 =head1 OmniPITR
 
+=head2 2011-08-05
+
+=over
+
+=item * Release version 0.1.3
+
+=item * Fixed bug with handling Minimum Recovery Location in slave backup
+
+=back
+
 =head2 2011-06-30
 
 =over
