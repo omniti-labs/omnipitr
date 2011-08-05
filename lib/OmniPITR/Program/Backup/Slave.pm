@@ -184,13 +184,18 @@ sub make_dot_backup_file {
     my $timeline      = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's TimeLineID" };
 
     my $final_location = $self->{ 'CONTROL' }->{ 'final' }->{ "Latest checkpoint location" };
+    my $final_wal_filename = $self->convert_wal_location_and_timeline_to_filename( $final_location, $timeline );
     if (   ( defined $self->{ 'CONTROL' }->{ 'final' }->{ 'Minimum recovery ending location' } )
         && ( $self->{ 'CONTROL' }->{ 'final' }->{ 'Minimum recovery ending location' } =~ m{\A[a-f0-9]+/[a-f0-9]+\z}i )
         && ( '0/0' ne $self->{ 'CONTROL' }->{ 'final' }->{ 'Minimum recovery ending location' } ) )
     {
-        $final_location = $self->{ 'CONTROL' }->{ 'final' }->{ 'Minimum recovery ending location' };
+        my $minimum_location = $self->{ 'CONTROL' }->{ 'final' }->{ 'Minimum recovery ending location' };
+        my $minimum_wal_filename = $self->convert_wal_location_and_timeline_to_filename( $minimum_location, $timeline );
+        if ( $minimum_wal_filename gt $final_wal_filename ) {
+            $final_location     = $minimum_location;
+            $final_wal_filename = $minimum_wal_filename;
+        }
     }
-    my $final_wal_filename = $self->convert_wal_location_and_timeline_to_filename( $final_location, $timeline );
 
     my $final_wal_filename_re = qr{\A$final_wal_filename};
     $self->wait_for_file( $self->{ 'source' }->{ 'path' }, $final_wal_filename_re );
