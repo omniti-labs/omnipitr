@@ -125,6 +125,16 @@ variable.
 Full path to psql program - in case you can't set proper PATH environment
 variable.
 
+=item --tee-path
+
+Full path to tee program - in case you can't set proper PATH environment
+variable.
+
+=item --checksum-path (-cp)
+
+Full path to some checksumming program (e.g. md5sum). Without passing this
+option you will not get checksumming.
+
 =back
 
 =head2 DESCRIPTION

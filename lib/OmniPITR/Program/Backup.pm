@@ -11,6 +11,7 @@ use File::Copy;
 use English qw( -no_match_vars );
 use OmniPITR::Tools qw( ext_for_compression run_command );
 use Cwd;
+use IPC::Open2;
 
 =head1 run()
 
@@ -178,24 +179,47 @@ sub start_writers {
         my $full_file_path = File::Spec->catfile( $dst_path, $filename );
 
         if ( $type eq 'none' ) {
-            if ( open my $fh, '>', $full_file_path ) {
-                $writers{ $type } = $fh;
+            if (defined($self->{'checksum-path'}))
+            {
+                open2( my $in_fh, my $out_fh , $self->{'tee-path'} . " $full_file_path | " . $self->{'checksum-path'} );
+                # We need to catch an exception here
+                $writers{ $type } = { in => $in_fh, out => $out_fh, filename => $filename };
                 $self->log->log( "Starting \"none\" writer to $full_file_path" ) if $self->verbose;
                 next COMPRESSION;
             }
-            $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
+            else
+            {
+                if ( open my $fh, '>', $full_file_path ) {
+                    $writers{ $type } = { out => $fh };
+                    $self->log->log( "Starting \"none\" writer to $full_file_path" ) if $self->verbose;
+                    next COMPRESSION;
+                }
+                $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
+            }
         }
 
         my @command = map { quotemeta $_ } ( $self->{ $type . '-path' }, '--stdout', '-' );
         unshift @command, quotemeta( $self->{ 'nice-path' } ) unless $self->{ 'not-nice' };
-        push @command, ( '>', quotemeta( $full_file_path ) );
 
         $self->log->log( "Starting \"%s\" writer to %s", $type, $full_file_path ) if $self->verbose;
-        if ( open my $fh, '|-', join( ' ', @command ) ) {
-            $writers{ $type } = $fh;
+
+        if (defined($self->{'checksum-path'}))
+        {
+            push @command, ( '|', $self->{'tee-path'}, quotemeta( $full_file_path ), '|', $self->{'checksum-path'} );
+            open2( my $in_fh, my $out_fh, join( ' ', @command ) );
+            # We need to catch an exception here
+            $writers{ $type } = { in => $in_fh, out => $out_fh, filename => $filename };
             next COMPRESSION;
         }
-        $self->log->fatal( 'Cannot open command. Error: %s, Command: %s', $OS_ERROR, \@command );
+        else
+        {
+            push @command, ( '>', quotemeta( $full_file_path ) );
+            if ( open my $fh, '|-', join( ' ', @command ) ) {
+                $writers{ $type } = { out => $fh };
+                next COMPRESSION;
+            }
+            $self->log->fatal( 'Cannot open command. Error: %s, Command: %s', $OS_ERROR, \@command );
+        }      
     }
     $self->{ 'writers' } = \%writers;
     return;
@@ -349,7 +373,7 @@ sub tar_and_compress {
     while ( my $len = sysread( $tar, $buffer, 8192 ) ) {
         while ( my ( $type, $fh ) = each %{ $self->{ 'writers' } } ) {
             $self->{ 'sigpipeinfo' } = $type;
-            my $written = syswrite( $fh, $buffer, $len );
+            my $written = syswrite( $fh->{out}, $buffer, $len );
             next if $written == $len;
             $self->log->fatal( "Writting %u bytes to filehandle for <%s> compression wrote only %u bytes ?!", $len, $type, $written );
         }
@@ -357,7 +381,15 @@ sub tar_and_compress {
     close $tar;
 
     for my $fh ( values %{ $self->{ 'writers' } } ) {
-        close $fh;
+        close($fh->{out});
+        if (defined($self->{'checksum-path'}))
+        {
+            my $in_fh = $fh->{in};
+            my $checksum = <$in_fh>;
+            $checksum =~ s/([0-9a-f]+)\s+-\n/$1/s;
+            $self->log->log("File: %s Checksum: %s", $fh->{filename}, $checksum);
+            close($fh->{in});
+        }
     }
 
     delete $self->{ 'writers' };

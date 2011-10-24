@@ -499,6 +499,7 @@ sub read_args {
         'nice-path'          => 'nice',
         'psql-path'          => 'psql',
         'rsync-path'         => 'rsync',
+        'tee-path'           => 'tee',
         'pgcontroldata-path' => 'pg_controldata',
         'filename-template'  => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__',
     );
@@ -527,6 +528,8 @@ sub read_args {
         'psql-path|sp=s',
         'tar-path|tp=s',
         'rsync-path|rp=s',
+        'tee-path=s',
+        'checksum-path|cp=s',
         'pgcontroldata-path|pp=s',
         'not-nice|nn',
         'call-master|cm',

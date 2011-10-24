@@ -232,6 +232,7 @@ sub read_args {
         'nice-path'         => 'nice',
         'psql-path'         => 'psql',
         'rsync-path'        => 'rsync',
+        'tee-path'          => 'tee',
         'database'          => 'postgres',
         'filename-template' => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__',
     );
@@ -259,6 +260,8 @@ sub read_args {
         'psql-path|pp=s',
         'tar-path|tp=s',
         'rsync-path|rp=s',
+        'tee-path=s',
+        'checksum-path|cp=s',
         'not-nice|nn',
         );
 
