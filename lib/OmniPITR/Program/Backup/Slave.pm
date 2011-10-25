@@ -117,6 +117,7 @@ sub compress_xlogs {
         'work_dir'  => dirname( $self->{ 'source' }->{ 'path' } ),
         'tar_dir'   => \@stuff_to_compress,
         'transform' => $transform_command,
+        'data_type' => 'xlog',
     );
 
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
@@ -422,6 +423,7 @@ sub compress_pgdata {
         'tar_dir'   => $tablespaces,
         'excludes'  => [ map { sprintf( '%s/%s', basename( $self->{ 'data-dir' } ), $_ ) } @excludes ],
         'transform' => $transforms,
+        'data_type' => 'data',
     );
 
     $self->log->time_finish( 'Compressing $PGDATA' ) if $self->verbose;
@@ -499,7 +501,6 @@ sub read_args {
         'nice-path'          => 'nice',
         'psql-path'          => 'psql',
         'rsync-path'         => 'rsync',
-        'tee-path'           => 'tee',
         'pgcontroldata-path' => 'pg_controldata',
         'filename-template'  => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__',
     );
@@ -528,8 +529,7 @@ sub read_args {
         'psql-path|sp=s',
         'tar-path|tp=s',
         'rsync-path|rp=s',
-        'tee-path=s',
-        'checksum-path|cp=s',
+        'digest|dg=s',
         'pgcontroldata-path|pp=s',
         'not-nice|nn',
         'call-master|cm',
@@ -538,6 +538,12 @@ sub read_args {
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
     for my $key ( qw( log filename-template ) ) {
         $args{ $key } =~ tr/^/%/;
+    }
+
+    if (defined($args{digest}))
+    {
+        @{ $self->{digests} } = split(/,/,$args{digest});
+        delete $args{digest};
     }
 
     for my $key ( grep { !/^dst-(?:local|remote)$/ } keys %args ) {
