@@ -114,6 +114,11 @@ Log verbosely what is happening.
 
 Do not use nice for compressions.
 
+=item --digest (-dg)
+
+Digest method to use eg MD5 or SHA-1. Can be a comma seperated list to use
+multiple digest algorithms.
+
 =item --gzip-path (-gp)
 
 Full path to gzip program - in case you can't set proper PATH environment
@@ -153,16 +158,6 @@ variable.
 
 Full path to pg_controldata program - in case you can't set proper PATH
 environment variable.
-
-=item --tee-path
-
-Full path to tee program - in case you can't set proper PATH environment
-variable.
-
-=item --checksum-path (-cp)
-
-Full path to some checksumming program (e.g. md5sum). Without passing this
-option you will not get checksumming.
 
 =back
 
