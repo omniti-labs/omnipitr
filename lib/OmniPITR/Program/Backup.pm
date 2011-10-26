@@ -370,14 +370,14 @@ sub tar_and_compress {
             {
                 my $written = syswrite( $fhs->{final}, $buffer, $len );
 
-                foreach my $digest (keys %{ $self->{writers}{ $ARGS{data_type} }{$compression_type}{digest} })
-                {
-                    ($self->{writers}{ $ARGS{data_type} }{$compression_type}{digest}{$digest})->add($buffer);
-                }
-
                 if ($written != $len)
                 {
                     $self->log->fatal( "Writting %u bytes to filehandle for %s wrote only %u bytes ?!", $len, , $written );
+                }
+
+                foreach my $digest (keys %{ $self->{writers}{ $ARGS{data_type} }{$compression_type}{digest} })
+                {
+                    ($self->{writers}{ $ARGS{data_type} }{$compression_type}{digest}{$digest})->add($buffer);
                 }
             }
             elsif (($compression_type eq 'none') and ($len == 0))
