@@ -13,6 +13,7 @@ use OmniPITR::Tools qw( ext_for_compression run_command );
 use Cwd;
 use IPC::Open2;
 use Digest;
+use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
 
 =head1 run()
 
@@ -198,6 +199,8 @@ sub start_writers {
 
             open2( my $in_fh, my $out_fh, join( ' ', @command ) );
             # We need to catch an exception here
+            my $flags = fcntl($in_fh, F_GETFL, 0);
+            $flags = fcntl($in_fh, F_SETFL, $flags | O_NONBLOCK);
             $self->{writers}{ $data_type }{ $compression_type }{compression_in} = $in_fh;
             $self->{writers}{ $data_type }{ $compression_type }{compression_out} = $out_fh;
         }
@@ -384,7 +387,7 @@ sub tar_and_compress {
                 foreach my $digest (keys %{ $self->{writers}{ $ARGS{data_type} }{$compression_type}{digest} })
                 {
                     my $dg = ($self->{writers}{ $ARGS{data_type} }{$compression_type}{digest}{$digest})->hexdigest();
-                    $self->log->log("File: %s Digest: %s", $fhs->{filename}, $dg);
+                    $self->log->log("File: %s Method: %s Digest: %s", $fhs->{filename}, $digest, $dg);
                 }
             }
             else
@@ -401,6 +404,8 @@ sub tar_and_compress {
                 else
                 {
                     close($fhs->{compression_out});
+                    my $flags = fcntl($fhs->{compression_in}, F_GETFL, 0);
+                    $flags = fcntl($fhs->{compression_in}, F_SETFL, $flags & ~ O_NONBLOCK);
                 }
 
                 while (my $comp_len = sysread( $fhs->{compression_in}, my $comp_buffer, 8192 ))
@@ -411,13 +416,14 @@ sub tar_and_compress {
                     }
 
                     my $final_written = syswrite( $fhs->{final}, $comp_buffer, $comp_len );
+
                     if ($final_written != $comp_len)
                     {
                         $self->log->fatal( "Writting %u bytes to filehandle for %s wrote only %u bytes ?!", $comp_len, , $final_written );
                     }
                 }
 
-                if ($len > 0)
+                if ($len == 0)
                 {
                     close($fhs->{compression_in});
                     close($fhs->{final});
@@ -425,12 +431,13 @@ sub tar_and_compress {
                     foreach my $digest (keys %{ $self->{writers}{ $ARGS{data_type} }{$compression_type}{digest} })
                     {
                         my $dg = ($self->{writers}{ $ARGS{data_type} }{$compression_type}{digest}{$digest})->hexdigest();
-                        $self->log->log("File: %s Digest: %s", $fhs->{filename}, $dg);
+                        $self->log->log("File: %s Method: %s Digest: %s", $fhs->{filename}, $digest, $dg);
                     }
                 }
             }
         }
     } until ($len == 0);
+
     close $tar;
 
     my $stderr_output;
