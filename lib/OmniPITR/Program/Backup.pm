@@ -80,7 +80,7 @@ sub psql {
 
     $self->log->fatal( 'Running [%s] via psql failed: %s', $query, $status ) if $status->{ 'error_code' };
 
-    return $status->{'stdout'};
+    return $status->{ 'stdout' };
 }
 
 =head1 wait_for_file()
@@ -172,42 +172,49 @@ sub start_writers {
     my $self      = shift;
     my $data_type = shift;
 
-    while ( my ( $compression_type, $dst_path ) = each %{ $self->{ 'base' } } )
-    {
+    while ( my ( $compression_type, $dst_path ) = each %{ $self->{ 'base' } } ) {
         my $filename = $self->get_archive_filename( $data_type, $compression_type );
 
-        $self->{writers}{ $data_type }{ $compression_type } = { filename => $filename };
+        $self->{ 'writers' }->{ $data_type }->{ $compression_type } = { 'filename' => $filename };
 
         my $full_file_path = File::Spec->catfile( $dst_path, $filename );
 
-        if ( open my $fh, '>', $full_file_path )
-        {
-            $self->{writers}{ $data_type }{ $compression_type }{final} = $fh;
+        if ( open my $fh, '>', $full_file_path ) {
+            $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'final' } = $fh;
             $self->log->log( "Starting writer to $full_file_path" ) if $self->verbose;
         }
-        else
-        {
+        else {
             $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
         }
 
-        if ($compression_type ne 'none')
-        {
+        if ( $compression_type ne 'none' ) {
             my @command = map { quotemeta $_ } ( $self->{ $compression_type . '-path' }, '--stdout', '-' );
             unshift @command, quotemeta( $self->{ 'nice-path' } ) unless $self->{ 'not-nice' };
 
             $self->log->log( "Starting \"%s\" writer", $compression_type ) if $self->verbose;
 
             open2( my $in_fh, my $out_fh, join( ' ', @command ) );
+
             # We need to catch an exception here
-            my $flags = fcntl($in_fh, F_GETFL, 0);
-            $flags = fcntl($in_fh, F_SETFL, $flags | O_NONBLOCK);
-            $self->{writers}{ $data_type }{ $compression_type }{compression_in} = $in_fh;
-            $self->{writers}{ $data_type }{ $compression_type }{compression_out} = $out_fh;
+            my $flags = fcntl( $in_fh, F_GETFL, 0 );
+            $flags = fcntl( $in_fh, F_SETFL, $flags | O_NONBLOCK );
+            $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_in' }  = $in_fh;
+            $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_out' } = $out_fh;
         }
 
-        foreach my $digest (@{ $self->{digests} })
-        {
-            $self->{writers}{ $data_type }{ $compression_type }{digest}{$digest} = Digest->new($digest);
+        foreach my $digest ( @{ $self->{ 'digests' } } ) {
+            my $digest_filename = $self->get_archive_filename( $digest, $compression_type );
+            my $full_digest_path = File::Spec->catfile( $dst_path, $digest_filename );
+
+            if ( open my $fh, '>>', $full_digest_path ) {
+                $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_fh' }->{ $digest } = $fh;
+                $self->log->log( "Starting writer to $full_digest_path" ) if $self->verbose;
+            }
+            else {
+                $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
+            }
+
+            $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } = Digest->new( $digest );
         }
     }
 
@@ -359,84 +366,74 @@ sub tar_and_compress {
     chdir $previous_dir if $ARGS{ 'work_dir' };
 
     my $len = 0;
-    do
-    {
+    do {
         $len = sysread( $tar, my $buffer, 8192 );
-        while ( my ( $compression_type, $fhs ) = each %{ $self->{ 'writers' }{ $ARGS{data_type} } } )
-        {
+        while ( my ( $compression_type, $fhs ) = each %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } } } ) {
             $self->{ 'sigpipeinfo' } = $compression_type;
 
-            if (($compression_type eq 'none') and ($len > 0))
-            {
-                my $written = syswrite( $fhs->{final}, $buffer, $len );
+            if ( ( $compression_type eq 'none' ) and ( $len > 0 ) ) {
+                my $written = syswrite( $fhs->{ 'final' }, $buffer, $len );
 
-                if ($written != $len)
-                {
-                    $self->log->fatal( "Writting %u bytes to filehandle for %s wrote only %u bytes ?!", $len, , $written );
+                if ( $written != $len ) {
+                    $self->log->fatal( "Writting %u bytes to filehandle for %s wrote only %u bytes ?!", $len, $fhs->{ 'filename' }, $written );
                 }
 
-                foreach my $digest (keys %{ $self->{writers}{ $ARGS{data_type} }{$compression_type}{digest} })
-                {
-                    ($self->{writers}{ $ARGS{data_type} }{$compression_type}{digest}{$digest})->add($buffer);
+                foreach my $digester ( values %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_obj' } } ) {
+                    $digester->add( $buffer );
                 }
             }
-            elsif (($compression_type eq 'none') and ($len == 0))
-            {
-                close($fhs->{final});
+            elsif ( ( $compression_type eq 'none' ) and ( $len == 0 ) ) {
+                close( $fhs->{ 'final' } );
 
-                foreach my $digest (keys %{ $self->{writers}{ $ARGS{data_type} }{$compression_type}{digest} })
-                {
-                    my $dg = ($self->{writers}{ $ARGS{data_type} }{$compression_type}{digest}{$digest})->hexdigest();
-                    $self->log->log("File: %s Method: %s Digest: %s", $fhs->{filename}, $digest, $dg);
+                while ( my ( $digest_type, $digester ) = each %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_obj' } } ) {
+                    my $digest = $digester->hexdigest();
+                    $self->log->log( "File: %s Method: %s Digest: %s", $fhs->{ 'filename' }, $digest_type, $digest );
+                    my $fh = $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_fh' }->{ $digest_type };
+                    print $fh $digest . " *" . $fhs->{ 'filename' } . "\n";
+                    close( $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_fh' }->{ $digest_type } );
                 }
             }
-            else
-            {
-                if ($len > 0)
-                {
-                    my $written = syswrite( $fhs->{compression_out}, $buffer, $len );
+            else {
+                if ( $len > 0 ) {
+                    my $written = syswrite( $fhs->{ 'compression_out' }, $buffer, $len );
 
-                    if ($written != $len)
-                    {
+                    if ( $written != $len ) {
                         $self->log->fatal( "Writting %u bytes to filehandle for <%s> compression wrote only %u bytes ?!", $len, $compression_type, $written );
                     }
                 }
-                else
-                {
-                    close($fhs->{compression_out});
-                    my $flags = fcntl($fhs->{compression_in}, F_GETFL, 0);
-                    $flags = fcntl($fhs->{compression_in}, F_SETFL, $flags & ~ O_NONBLOCK);
+                else {
+                    close( $fhs->{ 'compression_out' } );
+                    my $flags = fcntl( $fhs->{ 'compression_in' }, F_GETFL, 0 );
+                    $flags = fcntl( $fhs->{ 'compression_in' }, F_SETFL, $flags & ~O_NONBLOCK );
                 }
 
-                while (my $comp_len = sysread( $fhs->{compression_in}, my $comp_buffer, 8192 ))
-                {
-                    foreach my $digest (keys %{ $self->{writers}{ $ARGS{data_type} }{$compression_type}{digest} })
-                    {
-                        ($self->{writers}{ $ARGS{data_type} }{$compression_type}{digest}{$digest})->add($comp_buffer);
+                while ( my $comp_len = sysread( $fhs->{ 'compression_in' }, my $comp_buffer, 8192 ) ) {
+                    foreach my $digester ( values %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_obj' } } ) {
+                        $digester->add( $comp_buffer );
                     }
 
-                    my $final_written = syswrite( $fhs->{final}, $comp_buffer, $comp_len );
+                    my $final_written = syswrite( $fhs->{ 'final' }, $comp_buffer, $comp_len );
 
-                    if ($final_written != $comp_len)
-                    {
-                        $self->log->fatal( "Writting %u bytes to filehandle for %s wrote only %u bytes ?!", $comp_len, , $final_written );
+                    if ( $final_written != $comp_len ) {
+                        $self->log->fatal( "Writting %u bytes to filehandle for %s wrote only %u bytes ?!", $comp_len, $fhs->{ 'filename' }, $final_written );
                     }
                 }
 
-                if ($len == 0)
-                {
-                    close($fhs->{compression_in});
-                    close($fhs->{final});
+                if ( $len == 0 ) {
+                    close( $fhs->{ 'compression_in' } );
+                    close( $fhs->{ 'final' } );
 
-                    foreach my $digest (keys %{ $self->{writers}{ $ARGS{data_type} }{$compression_type}{digest} })
-                    {
-                        my $dg = ($self->{writers}{ $ARGS{data_type} }{$compression_type}{digest}{$digest})->hexdigest();
-                        $self->log->log("File: %s Method: %s Digest: %s", $fhs->{filename}, $digest, $dg);
+                    while ( my ( $digest_type, $digester ) = each %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_obj' } } ) {
+                        my $digest = $digester->hexdigest();
+                        $self->log->log( "File: %s Method: %s Digest: %s", $fhs->{ 'filename' }, $digest_type, $digest );
+                        my $fh = $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_fh' }->{ $digest_type };
+                        print $fh $digest . " *" . $fhs->{ 'filename' } . "\n";
+                        close( $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_fh' }->{ $digest_type } );
                     }
                 }
             }
         }
-    } until ($len == 0);
+    } until ( $len == 0 );
 
     close $tar;
 
@@ -492,7 +489,7 @@ sub deliver_to_all_local_destinations {
 
         my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
 
-        for my $type ( qw( data xlog ) ) {
+        for my $type ( ( @{ $self->{digests} }, qw( data xlog ) ) ) {
 
             my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
             my $source_filename = File::Spec->catfile( $B, $filename );
@@ -528,7 +525,7 @@ sub deliver_to_all_remote_destinations {
 
         my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
 
-        for my $type ( qw( data xlog ) ) {
+        for my $type ( ( @{ $self->{digests} }, qw( data xlog ) ) ) {
 
             my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
             my $source_filename = File::Spec->catfile( $B, $filename );
