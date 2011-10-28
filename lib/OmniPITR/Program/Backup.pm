@@ -193,13 +193,20 @@ sub start_writers {
 
             $self->log->log( "Starting \"%s\" writer", $compression_type ) if $self->verbose;
 
-            open2( my $in_fh, my $out_fh, join( ' ', @command ) );
+            my ( $in_fh, $out_fh );
+            eval {
+                open2( $in_fh, $out_fh, join( ' ', @command ) );
+            };
 
-            # We need to catch an exception here
-            my $flags = fcntl( $in_fh, F_GETFL, 0 );
-            $flags = fcntl( $in_fh, F_SETFL, $flags | O_NONBLOCK );
-            $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_in' }  = $in_fh;
-            $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_out' } = $out_fh;
+            if ( $@ ) {
+                $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $@ );
+            }
+            else {
+                my $flags = fcntl( $in_fh, F_GETFL, 0 );
+                fcntl( $in_fh, F_SETFL, $flags | O_NONBLOCK );
+                $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_in' }  = $in_fh;
+                $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_out' } = $out_fh;
+            }
         }
 
         for ( my $i = 0; $i < scalar( @{ $self->{ 'digests' } } ); $i++ ) {
@@ -211,7 +218,7 @@ sub start_writers {
                 eval {
                     $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } = Digest->new( $digest );
                 };
-                if ($@) {
+                if ( $@ ) {
                     $self->log->log( 'Cannot use digest method %s', $digest );
                     delete( $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } );
                     splice( @{ $self->{ 'digests' } }, $i--, 1 );
