@@ -202,19 +202,33 @@ sub start_writers {
             $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_out' } = $out_fh;
         }
 
-        foreach my $digest ( @{ $self->{ 'digests' } } ) {
-            my $digest_filename = $self->get_archive_filename( $digest, $compression_type );
-            my $full_digest_path = File::Spec->catfile( $dst_path, $digest_filename );
-
-            if ( open my $fh, '>>', $full_digest_path ) {
-                $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_fh' }->{ $digest } = $fh;
-                $self->log->log( "Starting writer to $full_digest_path" ) if $self->verbose;
+        for ( my $i = 0; $i < scalar( @{ $self->{ 'digests' } } ); $i++ ) {
+            my $digest = $self->{ 'digests' }->[$i];
+            if ( defined( $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } ) ) {
+                splice( @{ $self->{ 'digests' } }, $i--, 1 );
             }
             else {
-                $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
-            }
+                eval {
+                    $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } = Digest->new( $digest );
+                };
+                if ($@) {
+                    $self->log->log( 'Cannot use digest method %s', $digest );
+                    delete( $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } );
+                    splice( @{ $self->{ 'digests' } }, $i--, 1 );
+                }
+                else {
+                    my $digest_filename = $self->get_archive_filename( $digest, $compression_type );
+                    my $full_digest_path = File::Spec->catfile( $dst_path, $digest_filename );
 
-            $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } = Digest->new( $digest );
+                    if ( open( my $fh, '>>', $full_digest_path ) ) {
+                        $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_fh' }->{ $digest } = $fh;
+                        $self->log->log( "Starting writer to $full_digest_path" ) if $self->verbose;
+                    }
+                    else {
+                        $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
+                    }
+                }
+            }
         }
     }
 
