@@ -1,11 +1,11 @@
 #!/bin/bash
 
 get_slave_receiver_location() {
-    ps ww o cmd= --ppid "$slave_postmaster_pid" | awk '$0~/^postgres: wal receiver process.*[0-9A-F]+\/[0-9A-F]+[[:space:]]*$/ {split($NF, f, "/"); printf "%08s%08s\n", f[1], f[2]}'
+    ps ww o cmd= --ppid "$slave_postmaster_pid" | awk '$0~/^postgres: wal receiver process.*[0-9A-F]+\/[0-9A-F]+ *$/ {split($NF, f, "/"); printf "%08s%08s\n", f[1], f[2]}'
 }
 
 get_master_sender_location() {
-    ps ww o cmd= --ppid "$( head -n 1 data-master/postmaster.pid )" | awk '$0~/^postgres: wal sender process.*[0-9A-F]+\/[0-9A-F]+[[:space:]]*$/ {split($NF, f, "/"); printf "%08s%08s\n", f[1], f[2]}' | LC_ALL=C sort | tail -n 1
+    ps ww o cmd= --ppid "$( head -n 1 data-master/postmaster.pid )" | awk '$0~/^postgres: wal sender process.*[0-9A-F]+\/[0-9A-F]+ *$/ {split($NF, f, "/"); printf "%08s%08s\n", f[1], f[2]}' | LC_ALL=C sort | tail -n 1
 }
 
 make_sr_slave () {
