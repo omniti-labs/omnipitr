@@ -270,8 +270,8 @@ sub read_args {
         $args{ $key } =~ tr/^/%/;
     }
 
-    if (defined($args{digest}))
-    {
+    $self->{digests} = [];
+    if (defined($args{digest})) {
         @{ $self->{digests} } = split(/,/,$args{digest});
         delete $args{digest};
     }
