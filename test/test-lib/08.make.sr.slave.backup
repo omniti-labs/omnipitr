@@ -6,7 +6,7 @@ make_sr_slave_backup() {
 
     mkdir /home/depesz/omnipitr/tmp/backup-sr-slave
 
-    /opt/omnipitr/bin/omnipitr-backup-slave -P 54001 -cm -p /home/depesz/omnipitr/pause.master-slave -s gzip=/home/depesz/omnipitr/longarchive -t /home/depesz/omnipitr/tmp/backup-sr-slave/ -D /home/depesz/data-master-sr-slave/ -dl gzip=/home/depesz/omnipitr/backup/ -f "master-sr-slave-__FILETYPE__.tar__CEXT__" -l /home/depesz/omnipitr/log-backup-sr-slave -v
+    /opt/omnipitr/bin/omnipitr-backup-slave -dg MD5,SHA-1 -P 54001 -cm -p /home/depesz/omnipitr/pause.master-slave -s gzip=/home/depesz/omnipitr/longarchive -t /home/depesz/omnipitr/tmp/backup-sr-slave/ -D /home/depesz/data-master-sr-slave/ -dl gzip=/home/depesz/omnipitr/backup/ -f "master-sr-slave-__FILETYPE__.tar__CEXT__" -l /home/depesz/omnipitr/log-backup-sr-slave -v
 
     stop_load_generators
 

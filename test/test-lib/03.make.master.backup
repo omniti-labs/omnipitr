@@ -1,7 +1,7 @@
 #!/bin/bash
 
 make_master_backup() {
-    /opt/omnipitr/bin/omnipitr-backup-master -p 54001 -t /home/depesz/omnipitr/tmp/backup-master/ -D /home/depesz/data-master/ -x /home/depesz/omnipitr/backup-archive/ -dl gzip=/home/depesz/omnipitr/backup/ -f "master-__FILETYPE__.tar__CEXT__" -l /home/depesz/omnipitr/log -v
+    /opt/omnipitr/bin/omnipitr-backup-master -dg MD5,SHA-1 -p 54001 -t /home/depesz/omnipitr/tmp/backup-master/ -D /home/depesz/data-master/ -x /home/depesz/omnipitr/backup-archive/ -dl gzip=/home/depesz/omnipitr/backup/ -f "master-__FILETYPE__.tar__CEXT__" -l /home/depesz/omnipitr/log -v
 
     if [[ ! -e /home/depesz/omnipitr/backup/master-data.tar.gz ]]
     then
