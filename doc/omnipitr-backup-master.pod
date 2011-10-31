@@ -92,8 +92,8 @@ Do not use nice for compressions.
 
 =item --digest (-dg)
 
-Digest method to use eg MD5 or SHA-1. Can be a comma seperated list to use
-multiple digest algorithms.
+Digest method to use (eg MD5 or SHA-1) for checksumming. Can be a comma
+seperated list to use multiple digest algorithms.
 
 =item --gzip-path (-gp)
 
