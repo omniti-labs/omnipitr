@@ -94,6 +94,7 @@ sub compress_xlogs {
     $self->tar_and_compress(
         'work_dir' => $self->{ 'xlogs' } . '.real',
         'tar_dir'  => [ basename( $self->{ 'data-dir' } ) ],
+        'data_type' => 'xlog',
     );
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
     rmtree( $self->{ 'xlogs' } . '.real', 0 );
@@ -126,6 +127,7 @@ sub compress_pgdata {
         'tar_dir'   => $tablespaces,
         'excludes'  => \@excludes,
         'transform' => $transforms,
+        'data_type' => 'data',
     );
 
     $self->log->time_finish( 'Compressing $PGDATA' ) if $self->verbose;
@@ -259,12 +261,19 @@ sub read_args {
         'psql-path|pp=s',
         'tar-path|tp=s',
         'rsync-path|rp=s',
+        'digest|dg=s',
         'not-nice|nn',
         );
 
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
     for my $key ( qw( log filename-template ) ) {
         $args{ $key } =~ tr/^/%/;
+    }
+
+    $self->{digests} = [];
+    if (defined($args{digest})) {
+        @{ $self->{digests} } = split(/,/,$args{digest});
+        delete $args{digest};
     }
 
     for my $key ( grep { !/^dst-(?:local|remote)$/ } keys %args ) {
