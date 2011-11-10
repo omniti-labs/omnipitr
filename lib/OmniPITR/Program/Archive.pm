@@ -2,7 +2,7 @@ package OmniPITR::Program::Archive;
 use strict;
 use warnings;
 
-our $VERSION = '0.1.3';
+our $VERSION = '0.2.0';
 use base qw( OmniPITR::Program );
 
 use Carp;

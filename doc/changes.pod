@@ -1,5 +1,16 @@
 =head1 OmniPITR
 
+=head2 2011-11-10
+
+=over
+
+=item * Release version 0.2.0
+
+=item * Added ability to create checksums of backups, with --digest option for
+omnipitr-backup-master and omnipitr-backup-slave programs
+
+=back
+
 =head2 2011-08-05
 
 =over

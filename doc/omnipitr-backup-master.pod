@@ -95,6 +95,8 @@ Do not use nice for compressions.
 Digest method to use (eg MD5 or SHA-1) for checksumming. Can be a comma
 seperated list to use multiple digest algorithms.
 
+For details please check L<CHECKSUMMING> below.
+
 =item --gzip-path (-gp)
 
 Full path to gzip program - in case you can't set proper PATH environment
@@ -260,6 +262,55 @@ For details - please consult manual to your choosen compression tool.
 =back
 
 B<It is strongly suggest to use only 1 compression method for all destinations>
+
+=head2 CHECKSUMMING
+
+OmniPITR can (since version 0.2.0) calculate checksums of created files.
+
+To calculate the checksums, OmniPITR uses Digest Perl module (part of standard
+Perl distribution).
+
+Digest module supports (now) 5 different types of checksums:
+
+=over
+
+=item * MD5 - standard md5 algorithm
+
+=item * SHA-1 - SHA-1 algorithm
+
+=item * SHA-256 - SHA-2 algorithm with hash size of 256 bits
+
+=item * SHA-384 - SHA-2 algorithm with hash size of 384 bits
+
+=item * SHA-512 - SHA-2 algorithm with hash size of 512 bits
+
+=back
+
+If you'll choose to use checksums, for every type of checksum (you can specify
+--digest=MD5,SHA-512) there will be one additional file created, named just like
+data and xlog tarbals, but with __FILETYPE__ part of filename (details in
+L<FILENAMES>) changed to digest name.
+
+So, with filename template being __FILETYPE__.tar__CEXT__, gzip compression and
+MD5 checksumming, you will get 3 files:
+
+=over
+
+=item * data.tar.gz
+
+=item * xlog.tar.gz
+
+=item * MD5.tar.gz
+
+=back
+
+It is important to understand that the checksum file is plain text, and the
+parts of its name that suggest tar.gz as just "leftovers" from filename
+template.
+
+After creation, such checksum file can be verified with:
+
+    md5sum -c MD5.tar.gz
 
 =head2 FILENAMES
 
