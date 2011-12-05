@@ -181,7 +181,7 @@ sub start_writers {
 
         if ( open my $fh, '>', $full_file_path ) {
             $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'final' } = $fh;
-            $self->log->log( "Starting writer to $full_file_path" ) if $self->verbose;
+            $self->log->log( "Starting writer to %s, fd#%d", $full_file_path, fileno( $fh ) ) if $self->verbose;
         }
         else {
             $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
@@ -198,14 +198,15 @@ sub start_writers {
                 open2( $in_fh, $out_fh, join( ' ', @command ) );
             };
 
-            if ( $@ ) {
-                $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $@ );
+            if ( $EVAL_ERROR ) {
+                $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $EVAL_ERROR );
             }
             else {
                 my $flags = fcntl( $in_fh, F_GETFL, 0 );
                 fcntl( $in_fh, F_SETFL, $flags | O_NONBLOCK );
                 $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_in' }  = $in_fh;
                 $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_out' } = $out_fh;
+                $self->log->log( 'Compression (%s) filter started. in fd#%d, out fd#%d', fileno( $in_fh ), fileno( $out_fh ) ) if $self->verbose;
             }
         }
 
@@ -229,7 +230,7 @@ sub start_writers {
 
                     if ( open( my $fh, '>>', $full_digest_path ) ) {
                         $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_fh' }->{ $digest } = $fh;
-                        $self->log->log( "Starting writer to $full_digest_path" ) if $self->verbose;
+                        $self->log->log( 'Starting writer to %s, fd#%d', $full_digest_path, fileno( $fh ) ) if $self->verbose;
                     }
                     else {
                         $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
