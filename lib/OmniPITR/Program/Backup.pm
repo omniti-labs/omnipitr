@@ -206,7 +206,7 @@ sub start_writers {
                 fcntl( $in_fh, F_SETFL, $flags | O_NONBLOCK );
                 $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_in' }  = $in_fh;
                 $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_out' } = $out_fh;
-                $self->log->log( 'Compression (%s) filter started. in fd#%d, out fd#%d', fileno( $in_fh ), fileno( $out_fh ) ) if $self->verbose;
+                $self->log->log( 'Compression (%s) filter started. in fd#%d, out fd#%d', $compression_type, fileno( $in_fh ), fileno( $out_fh ) ) if $self->verbose;
             }
         }
 
