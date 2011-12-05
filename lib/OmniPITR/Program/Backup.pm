@@ -416,19 +416,6 @@ sub tar_and_compress {
                 }
             }
             else {
-
-                while ( my $comp_len = sysread( $fhs->{ 'compression_in' }, my $comp_buffer, 8192 ) ) {
-                    foreach my $digester ( values %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_obj' } } ) {
-                        $digester->add( $comp_buffer );
-                    }
-
-                    my $final_written = syswrite( $fhs->{ 'final' }, $comp_buffer, $comp_len );
-
-                    if ( $final_written != $comp_len ) {
-                        $self->log->fatal( "Writting %u bytes to filehandle for %s wrote only %u bytes ?!", $comp_len, $fhs->{ 'filename' }, $final_written );
-                    }
-                }
-
                 if ( $len > 0 ) {
                     my $written = syswrite( $fhs->{ 'compression_out' }, $buffer, $len );
 
