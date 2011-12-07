@@ -119,10 +119,10 @@ Returns full path to temp file. Name of the file is passed as argument, temp dir
 =cut
 
 sub temp_file {
-    my $self = shift;
+    my $self     = shift;
     my $filename = shift;
     $self->prepare_temp_directory;
-    return File::Spec->catfile( $self->{'temp-dir'}, $filename );
+    return File::Spec->catfile( $self->{ 'temp-dir' }, $filename );
 }
 
 =head1 DESTROY()

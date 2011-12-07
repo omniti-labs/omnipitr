@@ -266,14 +266,13 @@ sub tar_and_compress {
 
     my $tar = $self->_tar_command( %ARGS );
 
-
     $self->log->log( 'Actual command to make tarballs: %s', $tar ) if $self->verbose;
 
     my @full_command = ();
-    push @full_command, 'exec', quotemeta( $self->{'shell-path'} );
-    push @full_command, '-c', quotemeta( $tar );
-    push @full_command, '>', quotemeta( $self->temp_file( 'full_tar.stdout' ) );
-    push @full_command, '2>', quotemeta( $self->temp_file( 'full_tar.stderr' ) );
+    push @full_command, 'exec', quotemeta( $self->{ 'shell-path' } );
+    push @full_command, '-c',   quotemeta( $tar );
+    push @full_command, '>',    quotemeta( $self->temp_file( 'full_tar.stdout' ) );
+    push @full_command, '2>',   quotemeta( $self->temp_file( 'full_tar.stderr' ) );
 
     my $previous_dir = getcwd;
     chdir $ARGS{ 'work_dir' } if $ARGS{ 'work_dir' };
@@ -281,7 +280,7 @@ sub tar_and_compress {
     chdir $previous_dir if $ARGS{ 'work_dir' };
 
     my @files = (
-        'tar stderr' => $self->temp_file( 'tar.stderr' ),
+        'tar stderr'          => $self->temp_file( 'tar.stderr' ),
         'full command stdout' => $self->temp_file( 'full_tar.stdout' ),
         'full command stderr' => $self->temp_file( 'full_tar.stderr' ),
     );
@@ -290,8 +289,8 @@ sub tar_and_compress {
         my $filename = shift @files;
         next unless -s $filename;
         my $fh;
-        unless (open $fh, '<', $filename) {
-            $self->log->log( 'Cannot open %s file (%s) for reading: %s', $desc, $filename, $OS_ERROR);
+        unless ( open $fh, '<', $filename ) {
+            $self->log->log( 'Cannot open %s file (%s) for reading: %s', $desc, $filename, $OS_ERROR );
             next;
         }
         my $data;
@@ -340,7 +339,7 @@ sub deliver_to_all_local_destinations {
 
         my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
 
-        for my $type ( ( @{ $self->{digests} }, qw( data xlog ) ) ) {
+        for my $type ( ( @{ $self->{ 'digests' } }, qw( data xlog ) ) ) {
 
             my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
             my $source_filename = File::Spec->catfile( $B, $filename );
@@ -376,7 +375,7 @@ sub deliver_to_all_remote_destinations {
 
         my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
 
-        for my $type ( ( @{ $self->{digests} }, qw( data xlog ) ) ) {
+        for my $type ( ( @{ $self->{ 'digests' } }, qw( data xlog ) ) ) {
 
             my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
             my $source_filename = File::Spec->catfile( $B, $filename );
@@ -435,17 +434,18 @@ sub _tar_command {
 
     $tar_str .= " 2> " . quotemeta( $tar_stderr_filename );
 
-    my @writers = $self->_compression_commands( $ARGS{'data_type'} );
+    my @writers = $self->_compression_commands( $ARGS{ 'data_type' } );
 
     if ( 1 == scalar @writers ) {
-        $tar_str .= ( $writers[0]->{'command'} ? ' | ' : ' > ' ) . $writers[0]->{'str'};
-    } else {
+        $tar_str .= ( $writers[ 0 ]->{ 'command' } ? ' | ' : ' > ' ) . $writers[ 0 ]->{ 'str' };
+    }
+    else {
         my $last = pop @writers;
-        $tar_str .= ' | exec ' . quotemeta( $self->{'tee-path'} );
+        $tar_str .= ' | exec ' . quotemeta( $self->{ 'tee-path' } );
         for ( @writers ) {
-            $tar_str .= " " . ( $_->{'command'} ? ">( " . $_->{'str'} . " )" : $_->{'str'} );
+            $tar_str .= " " . ( $_->{ 'command' } ? ">( " . $_->{ 'str' } . " )" : $_->{ 'str' } );
         }
-        $tar_str .= ( $last->{'command'} ? ' | ' : ' > ' ) . $last->{'str'}
+        $tar_str .= ( $last->{ 'command' } ? ' | ' : ' > ' ) . $last->{ 'str' };
     }
 
     return $tar_str;
@@ -458,10 +458,10 @@ Helper function which returns array. Each element of the array is string to be p
 =cut
 
 sub _compression_commands {
-    my $self = shift;
+    my $self      = shift;
     my $data_type = shift;
-    my @reply = ();
-    my $nice = $self->{'not-nice'} ? "" : quotemeta( $self->{ 'nice-path' } ) . " ";
+    my @reply     = ();
+    my $nice      = $self->{ 'not-nice' } ? "" : quotemeta( $self->{ 'nice-path' } ) . " ";
 
     while ( my ( $compression_type, $dst_path ) = each %{ $self->{ 'base' } } ) {
         my $output = $self->get_archive_filename( $data_type, $compression_type );
@@ -470,15 +470,16 @@ sub _compression_commands {
         my $reply_part = {};
 
         if ( 'none' eq $compression_type ) {
-            $reply_part->{'str'} = $output_path;
-        } else {
-            $reply_part->{'str'} = 'exec ' . $nice . quotemeta( $self->{ $compression_type . '-path' } ) . ' --stdout -';
-            $reply_part->{'command'} = 1;
+            $reply_part->{ 'str' } = $output_path;
+        }
+        else {
+            $reply_part->{ 'str' }     = 'exec ' . $nice . quotemeta( $self->{ $compression_type . '-path' } ) . ' --stdout -';
+            $reply_part->{ 'command' } = 1;
         }
 
-        if ( 0 < scalar @{ $self->{'digests'} } ) {
+        if ( 0 < scalar @{ $self->{ 'digests' } } ) {
             my @digest_strs = ();
-            for my $d ( @{ $self->{'digests'} } ) {
+            for my $d ( @{ $self->{ 'digests' } } ) {
                 my $digest_filename = File::Spec->catfile( $dst_path, $self->get_archive_filename( $d, $compression_type ) );
                 my @digest = ( $Config{ 'perlpath' }, '-MDigest', '-le', q{binmode STDIN;print Digest->new("} . $d . q{")->addfile(\*STDIN)->hexdigest().' *'.$ARGV[0]}, $output );
                 my $digest_str = 'exec ' . $nice . join( ' ', map { quotemeta $_ } @digest );
@@ -489,14 +490,16 @@ sub _compression_commands {
             if ( 'none' eq $compression_type ) {
                 push @reply, $reply_part;
                 push @reply, map { { 'command' => 1, 'str' => $_ } } @digest_strs;
-            } else {
-                $reply_part->{'str'} .= ' | exec ' . $self->{'tee-path'};
-                $reply_part->{'str'} .= " >( $_ )" for @digest_strs;
-                $reply_part->{'str'} .= ' > ' . $output_path;
+            }
+            else {
+                $reply_part->{ 'str' } .= ' | exec ' . $self->{ 'tee-path' };
+                $reply_part->{ 'str' } .= " >( $_ )" for @digest_strs;
+                $reply_part->{ 'str' } .= ' > ' . $output_path;
                 push @reply, $reply_part;
             }
-        } else {
-            $reply_part->{'str'} .= ' > ' . $output_path unless 'none' eq $compression_type;
+        }
+        else {
+            $reply_part->{ 'str' } .= ' > ' . $output_path unless 'none' eq $compression_type;
             push @reply, $reply_part;
         }
     }

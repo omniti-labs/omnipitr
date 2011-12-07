@@ -91,8 +91,8 @@ sub compress_xlogs {
     $self->log->time_start( 'Compressing xlogs' ) if $self->verbose;
 
     $self->tar_and_compress(
-        'work_dir' => $self->{ 'xlogs' } . '.real',
-        'tar_dir'  => [ basename( $self->{ 'data-dir' } ) ],
+        'work_dir'  => $self->{ 'xlogs' } . '.real',
+        'tar_dir'   => [ basename( $self->{ 'data-dir' } ) ],
         'data_type' => 'xlog',
     );
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
@@ -272,10 +272,10 @@ sub read_args {
         $args{ $key } =~ tr/^/%/;
     }
 
-    $self->{digests} = [];
-    if (defined($args{digest})) {
-        @{ $self->{digests} } = split(/,/,$args{digest});
-        delete $args{digest};
+    $self->{ 'digests' } = [];
+    if ( defined( $args{ digest } ) ) {
+        @{ $self->{ 'digests' } } = split( /,/, $args{ digest } );
+        delete $args{ digest };
     }
 
     for my $key ( grep { !/^dst-(?:local|remote)$/ } keys %args ) {
@@ -364,13 +364,11 @@ sub validate_args {
 
     my %bad_digest = ();
     for my $digest_type ( $self->{ 'digests' } ) {
-        eval {
-            my $tmp = Digest->new( $digest_type );
-        };
+        eval { my $tmp = Digest->new( $digest_type ); };
         $self->log->log( 'Bad digest method: %s', $digest_type ) if $EVAL_ERROR;
         $bad_digest{ $digest_type } = 1;
     }
-    $self->{ 'digests' } = [ grep { ! $bad_digest{ $_ } } @{ $self->{ 'digests' } } ];
+    $self->{ 'digests' } = [ grep { !$bad_digest{ $_ } } @{ $self->{ 'digests' } } ];
 
     return unless $self->{ 'destination' }->{ 'local' };
 
