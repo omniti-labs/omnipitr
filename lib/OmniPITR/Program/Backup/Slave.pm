@@ -97,7 +97,6 @@ sub compress_xlogs {
     $self->uncompress_wal_archive_segments();
 
     $self->log->time_start( 'Compressing xlogs' ) if $self->verbose;
-    $self->start_writers( 'xlog' );
 
     my $source_transform_from = basename( $self->{ 'source' }->{ 'path' } );
     $source_transform_from =~ s{^/*}{};
@@ -401,7 +400,6 @@ sub compress_pgdata {
     my $self = shift;
 
     $self->log->time_start( 'Compressing $PGDATA' ) if $self->verbose;
-    $self->start_writers( 'data' );
 
     my $transform_from = $self->{ 'temp-dir' };
     $transform_from =~ s{^/*}{};
@@ -498,9 +496,11 @@ sub read_args {
         'bzip2-path'         => 'bzip2',
         'lzma-path'          => 'lzma',
         'tar-path'           => 'tar',
+        'tee-path'           => 'tee',
         'nice-path'          => 'nice',
         'psql-path'          => 'psql',
         'rsync-path'         => 'rsync',
+        'shell-path'         => 'bash',
         'pgcontroldata-path' => 'pg_controldata',
         'filename-template'  => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__',
     );
@@ -528,7 +528,9 @@ sub read_args {
         'nice-path|np=s',
         'psql-path|sp=s',
         'tar-path|tp=s',
+        'tee-path|ep=s',
         'rsync-path|rp=s',
+        'shell-path|sh=s',
         'digest|dg=s',
         'pgcontroldata-path|pp=s',
         'not-nice|nn',
@@ -540,10 +542,10 @@ sub read_args {
         $args{ $key } =~ tr/^/%/;
     }
 
-    $self->{digests} = [];
-    if (defined($args{digest})) {
-        @{ $self->{digests} } = split(/,/,$args{digest});
-        delete $args{digest};
+    $self->{ digests } = [];
+    if ( defined( $args{ digest } ) ) {
+        @{ $self->{ digests } } = split( /,/, $args{ digest } );
+        delete $args{ digest };
     }
 
     for my $key ( grep { !/^dst-(?:local|remote)$/ } keys %args ) {
@@ -649,6 +651,16 @@ sub validate_args {
     $self->log->fatal( 'Directory for provided removal pause trigger (%s) does not exist!',   $self->{ 'removal-pause-trigger' } ) unless -e dirname( $self->{ 'removal-pause-trigger' } );
     $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not directory!', $self->{ 'removal-pause-trigger' } ) unless -d dirname( $self->{ 'removal-pause-trigger' } );
     $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not writable!',  $self->{ 'removal-pause-trigger' } ) unless -w dirname( $self->{ 'removal-pause-trigger' } );
+
+    my %bad_digest = ();
+    for my $digest_type ( $self->{ 'digests' } ) {
+        eval {
+            my $tmp = Digest->new( $digest_type );
+        };
+        $self->log->log( 'Bad digest method: %s', $digest_type );
+        $bad_digest{ $digest_type } = 1;
+    }
+    $self->{ 'digests' } = [ grep { ! $bad_digest{ $_ } } @{ $self->{ 'digests' } } ];
 
     return unless $self->{ 'destination' }->{ 'local' };
 

@@ -112,6 +112,19 @@ sub prepare_temp_directory {
     return;
 }
 
+=head1 temp_file()
+
+Returns full path to temp file. Name of the file is passed as argument, temp directory is created (if needed) and full path is returned.
+
+=cut
+
+sub temp_file {
+    my $self = shift;
+    my $filename = shift;
+    $self->prepare_temp_directory;
+    return File::Spec->catfile( $self->{'temp-dir'}, $filename );
+}
+
 =head1 DESTROY()
 
 Destructor for object - removes temp directory on program exit.

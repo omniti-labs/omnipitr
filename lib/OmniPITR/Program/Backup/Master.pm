@@ -89,7 +89,6 @@ segments that accumulated during backup of data directory.
 sub compress_xlogs {
     my $self = shift;
     $self->log->time_start( 'Compressing xlogs' ) if $self->verbose;
-    $self->start_writers( 'xlog' );
 
     $self->tar_and_compress(
         'work_dir' => $self->{ 'xlogs' } . '.real',
@@ -112,7 +111,6 @@ directory.
 sub compress_pgdata {
     my $self = shift;
     $self->log->time_start( 'Compressing $PGDATA' ) if $self->verbose;
-    $self->start_writers( 'data' );
 
     my @excludes = qw( pg_log/* pg_xlog/0* pg_xlog/archive_status/* postmaster.pid );
     for my $dir ( qw( pg_log pg_xlog ) ) {
@@ -231,9 +229,11 @@ sub read_args {
         'bzip2-path'        => 'bzip2',
         'lzma-path'         => 'lzma',
         'tar-path'          => 'tar',
+        'tee-path'          => 'tee',
         'nice-path'         => 'nice',
         'psql-path'         => 'psql',
         'rsync-path'        => 'rsync',
+        'shell-path'        => 'bash',
         'database'          => 'postgres',
         'filename-template' => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__',
     );
@@ -260,7 +260,9 @@ sub read_args {
         'nice-path|np=s',
         'psql-path|pp=s',
         'tar-path|tp=s',
+        'tee-path|ep=s',
         'rsync-path|rp=s',
+        'shell-path|sh=s',
         'digest|dg=s',
         'not-nice|nn',
         );
@@ -359,6 +361,16 @@ sub validate_args {
     $self->log->fatal( 'Xlogs dir (%s) parent (%s) does not exist. Cannot continue.',   $self->{ 'xlogs' }, $xlog_parent ) unless -e $xlog_parent;
     $self->log->fatal( 'Xlogs dir (%s) parent (%s) is not directory. Cannot continue.', $self->{ 'xlogs' }, $xlog_parent ) unless -d $xlog_parent;
     $self->log->fatal( 'Xlogs dir (%s) parent (%s) is not writable. Cannot continue.',  $self->{ 'xlogs' }, $xlog_parent ) unless -w $xlog_parent;
+
+    my %bad_digest = ();
+    for my $digest_type ( $self->{ 'digests' } ) {
+        eval {
+            my $tmp = Digest->new( $digest_type );
+        };
+        $self->log->log( 'Bad digest method: %s', $digest_type );
+        $bad_digest{ $digest_type } = 1;
+    }
+    $self->{ 'digests' } = [ grep { ! $bad_digest{ $_ } } @{ $self->{ 'digests' } } ];
 
     return unless $self->{ 'destination' }->{ 'local' };
 

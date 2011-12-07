@@ -10,10 +10,10 @@ use File::Path qw( mkpath rmtree );
 use File::Copy;
 use English qw( -no_match_vars );
 use OmniPITR::Tools qw( ext_for_compression run_command );
+use Data::Dumper;
 use Cwd;
-use IPC::Open2;
 use Digest;
-use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
+use Config;
 
 =head1 run()
 
@@ -157,92 +157,6 @@ sub choose_base_local_destinations {
     return;
 }
 
-=head1 start_writers()
-
-Starts set of filehandles, which write to file, or to compression program,
-to create final archives.
-
-Each compression schema gets its own filehandle, and printing data to it,
-will pass it to file directly or through compression program that has been
-chosen based on command line arguments.
-
-=cut
-
-sub start_writers {
-    my $self      = shift;
-    my $data_type = shift;
-
-    while ( my ( $compression_type, $dst_path ) = each %{ $self->{ 'base' } } ) {
-        my $filename = $self->get_archive_filename( $data_type, $compression_type );
-
-        $self->{ 'writers' }->{ $data_type }->{ $compression_type } = { 'filename' => $filename };
-
-        my $full_file_path = File::Spec->catfile( $dst_path, $filename );
-
-        if ( open my $fh, '>', $full_file_path ) {
-            $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'final' } = $fh;
-            $self->log->log( "Starting writer to %s, fd#%d", $full_file_path, fileno( $fh ) ) if $self->verbose;
-        }
-        else {
-            $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
-        }
-
-        if ( $compression_type ne 'none' ) {
-            my @command = map { quotemeta $_ } ( $self->{ $compression_type . '-path' }, '--stdout', '-' );
-            unshift @command, quotemeta( $self->{ 'nice-path' } ) unless $self->{ 'not-nice' };
-
-            $self->log->log( "Starting \"%s\" writer", $compression_type ) if $self->verbose;
-
-            my ( $in_fh, $out_fh );
-            eval {
-                open2( $in_fh, $out_fh, join( ' ', @command ) );
-            };
-
-            if ( $EVAL_ERROR ) {
-                $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $EVAL_ERROR );
-            }
-            else {
-                my $flags = fcntl( $in_fh, F_GETFL, 0 );
-                fcntl( $in_fh, F_SETFL, $flags | O_NONBLOCK );
-                $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_in' }  = $in_fh;
-                $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'compression_out' } = $out_fh;
-                $self->log->log( 'Compression (%s) filter started. in fd#%d, out fd#%d', $compression_type, fileno( $in_fh ), fileno( $out_fh ) ) if $self->verbose;
-            }
-        }
-
-        for ( my $i = 0; $i < scalar( @{ $self->{ 'digests' } } ); $i++ ) {
-            my $digest = $self->{ 'digests' }->[$i];
-            if ( defined( $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } ) ) {
-                splice( @{ $self->{ 'digests' } }, $i--, 1 );
-            }
-            else {
-                eval {
-                    $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } = Digest->new( $digest );
-                };
-                if ( $@ ) {
-                    $self->log->log( 'Cannot use digest method %s', $digest );
-                    delete( $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_obj' }->{ $digest } );
-                    splice( @{ $self->{ 'digests' } }, $i--, 1 );
-                }
-                else {
-                    my $digest_filename = $self->get_archive_filename( $digest, $compression_type );
-                    my $full_digest_path = File::Spec->catfile( $dst_path, $digest_filename );
-
-                    if ( open( my $fh, '>>', $full_digest_path ) ) {
-                        $self->{ 'writers' }->{ $data_type }->{ $compression_type }->{ 'digest_fh' }->{ $digest } = $fh;
-                        $self->log->log( 'Starting writer to %s, fd#%d', $full_digest_path, fileno( $fh ) ) if $self->verbose;
-                    }
-                    else {
-                        $self->log->fatal( 'Cannot write to %s : %s', $full_file_path, $OS_ERROR );
-                    }
-                }
-            }
-        }
-    }
-
-    return;
-}
-
 =head1 get_tablespaces_and_transforms()
 
 Helper function.  Takes no arguments.  Uses pg_tblspc directory and returns
@@ -350,132 +264,47 @@ sub tar_and_compress {
     my $self = shift;
     my %ARGS = @_;
 
-    local $SIG{ 'PIPE' } = sub { $self->log->fatal( 'Got SIGPIPE while tarring %s for %s', $ARGS{ 'tar_dir' }, $self->{ 'sigpipeinfo' } ); };
+    my $tar = $self->_tar_command( %ARGS );
 
-    my @tar_command = ( $self->{ 'tar-path' }, 'cf', '-' );
-    unshift @tar_command, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
 
-    if ( $ARGS{ 'excludes' } ) {
-        push @tar_command, map { '--exclude=' . $_ } @{ $ARGS{ 'excludes' } };
-    }
+    $self->log->log( 'Actual command to make tarballs: %s', $tar ) if $self->verbose;
 
-    if ( $ARGS{ 'transform' } ) {
-        if ( ref $ARGS{ 'transform' } ) {
-            push @tar_command, map { '--transform=' . $_ } @{ $ARGS{ 'transform' } };
-        }
-        else {
-            push @tar_command, '--transform=' . $ARGS{ 'transform' };
-        }
-    }
-
-    push @tar_command, @{ $ARGS{ 'tar_dir' } };
-
-    my $tar_str = join ' ', map { quotemeta $_ } @tar_command;
-
-    $self->prepare_temp_directory();
-
-    my $tar_stderr_filename = File::Spec->catfile( $self->{ 'temp-dir' }, 'tar.stderr' );
-    $tar_str .= ' 2> ' . quotemeta( $tar_stderr_filename );
+    my @full_command = ();
+    push @full_command, 'exec', quotemeta( $self->{'shell-path'} );
+    push @full_command, '-c', quotemeta( $tar );
+    push @full_command, '>', quotemeta( $self->temp_file( 'full_tar.stdout' ) );
+    push @full_command, '2>', quotemeta( $self->temp_file( 'full_tar.stderr' ) );
 
     my $previous_dir = getcwd;
     chdir $ARGS{ 'work_dir' } if $ARGS{ 'work_dir' };
-
-    my $tar;
-    unless ( open $tar, '-|', $tar_str ) {
-        $self->log->fatal( 'Cannot start tar (%s) : %s', $tar_str, $OS_ERROR );
-    }
-
+    my $retval = system( join( ' ', @full_command ) );
     chdir $previous_dir if $ARGS{ 'work_dir' };
 
-    my $len = 0;
-    do {
-        $len = sysread( $tar, my $buffer, 8192 );
-        while ( my ( $compression_type, $fhs ) = each %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } } } ) {
-            $self->{ 'sigpipeinfo' } = $compression_type;
+    my @files = (
+        'tar stderr' => $self->temp_file( 'tar.stderr' ),
+        'full command stdout' => $self->temp_file( 'full_tar.stdout' ),
+        'full command stderr' => $self->temp_file( 'full_tar.stderr' ),
+    );
 
-            if ( ( $compression_type eq 'none' ) and ( $len > 0 ) ) {
-                my $written = syswrite( $fhs->{ 'final' }, $buffer, $len );
-
-                if ( $written != $len ) {
-                    $self->log->fatal( "Writting %u bytes to filehandle for %s wrote only %u bytes ?!", $len, $fhs->{ 'filename' }, $written );
-                }
-
-                foreach my $digester ( values %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_obj' } } ) {
-                    $digester->add( $buffer );
-                }
-            }
-            elsif ( ( $compression_type eq 'none' ) and ( $len == 0 ) ) {
-                close( $fhs->{ 'final' } );
-
-                while ( my ( $digest_type, $digester ) = each %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_obj' } } ) {
-                    my $digest = $digester->hexdigest();
-                    $self->log->log( "File: %s Method: %s Digest: %s", $fhs->{ 'filename' }, $digest_type, $digest );
-                    my $fh = $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_fh' }->{ $digest_type };
-                    print $fh $digest . " *" . $fhs->{ 'filename' } . "\n";
-                    close( $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_fh' }->{ $digest_type } );
-                }
-            }
-            else {
-                if ( $len > 0 ) {
-                    my $written = syswrite( $fhs->{ 'compression_out' }, $buffer, $len );
-
-                    if ( $written != $len ) {
-                        $self->log->fatal( "Writting %u bytes to filehandle for <%s> compression wrote only %u bytes ?!", $len, $compression_type, $written );
-                    }
-                }
-                else {
-                    close( $fhs->{ 'compression_out' } );
-                    my $flags = fcntl( $fhs->{ 'compression_in' }, F_GETFL, 0 );
-                    $flags = fcntl( $fhs->{ 'compression_in' }, F_SETFL, $flags & ~O_NONBLOCK );
-                }
-
-                while ( my $comp_len = sysread( $fhs->{ 'compression_in' }, my $comp_buffer, 8192 ) ) {
-                    foreach my $digester ( values %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_obj' } } ) {
-                        $digester->add( $comp_buffer );
-                    }
-
-                    my $final_written = syswrite( $fhs->{ 'final' }, $comp_buffer, $comp_len );
-
-                    if ( $final_written != $comp_len ) {
-                        $self->log->fatal( "Writting %u bytes to filehandle for %s wrote only %u bytes ?!", $comp_len, $fhs->{ 'filename' }, $final_written );
-                    }
-                }
-
-                if ( $len == 0 ) {
-                    close( $fhs->{ 'compression_in' } );
-                    close( $fhs->{ 'final' } );
-
-                    while ( my ( $digest_type, $digester ) = each %{ $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_obj' } } ) {
-                        my $digest = $digester->hexdigest();
-                        $self->log->log( "File: %s Method: %s Digest: %s", $fhs->{ 'filename' }, $digest_type, $digest );
-                        my $fh = $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_fh' }->{ $digest_type };
-                        print $fh $digest . " *" . $fhs->{ 'filename' } . "\n";
-                        close( $self->{ 'writers' }->{ $ARGS{ 'data_type' } }->{ $compression_type }->{ 'digest_fh' }->{ $digest_type } );
-                    }
-                }
-            }
+    while ( my $desc = shift @files ) {
+        my $filename = shift @files;
+        next unless -s $filename;
+        my $fh;
+        unless (open $fh, '<', $filename) {
+            $self->log->log( 'Cannot open %s file (%s) for reading: %s', $desc, $filename, $OS_ERROR);
+            next;
         }
-    } until ( $len == 0 );
-
-    close $tar;
-
-    my $stderr_output;
-    my $stderr;
-    unless ( open $stderr, '<', $tar_stderr_filename ) {
-        $self->log->log( 'Cannot open tar stderr file (%s) for reading: %s', $tar_stderr_filename );
-        return;
+        my $data;
+        {
+            local $/;
+            $data = <$fh>;
+        };
+        close $fh;
+        $self->log->log( '%s:', $desc );
+        $self->log->log( '==============================================' );
+        $self->log->log( '%s', $data );
+        $self->log->log( '==============================================' );
     }
-    {
-        local $/;
-        $stderr_output = <$stderr>;
-    };
-    close $stderr;
-    return unless $stderr_output;
-    $self->log->log( 'Tar (%s) generated these output on stderr:', $tar_str );
-    $self->log->log( '==============================================' );
-    $self->log->log( '%s', $stderr_output );
-    $self->log->log( '==============================================' );
-    unlink $tar_stderr_filename;
     return;
 }
 
@@ -569,6 +398,110 @@ sub deliver_to_all_remote_destinations {
         }
     }
     return;
+}
+
+=head1 _tar_command()
+
+Helper function which returns string to be passed to system() to run tar of given directory
+
+=cut
+
+sub _tar_command {
+    my $self = shift;
+    my %ARGS = @_;
+
+    my @tar_command = ( $self->{ 'tar-path' }, 'cf', '-' );
+    unshift @tar_command, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
+    unshift @tar_command, 'exec';
+
+    if ( $ARGS{ 'excludes' } ) {
+        push @tar_command, map { '--exclude=' . $_ } @{ $ARGS{ 'excludes' } };
+    }
+
+    if ( $ARGS{ 'transform' } ) {
+        if ( ref $ARGS{ 'transform' } ) {
+            push @tar_command, map { '--transform=' . $_ } @{ $ARGS{ 'transform' } };
+        }
+        else {
+            push @tar_command, '--transform=' . $ARGS{ 'transform' };
+        }
+    }
+
+    push @tar_command, @{ $ARGS{ 'tar_dir' } };
+
+    my $tar_str = join ' ', map { quotemeta $_ } @tar_command;
+
+    my $tar_stderr_filename = $self->temp_file( 'tar.stderr' );
+
+    $tar_str .= " 2> " . quotemeta( $tar_stderr_filename );
+
+    my @writers = $self->_compression_commands( $ARGS{'data_type'} );
+
+    if ( 1 == scalar @writers ) {
+        $tar_str .= ( $writers[0]->{'command'} ? ' | ' : ' > ' ) . $writers[0]->{'str'};
+    } else {
+        my $last = pop @writers;
+        $tar_str .= ' | exec ' . quotemeta( $self->{'tee-path'} );
+        for ( @writers ) {
+            $tar_str .= " " . ( $_->{'command'} ? ">( " . $_->{'str'} . " )" : $_->{'str'} );
+        }
+        $tar_str .= ( $last->{'command'} ? ' | ' : ' > ' ) . $last->{'str'}
+    }
+
+    return $tar_str;
+}
+
+=head1 _compression_commands()
+
+Helper function which returns array. Each element of the array is string to be passed to system() that will cause it to compress data from stdin to appropriate output file.
+
+=cut
+
+sub _compression_commands {
+    my $self = shift;
+    my $data_type = shift;
+    my @reply = ();
+    my $nice = $self->{'not-nice'} ? "" : quotemeta( $self->{ 'nice-path' } ) . " ";
+
+    while ( my ( $compression_type, $dst_path ) = each %{ $self->{ 'base' } } ) {
+        my $output = $self->get_archive_filename( $data_type, $compression_type );
+        my $output_path = quotemeta( File::Spec->catfile( $dst_path, $output ) );
+
+        my $reply_part = {};
+
+        if ( 'none' eq $compression_type ) {
+            $reply_part->{'str'} = $output_path;
+        } else {
+            $reply_part->{'str'} = 'exec ' . $nice . quotemeta( $self->{ $compression_type . '-path' } ) . ' --stdout -';
+            $reply_part->{'command'} = 1;
+        }
+
+        if ( 0 < scalar @{ $self->{'digests'} } ) {
+            my @digest_strs = ();
+            for my $d ( @{ $self->{'digests'} } ) {
+                my $digest_filename = File::Spec->catfile( $dst_path, $self->get_archive_filename( $d, $compression_type ) );
+                my @digest = ( $Config{ 'perlpath' }, '-MDigest', '-le', q{binmode STDIN;print Digest->new("} . $d . q{")->addfile(\*STDIN)->hexdigest().' *'.$ARGV[0]}, $output );
+                my $digest_str = 'exec ' . $nice . join( ' ', map { quotemeta $_ } @digest );
+                $digest_str .= ( $data_type eq 'data' ? ' > ' : ' >> ' ) . quotemeta( $digest_filename );
+                push @digest_strs, $digest_str;
+            }
+
+            if ( 'none' eq $compression_type ) {
+                push @reply, $reply_part;
+                push @reply, map { { 'command' => 1, 'str' => $_ } } @digest_strs;
+            } else {
+                $reply_part->{'str'} .= ' | exec ' . $self->{'tee-path'};
+                $reply_part->{'str'} .= " >( $_ )" for @digest_strs;
+                $reply_part->{'str'} .= ' > ' . $output_path;
+                push @reply, $reply_part;
+            }
+        } else {
+            $reply_part->{'str'} .= ' > ' . $output_path unless 'none' eq $compression_type;
+            push @reply, $reply_part;
+        }
+    }
+
+    return @reply;
 }
 
 1;
