@@ -657,7 +657,7 @@ sub validate_args {
         eval {
             my $tmp = Digest->new( $digest_type );
         };
-        $self->log->log( 'Bad digest method: %s', $digest_type );
+        $self->log->log( 'Bad digest method: %s', $digest_type ) if $EVAL_ERROR;
         $bad_digest{ $digest_type } = 1;
     }
     $self->{ 'digests' } = [ grep { ! $bad_digest{ $_ } } @{ $self->{ 'digests' } } ];
