@@ -1,0 +1,269 @@
+=head1 OmniPITR - omnipitr-synch
+
+=head2 USAGE
+
+/some/path/omnipitr/bin/omnipitr-synch [options]
+
+Options:
+
+=over
+
+=item --data-dir (-D)
+
+Where PostgreSQL datadir is located (path)
+
+=item --database (-d)
+
+Which database to connect to to issue required SQL queries. Defaults to
+template1.
+
+=item --host (-h)
+
+Which host to connect to when connecting to database to run pg_backup_*
+functions. Shouldn't really be changed in 99% of cases. Defaults to empty string
+- i.e. use UNIX sockets.
+
+=item --port (-p)
+
+Which port to connect to when connecting to database. Defaults to 5432.
+
+=item --username (-U)
+
+What username to use when connecting to database. Defaults to postgres.
+
+=item --output (-o)
+
+Where to copy DATADIR - this has to be valid rsync path to remote machine.
+
+Please check L<OUTPUT> section for more details.
+
+=item --map (-m)
+
+When transmitting tablespaces, you might want to change output path for
+tablespace files - this is used then.
+
+Please check L<OUTPUT> section for more details.
+
+=item --log (-l)
+
+Name of logfile (actually template, as it supports %% L<strftime(3)>
+markers. Unfortunately due to the %x usage by PostgreSQL, We cannot use %%
+macros directly. Instead - any occurence of ^ character in log dir will be first
+changed to %, and later on passed to strftime.
+
+=item --pid-file
+
+Name of file to use for pidfile. If it is specified, than only one copy of
+I<omnipitr-synch> (with this pidfile) can run at the same time.
+
+Trying to run second copy of I<omnipitr-synch> will result in an error.
+
+=item --verbose (-v)
+
+Log verbosely what is happening.
+
+=item --rsync-path (-rp)
+
+Full path to rsync program - in case you can't set proper PATH environment
+variable.
+
+=item --psql-path (-pp)
+
+Full path to psql program - in case you can't set proper PATH environment
+variable.
+
+=item --automatic (-a)
+
+Run without confirmations. Without this option, I<omnipitr-synch> will first
+gather data, apply output mappings, list all details, and then wait for use
+confirmation.
+
+=back
+
+=head2 DESCRIPTION
+
+This program is meant to be ran by hand to setup new slave system for
+replication.
+
+It transfers PGDATA of PostgreSQL instance to new server, together with all
+necessary tablespaces, but skipping irrelevant files.
+
+The transfer can be made when running source instance, thanks to calls to
+pg_start_backup() and pg_stop_backup() PostgreSQL functions.
+
+Which options should be given depends only on installation, but generally you
+will need at least:
+
+=over
+
+=item * --data-dir
+
+Where the main data directory is located.
+
+=item * --log
+
+to make sure that information is logged someplace about progress. Unlike other
+omnipitr-* programs, when you'll don't provide -l, I<omnipitr-synch> will output
+to STDOUT. This was done because unlike other omnipitr programs, this one is
+meant to be ran by hand, and not from cronjobs (although it's possible to do).
+
+=item * --output
+
+to specify where to send the data dir.
+
+I<omnipitr-synch> delivers files to destination using rsync program.  Both
+direct-rsync and rsync-over-ssh are supported (it's better to use direct rsync
+- it uses less resources due to lack of encryption.
+
+Destination url/location should be in a format that is usable by I<rsync>
+program.
+
+For example you can use:
+
+=over
+
+=item * rsync://user@remote_host/module/path/
+
+=item * host:/path/
+
+=back
+
+To allow remote delivery you need to have rsync program. In case you're using
+rsync over ssh, I<ssh> program has also to be available.
+
+In case your rsync/ssh programs are in custom directories simply set I<$PATH>
+environemnt variable before starting PostgreSQL.
+
+Due to specifics of direct-ssh, it is important to read and understand the
+L<OUTPUT> section of this document before synch'ing PostgreSQL installations
+that use tablespaces.
+
+=back
+
+=head2 OUTPUT
+
+If I<omnipitr-synch> detects additional tablespaces, they will be also
+sent to destination (--output) server.
+
+In case the output uses direct rsync communication (as detected by existence of
+rsync:// prefix in output path), tablespaces are delivered in the same "rsync
+module" as the normal data dir.
+
+For example, assuming you have tablespaces located in:
+
+=over
+
+=item * /ts1
+
+=item * /mnt/ssd/ts2
+
+=item * /var/ts3
+
+=back
+
+and PGDATA in /var/lib/pgsql/data, and you'll call I<omnipitr-synch> with:
+
+  --output rsync://remote/a/b/c
+
+Then:
+
+=over
+
+=item * content of /var/lib/pgsql/data (pgdata) will be delivered to rsync://remote/a/b/c
+
+=item * tablespace from /ts1 will be delivered to rsync://remote/a/ts1
+
+=item * tablespace from /mnt/ssd/ts2 will be delivered to rsync://remote/a/mnt/ssd/ts2
+
+=item * tablespace from /var/ts3 will be delivered to rsync://remote/a/var/ts3
+
+=back
+
+That is "a", will be kept the same, since it's rsync "module" (for details
+please check rsync(1) manual.
+
+In case of rsync-over-ssh (detected by lack of rsync:// prefix), with
+
+  --output remote:/a/b/c
+
+=over
+
+=item * content of /var/lib/pgsql/data (pgdata) will be delivered to directory /a/b/c on remote machine
+
+=item * tablespace from /ts1 will be delivered to /ts1 on remote machine
+
+=item * tablespace from /mnt/ssd/ts2 will be delivered to /mnt/ssd/ts2 on remote machine
+
+=item * tablespace from /var/ts3 will be delivered to /var/ts3 on remote machine
+
+=back
+
+Due to "modules" in direct-rsync approach, I<omnipitr-synch> supports the notion
+of maps. These are used to change tablespace output paths (not data dir, just
+tablespace paths).
+
+--map option has following syntax:
+
+    --map from:to
+
+for example:
+
+    --map /ts1:rsync://remote/x/y/z
+
+Above means that tablespace located in /ts1 directory locally will be delivered
+to module x, path y/z on remote machine.
+
+Map syntax assumes the given paths are prefixes. So, for example adding:
+
+    --map /:rsync://remote/root/ --output rsync://remote/a/b/c
+
+would (in our example situation described above):
+
+=over
+
+=item * deliver content of /var/lib/pgsql/data (pgdata) rsync://remote/a/b/c
+
+=item * deliver tablespace from /ts1 to rsync://remote/root/ts1
+
+=item * deliver tablespace from /mnt/ssd/ts2 to rsync://remote/root/mnt/ssd/ts2
+
+=item * deliver tablespace from /var/ts3 to rsync://remote/root/var/ts3
+
+=back
+
+If given tablespace is not matching any map rules, it will be delivered
+normally, like if no maps were provided.
+
+Please note and understand that changing paths to PostgreSQL instance is not
+supported - the mapping process is only meant as a way to simplify transfer of
+data in direct-rsync environment. Using it will not change PostgreSQL data to
+use tablespaces in different locations.
+
+=head2 EXAMPLES
+
+=head3 Simplistic run, deliver via rsync-over-ssh
+
+    /.../omnipitr-synch -D /mnt/data -o remote:/var/lib/pgsql/data
+
+=head3 Logging enabled, delivery using direct rsync
+
+    /.../omnipitr-synch -D /mnt/data -l "/var/log/omnipitr-synch-^Y^m^d.log" -o rsync://remote/module/pgdata
+
+=head3 Automatic run, with tablespaces mapped to different delivery and logging
+
+    /.../omnipitr-synch -D /mnt/data/ -l "/var/log/omnipitr/synch-^Y-^m-^d.log" -a -o rsync://remote/module/pgdata -m /:rsync://remote/tablespaces/
+
+=head2 IMPORTANT NOTICES
+
+=over
+
+=item * This program is dangerous - it will overwrite and delete data on the
+destination server - you should be sure what you want to do not to delete
+important files.
+
+=back
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2011 OmniTI. All rights reserved.
+
