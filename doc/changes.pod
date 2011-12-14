@@ -1,5 +1,16 @@
 =head1 OmniPITR
 
+=head2 2011-12-14
+
+=over
+
+=item * Release version 0.2.1
+
+=item * Change handling of IO to use external tools (tee) to avoid deadlocks
+in case of slow compression
+
+=back
+
 =head2 2011-11-10
 
 =over
