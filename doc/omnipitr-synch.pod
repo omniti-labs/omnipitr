@@ -10,7 +10,8 @@ Options:
 
 =item --data-dir (-D)
 
-Where PostgreSQL datadir is located (path)
+Where PostgreSQL datadir is located (path). If skipped, it will be taken from
+PostgreSQL settings.
 
 =item --database (-d)
 
@@ -33,9 +34,32 @@ What username to use when connecting to database. Defaults to postgres.
 
 =item --output (-o)
 
-Where to copy DATADIR - this has to be valid rsync path to remote machine.
+Where to copy DATADIR - syntax should be one of:
+
+=over
+
+=item * host:/absolute/path/to/new/place
+
+=item * user@host:/absolute/path/to/new/place
+
+=item * host:222:/absolute/path/to/new/place
+
+=item * user@host:222:/absolute/path/to/new/place
+
+=back
+
+The versions with :222: are used to specify non-standard port for ssh
+connections.
+
+You can have multiple --output options to send data to multiple new machines
+with single cost of preparing data on source.
 
 Please check L<OUTPUT> section for more details.
+
+=item --compress (-c)
+
+Whether to use compression - value of parameter is name of compression program
+(with path if necessary).
 
 =item --map (-m)
 
@@ -62,15 +86,30 @@ Trying to run second copy of I<omnipitr-synch> will result in an error.
 
 Log verbosely what is happening.
 
-=item --rsync-path (-rp)
+=item --tar-path (-tp)
 
-Full path to rsync program - in case you can't set proper PATH environment
+Full path to tar program - in case you can't set proper PATH environment
 variable.
 
 =item --psql-path (-pp)
 
 Full path to psql program - in case you can't set proper PATH environment
 variable.
+
+=item --remote-tar-path (-rtp)
+
+Full path to tar program on output side.
+
+=item --remote-compressor-path (-rcp)
+
+Full path to compression program that will be used to decompress data on remote
+machine (if local data will be compressed). Defaults to whatever was passed to
+--compress.
+
+=item --remote-rm (-rrp)
+
+Full path to rm program on output server - it will be used to clear output
+directories before uncompressing new data.
 
 =item --automatic (-a)
 
@@ -96,17 +135,6 @@ will need at least:
 
 =over
 
-=item * --data-dir
-
-Where the main data directory is located.
-
-=item * --log
-
-to make sure that information is logged someplace about progress. Unlike other
-omnipitr-* programs, when you'll don't provide -l, I<omnipitr-synch> will output
-to STDOUT. This was done because unlike other omnipitr programs, this one is
-meant to be ran by hand, and not from cronjobs (although it's possible to do).
-
 =item * --output
 
 to specify where to send the data dir.
@@ -115,28 +143,14 @@ I<omnipitr-synch> delivers files to destination using rsync program.  Both
 direct-rsync and rsync-over-ssh are supported (it's better to use direct rsync
 - it uses less resources due to lack of encryption.
 
-Destination url/location should be in a format that is usable by I<rsync>
-program.
+To allow delivery you need to have ssh program.
 
-For example you can use:
+=item * --log
 
-=over
-
-=item * rsync://user@remote_host/module/path/
-
-=item * host:/path/
-
-=back
-
-To allow remote delivery you need to have rsync program. In case you're using
-rsync over ssh, I<ssh> program has also to be available.
-
-In case your rsync/ssh programs are in custom directories simply set I<$PATH>
-environemnt variable before starting PostgreSQL.
-
-Due to specifics of direct-ssh, it is important to read and understand the
-L<OUTPUT> section of this document before synch'ing PostgreSQL installations
-that use tablespaces.
+to make sure that information is logged someplace about progress. Unlike other
+omnipitr-* programs, when you'll don't provide -l, I<omnipitr-synch> will output
+to STDOUT. This was done because unlike other omnipitr programs, this one is
+meant to be ran by hand, and not from cronjobs (although it's possible to do).
 
 =back
 
@@ -145,11 +159,8 @@ that use tablespaces.
 If I<omnipitr-synch> detects additional tablespaces, they will be also
 sent to destination (--output) server.
 
-In case the output uses direct rsync communication (as detected by existence of
-rsync:// prefix in output path), tablespaces are delivered in the same "rsync
-module" as the normal data dir.
-
-For example, assuming you have tablespaces located in:
+Full path to tablespaces will be te same as on source server, so for example,
+assuming you have tablespaces located in:
 
 =over
 
@@ -163,42 +174,23 @@ For example, assuming you have tablespaces located in:
 
 and PGDATA in /var/lib/pgsql/data, and you'll call I<omnipitr-synch> with:
 
-  --output rsync://remote/a/b/c
+  --output remote:/a/b/c
 
 Then:
 
 =over
 
-=item * content of /var/lib/pgsql/data (pgdata) will be delivered to rsync://remote/a/b/c
+=item * content of /var/lib/pgsql/data (pgdata) will be delivered to remote:/a/b/c
 
-=item * tablespace from /ts1 will be delivered to rsync://remote/a/ts1
+=item * tablespace from /ts1 will be delivered to remote:/ts1
 
-=item * tablespace from /mnt/ssd/ts2 will be delivered to rsync://remote/a/mnt/ssd/ts2
+=item * tablespace from /mnt/ssd/ts2 will be delivered to remote:/mnt/ssd/ts2
 
-=item * tablespace from /var/ts3 will be delivered to rsync://remote/a/var/ts3
-
-=back
-
-That is "a", will be kept the same, since it's rsync "module" (for details
-please check rsync(1) manual.
-
-In case of rsync-over-ssh (detected by lack of rsync:// prefix), with
-
-  --output remote:/a/b/c
-
-=over
-
-=item * content of /var/lib/pgsql/data (pgdata) will be delivered to directory /a/b/c on remote machine
-
-=item * tablespace from /ts1 will be delivered to /ts1 on remote machine
-
-=item * tablespace from /mnt/ssd/ts2 will be delivered to /mnt/ssd/ts2 on remote machine
-
-=item * tablespace from /var/ts3 will be delivered to /var/ts3 on remote machine
+=item * tablespace from /var/ts3 will be delivered to remote:/var/ts3
 
 =back
 
-Due to "modules" in direct-rsync approach, I<omnipitr-synch> supports the notion
+Since it might not always be desirable, I<omnipitr-synch> supports the notion
 of maps. These are used to change tablespace output paths (not data dir, just
 tablespace paths).
 
@@ -208,26 +200,26 @@ tablespace paths).
 
 for example:
 
-    --map /ts1:rsync://remote/x/y/z
+    --map /ts1:remote:/x/y/z
 
 Above means that tablespace located in /ts1 directory locally will be delivered
-to module x, path y/z on remote machine.
+to directory /x/y/z on remote machine.
 
 Map syntax assumes the given paths are prefixes. So, for example adding:
 
-    --map /:rsync://remote/root/ --output rsync://remote/a/b/c
+    --map /:remote:/root/ --output remote:/a/b/c
 
 would (in our example situation described above):
 
 =over
 
-=item * deliver content of /var/lib/pgsql/data (pgdata) rsync://remote/a/b/c
+=item * deliver content of /var/lib/pgsql/data (pgdata) remote:/a/b/c
 
-=item * deliver tablespace from /ts1 to rsync://remote/root/ts1
+=item * deliver tablespace from /ts1 to remote:/root/ts1
 
-=item * deliver tablespace from /mnt/ssd/ts2 to rsync://remote/root/mnt/ssd/ts2
+=item * deliver tablespace from /mnt/ssd/ts2 to remote:/root/mnt/ssd/ts2
 
-=item * deliver tablespace from /var/ts3 to rsync://remote/root/var/ts3
+=item * deliver tablespace from /var/ts3 to remote:/root/var/ts3
 
 =back
 
@@ -236,30 +228,36 @@ normally, like if no maps were provided.
 
 Please note and understand that changing paths to PostgreSQL instance is not
 supported - the mapping process is only meant as a way to simplify transfer of
-data in direct-rsync environment. Using it will not change PostgreSQL data to
-use tablespaces in different locations.
+data in specific cases where dba needs this modification to fit the data on
+disk.
+
+Using it will not change PostgreSQL internal paths to use tablespaces in
+different locations.
 
 =head2 EXAMPLES
 
-=head3 Simplistic run, deliver via rsync-over-ssh
+=head3 Simplistic run, get data dir from Pg itself:
 
-    /.../omnipitr-synch -D /mnt/data -o remote:/var/lib/pgsql/data
+    /.../omnipitr-synch -o remote:/var/lib/pgsql/data
 
-=head3 Logging enabled, delivery using direct rsync
+=head3 Logging enabled, direct path to data dir:
 
-    /.../omnipitr-synch -D /mnt/data -l "/var/log/omnipitr-synch-^Y^m^d.log" -o rsync://remote/module/pgdata
+    /.../omnipitr-synch -D /mnt/data -l "/var/log/omnipitr-synch-^Y^m^d.log" -o remote:/pgdata
 
 =head3 Automatic run, with tablespaces mapped to different delivery and logging
 
-    /.../omnipitr-synch -D /mnt/data/ -l "/var/log/omnipitr/synch-^Y-^m-^d.log" -a -o rsync://remote/module/pgdata -m /:rsync://remote/tablespaces/
+    /.../omnipitr-synch -D /mnt/data/ -l "/var/log/omnipitr/synch-^Y-^m-^d.log" -a -o remote:/pgdata -m /:remote:/tablespaces/
+
+=head3 Automatic run, with 2 destinations and compression:
+
+    /.../omnipitr-synch -a -o slave1:/pgdata -o slave2:/pgdata -c gzip
 
 =head2 IMPORTANT NOTICES
 
 =over
 
-=item * This program is dangerous - it will overwrite and delete data on the
-destination server - you should be sure what you want to do not to delete
-important files.
+=item * This program is dangerous - it will delete data on the destination
+server - you should be sure what you want to do not to delete important files.
 
 =back
 
