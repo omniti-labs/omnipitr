@@ -16,7 +16,7 @@ PostgreSQL settings.
 =item --database (-d)
 
 Which database to connect to to issue required SQL queries. Defaults to
-template1.
+postgres.
 
 =item --host (-h)
 
@@ -61,6 +61,19 @@ Please check L<OUTPUT> section for more details.
 Whether to use compression - value of parameter is name of compression program
 (with path if necessary).
 
+It is also used (as a flag) when using --rsync option.
+
+=item --rsync (-r)
+
+If used, I<omnipitr-synch> will use rsync instead of tar to transfer data (it
+will still be rsync over ssh). The benefit of using rsync is that it can send
+just the differences so it might be faster.
+
+The drawback is that (depending on situation) it can be more taxing for source
+server hardware (IO/CPU).
+
+Rsync will be used with data compression (-z) if --compress was given.
+
 =item --map (-m)
 
 When transmitting tablespaces, you might want to change output path for
@@ -96,9 +109,18 @@ variable.
 Full path to psql program - in case you can't set proper PATH environment
 variable.
 
+=item --rsync-path (-rp)
+
+Full path to rsync program - in case you can't set proper PATH environment
+variable.
+
 =item --remote-tar-path (-rtp)
 
 Full path to tar program on output side.
+
+=item --remote-rsync-path (-rsp)
+
+Full path to rsync program on output side.
 
 =item --remote-compressor-path (-rcp)
 
@@ -106,7 +128,7 @@ Full path to compression program that will be used to decompress data on remote
 machine (if local data will be compressed). Defaults to whatever was passed to
 --compress.
 
-=item --remote-rm (-rrp)
+=item --remote-rm-path (-rrp)
 
 Full path to rm program on output server - it will be used to clear output
 directories before uncompressing new data.
