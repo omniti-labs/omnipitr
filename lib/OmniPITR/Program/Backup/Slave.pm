@@ -591,16 +591,6 @@ sub read_args {
     $self->{ 'log_template' } = $args{ 'log' };
     $self->{ 'log' }          = OmniPITR::Log->new( $self->{ 'log_template' } );
 
-    my @psql = ();
-    push @psql, $self->{ 'psql-path' };
-    push @psql, '-qAtX';
-    push @psql, ( '-U', $self->{ 'username' } ) if $self->{ 'username' };
-    push @psql, ( '-d', $self->{ 'database' } ) if $self->{ 'database' };
-    push @psql, ( '-h', $self->{ 'host' } )     if $self->{ 'host' };
-    push @psql, ( '-p', $self->{ 'port' } )     if $self->{ 'port' };
-    push @psql, '-c';
-    $self->{ 'psql' } = \@psql;
-
     $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
 
     return;

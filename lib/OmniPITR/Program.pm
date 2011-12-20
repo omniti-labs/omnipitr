@@ -238,5 +238,63 @@ sub get_control_data {
     return $control_data;
 }
 
+=head1 psql()
+
+Runs given query via psql - assumes there is $self->{'psql-path'}.
+
+Uses also:
+
+=over
+
+=item * username
+
+=item * database
+
+=item * port
+
+=item * host
+
+=item
+
+optional keys from $self.
+
+On first run it will cache psql call arguments, so if you'd change them on
+subsequent calls, you have to delete $self->{'psql'}.
+
+In case of errors, it raises fatal error.
+
+Otherwise returns stdout of the psql.
+
+=cut
+
+sub psql {
+    my $self = shift;
+    my $query = shift;
+
+    unless ( $self->{'psql'} ) {
+        my @psql = ();
+        push @psql, $self->{ 'psql-path' };
+        push @psql, '-qAtX';
+        push @psql, ( '-U', $self->{ 'username' } ) if $self->{ 'username' };
+        push @psql, ( '-d', $self->{ 'database' } ) if $self->{ 'database' };
+        push @psql, ( '-h', $self->{ 'host' } )     if $self->{ 'host' };
+        push @psql, ( '-p', $self->{ 'port' } )     if $self->{ 'port' };
+        push @psql, '-c';
+        $self->{'psql'} = \@psql;
+    }
+
+    $self->prepare_temp_directory();
+
+    my @command = ( @{ $self->{ 'psql' } }, $query );
+
+    $self->log->time_start( $query ) if $self->verbose;
+    my $status = run_command( $self->{ 'temp-dir' }, @command );
+    $self->log->time_finish( $query ) if $self->verbose;
+
+    $self->log->fatal( 'Running [%s] via psql failed: %s', $query, $status ) if $status->{ 'error_code' };
+
+    return $status->{ 'stdout' };
+}
+
 1;
 

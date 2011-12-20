@@ -55,34 +55,6 @@ sub make_xlog_archive {
     croak( "make_xlog_archive() method in OmniPITR::Program::Backup was not overridden!" );
 }
 
-=head1 psql()
-
-Runs given query via psql (assuming options stored in $self->{'psql'}).
-
-In case of errors, it raises fatal error.
-
-Otherwise returns stdout of the psql.
-
-=cut
-
-sub psql {
-    my $self = shift;
-
-    my $query = shift;
-
-    $self->prepare_temp_directory();
-
-    my @command = ( @{ $self->{ 'psql' } }, $query );
-
-    $self->log->time_start( $query ) if $self->verbose;
-    my $status = run_command( $self->{ 'temp-dir' }, @command );
-    $self->log->time_finish( $query ) if $self->verbose;
-
-    $self->log->fatal( 'Running [%s] via psql failed: %s', $query, $status ) if $status->{ 'error_code' };
-
-    return $status->{ 'stdout' };
-}
-
 =head1 wait_for_file()
 
 Helper function which waits for file to appear.

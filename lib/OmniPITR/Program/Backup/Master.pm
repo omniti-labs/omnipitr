@@ -310,16 +310,6 @@ sub read_args {
 
     $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
 
-    my @psql = ();
-    push @psql, $self->{ 'psql-path' };
-    push @psql, '-qAtX';
-    push @psql, ( '-U', $self->{ 'username' } ) if $self->{ 'username' };
-    push @psql, ( '-d', $self->{ 'database' } ) if $self->{ 'database' };
-    push @psql, ( '-h', $self->{ 'host' } )     if $self->{ 'host' };
-    push @psql, ( '-p', $self->{ 'port' } )     if $self->{ 'port' };
-    push @psql, '-c';
-    $self->{ 'psql' } = \@psql;
-
     return;
 }
 
