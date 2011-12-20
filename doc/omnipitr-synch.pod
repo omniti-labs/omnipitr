@@ -139,6 +139,11 @@ Run without confirmations. Without this option, I<omnipitr-synch> will first
 gather data, apply output mappings, list all details, and then wait for use
 confirmation.
 
+=item --temp-dir (-t)
+
+Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
+variable location)
+
 =back
 
 =head2 DESCRIPTION
