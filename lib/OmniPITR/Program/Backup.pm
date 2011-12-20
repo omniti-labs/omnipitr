@@ -145,23 +145,13 @@ sub get_tablespaces_and_transforms {
     # Identify any tablespaces and get those
     my $tablespace_dir = File::Spec->catfile( $self->{ 'data-dir' }, "pg_tblspc" );
     my ( %tablespaces, @transform_regexs );
-    if ( -e $tablespace_dir ) {
-        my @pgfiles;
-        opendir( my $dh, $tablespace_dir ) or $self->log->fatal( "Unable to open tablespace directory $tablespace_dir" );
 
-        # Push onto our list the locations that are pointed to by the pg_tblspc symlinks
-        foreach my $filename ( readdir $dh ) {
-            next if $filename !~ /^\d+$/;    # Filename should be all numeric
-            my $full_name = File::Spec->catfile( $tablespace_dir, $filename );
-            next if !-l $full_name;          # It should be a symbolic link
-            my $link = readlink $full_name;
-            push @pgfiles, $link if $link;    # If it's a valid link, put it onto the list
-        }
-        closedir $dh;
+    my $ts = $self->get_tablespaces();
+    if ( defined $ts ) {
 
         # At this point pgfiles contains a list of the destinations.  Some of THOSE might be links however and need
         # to be identified since we need to pass the actual location bottom location to tar
-        %tablespaces = map { $_ => Cwd::abs_path( $_ ) } @pgfiles;
+        %tablespaces = map { $_->{ 'pg_visible' } => $_->{ 'real_path' } } values %{ $ts };
 
         # Populate the regexes to put these directories under tablespaces with transforms so that the actual physical location
         # is transformed into the 1-level deep link that the pg_tblspc files are pointing at.  We substr becase tar strips leading /

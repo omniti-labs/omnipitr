@@ -296,5 +296,54 @@ sub psql {
     return $status->{ 'stdout' };
 }
 
+=head1 find_tablespaces()
+
+Helper function.  Takes no arguments.  Uses pg_tblspc directory and returns
+a hashref of the physical locations of tablespaces.
+Keys in the hashref are tablespace OIDs (link names in pg_tblspc). Values
+are hashrefs with two keys:
+
+=over
+
+=item * pg_visible - what is the path to tablespace that PostgreSQL sees
+
+=item * real_path - what is the real absolute path to tablespace directory
+
+=back
+
+The two can be different in case tablespace got moved and symlinked back to
+original location, or if tablespace path itself contains symlinks.
+
+=cut
+
+sub get_tablespaces {
+    my $self = shift;
+
+    # Identify any tablespaces and get those
+    my $tablespace_dir = File::Spec->catfile( $self->{ 'data-dir' }, "pg_tblspc" );
+    my %tablespaces;
+
+    return unless -e $tablespace_dir;
+
+    my @pgfiles;
+    opendir( my $dh, $tablespace_dir ) or $self->log->fatal( "Unable to open tablespace directory $tablespace_dir" );
+
+    # Push onto our list the locations that are pointed to by the pg_tblspc symlinks
+    foreach my $filename ( readdir $dh ) {
+        next if $filename !~ /^\d+$/;    # Filename should be all numeric
+        my $full_name = File::Spec->catfile( $tablespace_dir, $filename );
+        next if !-l $full_name;          # It should be a symbolic link
+        my $pg_visible = readlink $full_name;
+        my $real_path = Cwd::abs_path( $full_name );
+        $tablespaces{ $filename } = {
+            'pg_visible' => $pg_visible,
+            'real_path' => $real_path,
+        };
+    }
+    closedir $dh;
+
+    return \%tablespaces;
+}
+
 1;
 
