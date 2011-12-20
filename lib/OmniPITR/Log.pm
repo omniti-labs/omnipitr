@@ -21,6 +21,10 @@ Constructor for logger class.
 
 Takes one argument: template (using %*, strftime variables).
 
+This argument can also be reference to File Handle to force log output to given stream. This can be used for example like:
+
+    my $logger = OmniPITR::Log->new( \*STDOUT );
+
 =cut
 
 sub new {
@@ -30,7 +34,14 @@ sub new {
 
     my $self = bless {}, $class;
 
-    $self->{ 'template' }       = $filename_template;
+    if ( ref $filename_template ) {
+
+        # It's forced filehandle
+        $self->{ 'forced_fh' } = $filename_template;
+    }
+    else {
+        $self->{ 'template' } = $filename_template;
+    }
     $self->{ 'program' }        = basename( $PROGRAM_NAME );
     $self->{ 'current_log_ts' } = 0;
     $self->{ 'current_log_fn' } = '';
@@ -227,6 +238,8 @@ require another filename.
 
 sub _get_log_fh {
     my $self = shift;
+
+    return $self->{ 'forced_fh' } if $self->{ 'forced_fh' };
 
     my $time = floor( time() );
     return $self->{ 'log_fh' } if $self->{ 'current_log_ts' } == $time;
