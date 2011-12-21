@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 BIN_DIR=$( perl -le 'use Cwd qw(realpath); print realpath(shift)' "$( dirname $0 )" )
 LIB_DIR=$( perl -le 'use Cwd qw(realpath); print realpath(shift)' "$( dirname $0 )/../lib" )
