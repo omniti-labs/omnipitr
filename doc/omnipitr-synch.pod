@@ -42,14 +42,11 @@ Where to copy DATADIR - syntax should be one of:
 
 =item * user@host:/absolute/path/to/new/place
 
-=item * host:222:/absolute/path/to/new/place
-
-=item * user@host:222:/absolute/path/to/new/place
-
 =back
 
-The versions with :222: are used to specify non-standard port for ssh
-connections.
+If you need to use non-standard port number, you'll have to use ~/.ssh/config
+file to define it for given host - this is due to problem with passing ssh port
+number for rsync-over-ssh.
 
 You can have multiple --output options to send data to multiple new machines
 with single cost of preparing data on source.
@@ -99,6 +96,11 @@ Trying to run second copy of I<omnipitr-synch> will result in an error.
 
 Log verbosely what is happening.
 
+=item --tee-path (-ep)
+
+Full path to tee program - in case you can't set proper PATH environment
+variable.
+
 =item --tar-path (-tp)
 
 Full path to tar program - in case you can't set proper PATH environment
@@ -107,6 +109,11 @@ variable.
 =item --psql-path (-pp)
 
 Full path to psql program - in case you can't set proper PATH environment
+variable.
+
+=item --ssh-path (-sp)
+
+Full path to ssh program - in case you can't set proper PATH environment
 variable.
 
 =item --rsync-path (-rp)
@@ -143,6 +150,16 @@ confirmation.
 
 Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
 variable location)
+
+=item --shell-path (-sh)
+
+Full path to shell to be used when calling compression/archiving/checksumming.
+
+It is important becaus the shell needs to support >( ... ) constructions.
+
+One of the shells that do support it is bash, and this is the default value for
+--shell-path. You can substitute different shell if you're sure it supports
+mentioned construction.
 
 =back
 
@@ -264,11 +281,6 @@ different locations.
 =head2 EXAMPLES
 
 =head3 Simplistic run, get data dir from Pg itself:
-
-    /.../omnipitr-synch -o remote:/var/lib/pgsql/data
-
-=head3 Logging enabled, direct path to data dir:
-
     /.../omnipitr-synch -D /mnt/data -l "/var/log/omnipitr-synch-^Y^m^d.log" -o remote:/pgdata
 
 =head3 Automatic run, with tablespaces mapped to different delivery and logging
