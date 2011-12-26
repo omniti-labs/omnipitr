@@ -7,7 +7,6 @@ use base qw( OmniPITR::Program );
 
 use Carp qw( croak );
 use English qw( -no_match_vars );
-use Data::Dumper;
 use Getopt::Long qw( :config no_ignore_case );
 use IO::Select;
 use POSIX ":sys_wait_h";
@@ -199,7 +198,6 @@ sub prepare_commands_to_run_via_tar {
     my $self     = shift;
     my @commands = ();
     for my $t ( @{ $self->{ 'transfers' } } ) {
-        print Dumper( $t );
         my @tar_cmd = ();
         push @tar_cmd, 'cd', quotemeta( $t->{ 'source' } ), ';';
         push @tar_cmd, quotemeta( $self->{ 'tar-path' } );
