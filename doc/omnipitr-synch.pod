@@ -281,7 +281,8 @@ different locations.
 =head2 EXAMPLES
 
 =head3 Simplistic run, get data dir from Pg itself:
-    /.../omnipitr-synch -D /mnt/data -l "/var/log/omnipitr-synch-^Y^m^d.log" -o remote:/pgdata
+
+    /.../omnipitr-synch -o remote:/pgdata
 
 =head3 Automatic run, with tablespaces mapped to different delivery and logging
 
