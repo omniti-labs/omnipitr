@@ -266,7 +266,9 @@ sub prepare_commands_to_run_via_rsync {
         my $src = $t->{ 'source' };
         $src =~ s{/*\z}{/};    # add slash
         for my $o ( @{ $t->{ 'outputs' } } ) {
-            my $dst_path = sprintf '%s%s:%s', ( $o->{ 'user' } ? $o->{ 'user' } . '@' : '' ), $o->{ 'host' }, $o->{ 'path' };
+            # We need to add one more layer of quoting for output paths in rsync mode, due to how rsync works.
+            my $use_path = $self->{ 'rsync' } ? quotemeta( $o->{ 'path' } ) : $o->{ 'path' };
+            my $dst_path = sprintf '%s%s:%s', ( $o->{ 'user' } ? $o->{ 'user' } . '@' : '' ), $o->{ 'host' }, $use_path;
             $dst_path =~ s{/*\z}{/};
 
             my @cmd = ();
