@@ -2,7 +2,7 @@ package OmniPITR::Program::Backup::Slave;
 use strict;
 use warnings;
 
-our $VERSION = '0.2.1';
+our $VERSION = '0.3.0';
 use base qw( OmniPITR::Program::Backup );
 
 use File::Spec;
