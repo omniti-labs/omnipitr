@@ -47,6 +47,22 @@ support for compressed walarchive, and pausing removal
 
 =item * Add --version option to all programs.
 
+=item * Add option to skip archiving of xlogs to omnipitr-backup-*
+
+This is assuming the user is keeping their own xlog archive and will limit
+the ability to restore a standalone database.
+
+=item * Have omnipitr-backup-* look at .backup file to determine exactly what
+xlogs it needs to keep for backup integrity.
+
+=item * Support sending to cloud storage such as Amazon S3
+
+=item * Add support for xz compression (similar to lzma)
+
+=item * Add support for using ZFS/LVM snapshops.
+
+This has the benefit of keeping required xlogs to a minimum for backups.
+
 =back
 
 =head2 COPYRIGHT
