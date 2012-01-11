@@ -1,5 +1,16 @@
 =head1 OmniPITR
 
+=head2 2012-01-11
+
+=over
+
+=item * Release version 0.3.1
+
+=item * Fixed bug with handling digests, that could cause omnipitr-backup-master
+or omnipitr-backup-slave to *not* make backup if bad digester was requested.
+
+=back
+
 =head2 2012-01-04
 
 =over
