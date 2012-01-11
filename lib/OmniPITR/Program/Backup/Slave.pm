@@ -544,8 +544,8 @@ sub read_args {
 
     $self->{ 'digests' } = [];
     if ( defined( $args{ digest } ) ) {
-        @{ $self->{ 'digests' } } = split( /,/, $args{ digest } );
-        delete $args{ digest };
+        $self->{ 'digests' } = [ split( /,/, $args{ 'digest' } ) ];
+        delete $args{ 'digest' };
     }
 
     for my $key ( grep { !/^dst-(?:local|remote)$/ } keys %args ) {
@@ -643,9 +643,10 @@ sub validate_args {
     $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not writable!',  $self->{ 'removal-pause-trigger' } ) unless -w dirname( $self->{ 'removal-pause-trigger' } );
 
     my %bad_digest = ();
-    for my $digest_type ( $self->{ 'digests' } ) {
+    for my $digest_type ( @{ $self->{ 'digests' } } ) {
         eval { my $tmp = Digest->new( $digest_type ); };
-        $self->log->log( 'Bad digest method: %s, problem: %s', $digest_type, $EVAL_ERROR ) if $EVAL_ERROR;
+        next unless $EVAL_ERROR;
+        $self->log->log( 'Bad digest method: %s, problem: %s', $digest_type, $EVAL_ERROR );
         $bad_digest{ $digest_type } = 1;
     }
     $self->{ 'digests' } = [ grep { !$bad_digest{ $_ } } @{ $self->{ 'digests' } } ];
