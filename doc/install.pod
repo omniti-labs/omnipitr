@@ -139,5 +139,5 @@ only to owner, simply run it like this:
 
 =head2 COPYRIGHT
 
-The OmniPITR project is Copyright (c) 2009-2010 OmniTI. All rights reserved.
+The OmniPITR project is Copyright (c) 2009-2012 OmniTI. All rights reserved.
 

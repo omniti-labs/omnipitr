@@ -67,4 +67,4 @@ This has the benefit of keeping required xlogs to a minimum for backups.
 
 =head2 COPYRIGHT
 
-The OmniPITR project is Copyright (c) 2009-2010 OmniTI. All rights reserved.
+The OmniPITR project is Copyright (c) 2009-2012 OmniTI. All rights reserved.
