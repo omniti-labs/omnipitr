@@ -32,6 +32,11 @@ Trying to run second copy of I<omnipitr-cleanup> will result in an error.
 
 Log verbosely what is happening.
 
+=item --removal-pause-trigger (-p)
+
+Path to file, which, if exists, causes I<omnipitr-cleanup> to not do any removal
+- for example when running I<omnipitr-backup-slave>.
+
 =back
 
 =head2 DESCRIPTION
