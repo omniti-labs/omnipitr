@@ -85,6 +85,12 @@ markers. Unfortunately due to the %x usage by PostgreSQL, We cannot use %%
 macros directly. Instead - any occurence of ^ character in log dir will be first
 changed to %, and later on passed to strftime.
 
+Please note that on some systems (Solaris for example) default shell treats ^ as
+special character, which requires you to quote the log filename (if it contains
+^ character). So you'd better write it as:
+
+    --log '/var/log/omnipitr-^Y-^m-^d.log'
+
 =item --pid-file
 
 Name of file to use for pidfile. If it is specified, than only one copy of
