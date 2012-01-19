@@ -1,5 +1,15 @@
 =head1 OmniPITR
 
+=head2 2012-01-19
+
+=over
+
+=item * Release of version 0.4.0
+
+=item * Fix handling of symlinks to walarchive in omnipitr-backup-slave
+
+=back
+
 =head2 2012-01-17
 
 =over

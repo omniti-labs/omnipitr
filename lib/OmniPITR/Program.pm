@@ -11,7 +11,7 @@ use File::Path qw( mkpath rmtree );
 use File::Spec;
 use Carp;
 
-our $VERSION = '0.3.1';
+our $VERSION = '0.4.0';
 
 =head1 new()
 
