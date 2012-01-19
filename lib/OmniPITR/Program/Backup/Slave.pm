@@ -629,6 +629,8 @@ sub validate_args {
     $self->log->fatal( 'Provided source of wal files (%s) is not directory!', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Provided source of wal files (%s) is not readable!',  $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };
 
+    $self->{ 'source' }->{ 'path' } = abs_path( $self->{ 'source' }->{ 'path' } );
+
     $self->log->fatal( 'Temp-dir was not provided!' ) unless defined $self->{ 'temp-dir' };
     $self->log->fatal( 'Provided temp-dir (%s) does not exist!',   $self->{ 'temp-dir' } ) unless -e $self->{ 'temp-dir' };
     $self->log->fatal( 'Provided temp-dir (%s) is not directory!', $self->{ 'temp-dir' } ) unless -d $self->{ 'temp-dir' };
