@@ -297,7 +297,7 @@ much of a burden for the system.
 To make the backup generation as light on resources as possible, direct
 destinations have been added.
 
-When using them, L<omnipitr-backup-master> doesn't create any local tarballs.
+When using them, L<omnipitr-backup-slave> doesn't create any local tarballs.
 
 Instead, output from tar (after optional compression) is sent directly to remote
 machine over SSH connection.
@@ -310,7 +310,7 @@ In case you'd like to use compression, but do it on remote machine, you can
 provide --remote-cat-path starting with !, and point it to script that does
 compression, and stores to proper file.
 
-For example, calling L<omnipitr-backup-master> with following options:
+For example, calling L<omnipitr-backup-slave> with following options:
 
     -dd user@host:/var/backups -rcp '!/usr/local/bin/gzip-and-store'
 
@@ -473,12 +473,12 @@ relate to date/time of beginning of backup process.
 
 =head2 TABLESPACES
 
-If I<omnipitr-backup-master> detects additional tablespaces, they will be
+If I<omnipitr-backup-slave> detects additional tablespaces, they will be
 also compressed to generated tarball.
 
 Since the full path to the tablespace directory is important, and should be preserved,
 and normally tar doesn't let you store files which path starts with "/" (as it
-would be dangerous), I<omnipitr-backup-master> uses the following approach:
+would be dangerous), I<omnipitr-backup-slave> uses the following approach:
 
 all tablespaces will be stored in tar, and upon extraction they will be put in
 the directory "tablespaces", and under it - there will be the full path to the tablespace
