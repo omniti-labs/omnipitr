@@ -63,6 +63,12 @@ information (you can provide many of these)
 You can also specify compression per-destination. Check L<COMPRESSION>
 section of the doc.
 
+=item --dst-direct (-dd)
+
+Specifies remote location to be used to store backup.
+
+Please check L<DIRECT-DESTINATION> part for more details.
+
 =item --temp-dir (-t)
 
 Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
@@ -172,6 +178,11 @@ variable.
 Full path to pg_controldata program - in case you can't set proper PATH
 environment variable.
 
+=item --ssh-path (-ssh)
+
+Full path to ssh program - in case you can't set proper PATH environment
+variable.
+
 =item --shell-path (-sh)
 
 Full path to shell to be used when calling compression/archiving/checksumming.
@@ -181,6 +192,26 @@ It is important becaus the shell needs to support >( ... ) constructions.
 One of the shells that do support it is bash, and this is the default value for
 --shell-path. You can substitute different shell if you're sure it supports
 mentioned construction.
+
+=item --remote-cat-path (-rcp)
+
+Path to cat program, to be run on remote side, when using direct destinations.
+
+Defaults to "cat"
+
+It will be used as command on remote machine, as:
+
+    ssh host 'cat - > /some/path/filename-from-template'
+
+In case remote-cat-path would be given with ! as the first character, it will
+change the invocation on remote machine, to pass filename as argument. For
+example:
+
+    -rcp '!/usr/local/bin/store-backup'
+
+will run:
+
+    ssh host '/usr/local/bin/store-backup /some/path/filename-from-template'
 
 =back
 
@@ -257,6 +288,48 @@ rsync over ssh, I<ssh> program has also to be available.
 
 In case your rsync/ssh programs are in custom directories simply set I<$PATH>
 environemnt variable before starting PostgreSQL.
+
+=head2 DIRECT-DESTINATION
+
+In some cases the overhead of creating local tarball with backup, can be too
+much of a burden for the system.
+
+To make the backup generation as light on resources as possible, direct
+destinations have been added.
+
+When using them, L<omnipitr-backup-master> doesn't create any local tarballs.
+
+Instead, output from tar (after optional compression) is sent directly to remote
+machine over SSH connection.
+
+Example data flow:
+
+    tar cf - . | gzip -c - | ssh user@host 'cat - > /some/file'
+
+In case you'd like to use compression, but do it on remote machine, you can
+provide --remote-cat-path starting with !, and point it to script that does
+compression, and stores to proper file.
+
+For example, calling L<omnipitr-backup-master> with following options:
+
+    -dd user@host:/var/backups -rcp '!/usr/local/bin/gzip-and-store'
+
+Will run (a bit simplified example):
+
+    tar cf - . | ssh user@host '/usr/local/bin/gzip-and-store /var/backups/filename-from-template'
+
+And then you can write this simplistic script as /usr/local/bin/gzip-and-store:
+
+    #!/usr/bin/env bash
+    gzip -c - > "$1".gz
+
+Which will make tarball on database server (it has to be run here, since that's
+where the files are), then transfer the tarball over ssh to remote machine,
+compress it there and store in /var/backups/.
+
+Of course --dst-direct can be compressed locally, using the same syntax as with
+--dst-local or --dst-remote, i.e. by using "xxx=" prefix, which is described in
+more details in L<COMPRESSION> part.
 
 =head2 COMPRESSION
 
