@@ -3,11 +3,6 @@ use strict;
 use warnings;
 use English qw( -no_match_vars );
 
-use File::Basename;
-use File::Path qw( mkpath rmtree );
-use File::Spec;
-use Carp;
-
 =head1 NAME
 
 OmniPITR::Program::Tools::CommandPiper - Class for building complex pipe-based shell commands
