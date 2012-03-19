@@ -234,7 +234,9 @@ sub read_args {
         'psql-path'         => 'psql',
         'rsync-path'        => 'rsync',
         'shell-path'        => 'bash',
+        'ssh-path'          => 'ssh',
         'database'          => 'postgres',
+        'remote-cat-path'   => 'cat',
         'filename-template' => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__',
     );
 
@@ -249,6 +251,7 @@ sub read_args {
         'xlogs|x=s',
         'dst-local|dl=s@',
         'dst-remote|dr=s@',
+        'dst-direct|dd=s@',
         'temp-dir|t=s',
         'log|l=s',
         'filename-template|f=s',
@@ -263,8 +266,10 @@ sub read_args {
         'tee-path|ep=s',
         'rsync-path|rp=s',
         'shell-path|sh=s',
+        'ssh-path|ssh=s',
         'digest|dg=s',
         'not-nice|nn',
+        'remote-cat-path|rcp=s',
         );
 
     croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
@@ -278,11 +283,11 @@ sub read_args {
         delete $args{ 'digest' };
     }
 
-    for my $key ( grep { !/^dst-(?:local|remote)$/ } keys %args ) {
+    for my $key ( grep { !/^dst-(?:local|remote|direct)$/ } keys %args ) {
         $self->{ $key } = $args{ $key };
     }
 
-    for my $type ( qw( local remote ) ) {
+    for my $type ( qw( local remote direct ) ) {
         my $D = [];
         $self->{ 'destination' }->{ $type } = $D;
 
@@ -336,7 +341,7 @@ sub validate_args {
 
     $self->{ 'data-dir' } = abs_path( $self->{ 'data-dir' } );
 
-    my $dst_count = scalar( @{ $self->{ 'destination' }->{ 'local' } } ) + scalar( @{ $self->{ 'destination' }->{ 'remote' } } );
+    my $dst_count = scalar( @{ $self->{ 'destination' }->{ 'local' } } ) + scalar( @{ $self->{ 'destination' }->{ 'remote' } } ) + scalar( @{ $self->{ 'destination' }->{ 'direct' } } );
     $self->log->fatal( "No --dst-* has been provided!" ) if 0 == $dst_count;
 
     $self->log->fatal( "Filename template does not contain __FILETYPE__ placeholder!" ) unless $self->{ 'filename-template' } =~ /__FILETYPE__/;

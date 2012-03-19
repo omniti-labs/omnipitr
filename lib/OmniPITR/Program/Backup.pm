@@ -10,6 +10,7 @@ use File::Path qw( mkpath rmtree );
 use File::Copy;
 use English qw( -no_match_vars );
 use OmniPITR::Tools qw( ext_for_compression run_command );
+use OmniPITR::Tools::CommandPiper;
 use Data::Dumper;
 use Cwd;
 use Digest;
@@ -38,7 +39,7 @@ sub run {
     $self->make_xlog_archive();
     $self->log->time_finish( 'Making xlog archive' ) if $self->verbose;
 
-    $self->deliver_to_all_destinations();
+    $self->deliver_to_all_remote_destinations();
 
     $self->log->log( 'All done.' );
     return;
@@ -100,6 +101,8 @@ destinations specifications.
 In case some compression schema exists only for remote destination, local
 temp directory is created in --temp-dir location.
 
+There can be additional destinations for given compression, if we have direct destinations.
+
 =cut
 
 sub choose_base_local_destinations {
@@ -110,20 +113,22 @@ sub choose_base_local_destinations {
 
     for my $dst ( @{ $self->{ 'destination' }->{ 'local' } } ) {
         my $type = $dst->{ 'compression' };
-        next if defined $base->{ $type };
-        $base->{ $type } = $dst->{ 'path' };
+        push @{ $base->{ $type } }, { 'type' => 'local', 'path' => $dst->{ 'path' } };
     }
 
-    my @unfilled = grep { !defined $base->{ $_ } } keys %{ $base };
-
-    return if 0 == scalar @unfilled;
-    $self->log->log( 'These compression(s) were given only for remote destinations. Usually this is not desired: %s', join( ', ', @unfilled ) );
-
     $self->prepare_temp_directory();
-    for my $type ( @unfilled ) {
+
+    for my $dst ( @{ $self->{ 'destination' }->{ 'remote' } } ) {
+        my $type = $dst->{ 'compression' };
+        next if defined $base->{ $type };
         my $tmp_dir = File::Spec->catfile( $self->{ 'temp-dir' }, $type );
         mkpath( $tmp_dir );
-        $base->{ $type } = $tmp_dir;
+        $base->{ $type } = [ { 'type' => 'local', 'path' => $tmp_dir } ];
+    }
+
+    for my $dst ( @{ $self->{ 'destination' }->{ 'direct' } } ) {
+        my $type = $dst->{ 'compression' };
+        push @{ $base->{ $type } }, { 'type' => 'direct', 'path' => $dst->{ 'path' } };
     }
 
     return;
@@ -269,61 +274,6 @@ sub tar_and_compress {
     return;
 }
 
-=head1 deliver_to_all_destinations()
-
-Simple wrapper to have single point to call to deliver backups to all
-requested backups.
-
-=cut
-
-sub deliver_to_all_destinations {
-    my $self = shift;
-
-    $self->deliver_to_all_local_destinations();
-
-    $self->deliver_to_all_remote_destinations();
-
-    return;
-}
-
-=head1 deliver_to_all_local_destinations()
-
-Copies backups to all local destinations which are not also base
-destinations for their respective compressions.
-
-=cut
-
-sub deliver_to_all_local_destinations {
-    my $self = shift;
-    return unless $self->{ 'destination' }->{ 'local' };
-    for my $dst ( @{ $self->{ 'destination' }->{ 'local' } } ) {
-        next if $dst->{ 'path' } eq $self->{ 'base' }->{ $dst->{ 'compression' } };
-
-        my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
-
-        for my $type ( ( @{ $self->{ 'digests' } }, qw( data xlog ) ) ) {
-
-            my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
-            my $source_filename = File::Spec->catfile( $B, $filename );
-            my $destination_filename = File::Spec->catfile( $dst->{ 'path' }, $filename );
-
-            my $time_msg = sprintf 'Copying %s to %s', $source_filename, $destination_filename;
-            $self->log->time_start( $time_msg ) if $self->verbose;
-
-            my $rc = copy( $source_filename, $destination_filename );
-
-            $self->log->time_finish( $time_msg ) if $self->verbose;
-
-            unless ( $rc ) {
-                $self->log->error( 'Cannot copy %s to %s : %s', $source_filename, $destination_filename, $OS_ERROR );
-                $self->{ 'had_errors' } = 1;
-            }
-
-        }
-    }
-    return;
-}
-
 =head1 deliver_to_all_remote_destinations()
 
 Delivers backups to remote destinations using rsync program.
@@ -335,7 +285,7 @@ sub deliver_to_all_remote_destinations {
     return unless $self->{ 'destination' }->{ 'remote' };
     for my $dst ( @{ $self->{ 'destination' }->{ 'remote' } } ) {
 
-        my $B = $self->{ 'base' }->{ $dst->{ 'compression' } };
+        my $B = $self->{ 'base' }->{ $dst->{ 'compression' } }->[0]->{'path'};
 
         for my $type ( ( @{ $self->{ 'digests' } }, qw( data xlog ) ) ) {
 
@@ -390,83 +340,97 @@ sub _tar_command {
 
     push @tar_command, @{ $ARGS{ 'tar_dir' } };
 
-    my $tar_str = join ' ', map { quotemeta $_ } @tar_command;
+    my $tar = OmniPITR::Tools::CommandPiper->new( @tar_command );
 
-    my $tar_stderr_filename = $self->temp_file( 'tar.stderr' );
+    $tar->add_stderr_file( $self->temp_file( 'tar.stderr' ) );
 
-    $tar_str .= " 2> " . quotemeta( $tar_stderr_filename );
+    $self->_add_tar_consummers( $tar, $ARGS{ 'data_type' } );
 
-    my @writers = $self->_compression_commands( $ARGS{ 'data_type' } );
-
-    if ( 1 == scalar @writers ) {
-        $tar_str .= ( $writers[ 0 ]->{ 'command' } ? ' | ' : ' > ' ) . $writers[ 0 ]->{ 'str' };
-    }
-    else {
-        my $last = pop @writers;
-        $tar_str .= ' | exec ' . quotemeta( $self->{ 'tee-path' } );
-        for ( @writers ) {
-            $tar_str .= " " . ( $_->{ 'command' } ? ">( " . $_->{ 'str' } . " )" : $_->{ 'str' } );
-        }
-        $tar_str .= ( $last->{ 'command' } ? ' | ' : ' > ' ) . $last->{ 'str' };
-    }
-
-    return $tar_str;
+    return $tar->command();
 }
 
-=head1 _compression_commands()
+=head1 _add_tar_consummers()
 
 Helper function which returns array. Each element of the array is string to be passed to system() that will cause it to compress data from stdin to appropriate output file.
 
 =cut
 
-sub _compression_commands {
+sub _add_tar_consummers {
     my $self      = shift;
+    my $tar       = shift;
     my $data_type = shift;
-    my @reply     = ();
-    my $nice      = $self->{ 'not-nice' } ? "" : quotemeta( $self->{ 'nice-path' } ) . " ";
 
-    while ( my ( $compression_type, $dst_path ) = each %{ $self->{ 'base' } } ) {
-        my $output = $self->get_archive_filename( $data_type, $compression_type );
-        my $output_path = quotemeta( File::Spec->catfile( $dst_path, $output ) );
+    for my $compression_type ( keys %{ $self->{ 'base' } } ) {
+        my $compressed = $tar;
 
-        my $reply_part = {};
-
-        if ( 'none' eq $compression_type ) {
-            $reply_part->{ 'str' } = $output_path;
-        }
-        else {
-            $reply_part->{ 'str' }     = 'exec ' . $nice . quotemeta( $self->{ $compression_type . '-path' } ) . ' --stdout -';
-            $reply_part->{ 'command' } = 1;
+        if ( $compression_type ne 'none' ) {
+            my @cmd = ( $self->{ $compression_type . '-path' }, '--stdout', '-' );
+            unshift @cmd, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
+            $compressed = $tar->add_stdout_program( @cmd );
         }
 
-        if ( 0 < scalar @{ $self->{ 'digests' } } ) {
-            my @digest_strs = ();
-            for my $d ( @{ $self->{ 'digests' } } ) {
-                my $digest_filename = File::Spec->catfile( $dst_path, $self->get_archive_filename( $d, $compression_type ) );
-                my @digest = ( $Config{ 'perlpath' }, '-MDigest', '-le', q{binmode STDIN;print Digest->new("} . $d . q{")->addfile(\*STDIN)->hexdigest().' *'.$ARGV[0]}, $output );
-                my $digest_str = 'exec ' . $nice . join( ' ', map { quotemeta $_ } @digest );
-                $digest_str .= ( $data_type eq 'data' ? ' > ' : ' >> ' ) . quotemeta( $digest_filename );
-                push @digest_strs, $digest_str;
-            }
+        my $tarball_filename = $self->get_archive_filename( $data_type, $compression_type );
 
-            if ( 'none' eq $compression_type ) {
-                push @reply, $reply_part;
-                push @reply, map { { 'command' => 1, 'str' => $_ } } @digest_strs;
-            }
-            else {
-                $reply_part->{ 'str' } .= ' | exec ' . $self->{ 'tee-path' };
-                $reply_part->{ 'str' } .= " >( $_ )" for @digest_strs;
-                $reply_part->{ 'str' } .= ' > ' . $output_path;
-                push @reply, $reply_part;
-            }
+        my %digesters = ();
+        for my $d ( @{ $self->{ 'digests' } } ) {
+            my @digest = ( $Config{ 'perlpath' }, '-MDigest', '-le', q{binmode STDIN;print Digest->new("} . $d . q{")->addfile(\*STDIN)->hexdigest().' *'.$ARGV[0]}, $tarball_filename );
+            unshift @digest, $self->{'nice-path'} unless $self->{'not-nice'};
+            $digesters{ $d } = $compressed->add_stdout_program( @digest );
+            $digesters{ $d }->set_write_mode( 'append' );
         }
-        else {
-            $reply_part->{ 'str' } .= ' > ' . $output_path unless 'none' eq $compression_type;
-            push @reply, $reply_part;
+
+        for my $destination ( @{ $self->{'base'}->{ $compression_type } } ) {
+            if ( $destination->{'type'} eq 'local' ) {
+                $compressed->add_stdout_file( File::Spec->catfile( $destination->{'path'}, $tarball_filename ) );
+                while (my ($digest_type, $digester) = each %digesters ) {
+                    $digester->add_stdout_file( File::Spec->catfile( $destination->{'path'}, $self->get_archive_filename( $digest_type, $compression_type ) ) );
+                }
+                next;
+            }
+            # it's not local, so it has to be remote now
+            $compressed->add_stdout_program( $self->_get_remote_writer_command( $destination->{'path'}, $tarball_filename ) );
+            while (my ($digest_type, $digester) = each %digesters ) {
+                $digester->add_stdout_program(
+                    $self->_get_remote_writer_command(
+                        $destination->{'path'},
+                        $self->get_archive_filename( $digest_type, $compression_type ),
+                        $data_type eq 'data' ? 'overwrite' : 'append',
+                    )
+                );
+            }
         }
     }
-
-    return @reply;
+    return;
 }
 
+=head1 _get_remote_writer_command()
+
+Helper function returning command line that should be added to deliver data to direct destination
+
+=cut
+
+sub _get_remote_writer_command {
+    my $self = shift;
+    my $remote_path = shift;
+    my $tarball_filename = shift;
+    my $mode = shift || 'overwrite';
+
+    $self->log->fatal( 'Given destination path is not parseable?! [%s]', $remote_path ) unless $remote_path =~ m{\A([^:]+):(.*)\z};
+    my $user_host = $1;
+    $remote_path = $2;
+    $remote_path =~ s{/*$}{/$tarball_filename};
+
+    my @remote_command = ( );
+    if ( substr( $self->{'remote-cat-path'}, 0, 1) eq '!' ) {
+        push @remote_command, quotemeta( substr( $self->{'remote-cat-path'}, 1) );
+    } else {
+        push @remote_command, quotemeta( $self->{'remote-cat-path'} );
+        push @remote_command, '-';
+        push @remote_command, $mode eq 'overwrite' ? '>' : '>>';
+    }
+    push @remote_command, quotemeta( $remote_path );
+
+    my $remote_sh = join ' ', @remote_command;
+    return ( $self->{'ssh-path'}, $user_host, $remote_sh );
+}
 1;

@@ -53,12 +53,39 @@ sub new {
     my $class = shift;
     my $self = bless {}, $class;
     $self->{ 'tee' }             = 'tee';
+    $self->{ 'write_mode' }      = '>';
     $self->{ 'cmd' }             = [ @_ ];
     $self->{ 'stdout_files' }    = [];
     $self->{ 'stdout_programs' } = [];
     $self->{ 'stderr_files' }    = [];
     $self->{ 'stderr_programs' } = [];
     return $self;
+}
+
+=head1 set_write_mode()
+
+Sets whether writes of data should overwrite, or append (> vs. >>)
+
+Accepted values:
+
+=over
+
+=item * overwrite
+
+=item * append
+
+=back
+
+Any other would switch back to default, which is overwrite.
+
+=cut
+
+sub set_write_mode {
+    my $self = shift;
+    my $want = shift;
+    $self->{ 'write_mode' } = '>';
+    $self->{ 'write_mode' } = '>>' if $want eq 'append';
+    return;
 }
 
 =head1 set_tee_path()
@@ -136,7 +163,9 @@ Helper function to create sub-programs, inheriting settings
 sub new_subprogram {
     my $self        = shift;
     my $sub_program = OmniPITR::Tools::CommandPiper->new( @_ );
-    $sub_program->set_tee_path( $self->{ 'tee' } );
+    for my $key ( qw( tee write_mode ) ) {
+        $sub_program->{ $key } = $self->{ $key };
+    }
     return $sub_program;
 }
 
@@ -170,11 +199,11 @@ sub stdout {
     my $self         = shift;
     my @stdout_parts = ();
     push @stdout_parts, map { [ 'PATH', $_ ] } @{ $self->{ 'stdout_files' } };
-    push @stdout_parts, map { [ 'CMD', $_->command() ] } @{ $self->{ 'stdout_programs' } };
+    push @stdout_parts, map { [ 'CMD',  $_->command() ] } @{ $self->{ 'stdout_programs' } };
     return if 0 == scalar @stdout_parts;
 
     my $ready = $self->tee_maker( @stdout_parts );
-    return sprintf( '> %s', $ready->[ 1 ] ) if 'PATH' eq $ready->[ 0 ];
+    return sprintf( '%s %s', $self->{ 'write_mode' }, $ready->[ 1 ] ) if 'PATH' eq $ready->[ 0 ];
     return sprintf( '| %s', $ready->[ 1 ] );
 }
 
@@ -192,7 +221,7 @@ sub stderr {
     return if 0 == scalar @stderr_parts;
 
     my $ready = $self->tee_maker( @stderr_parts );
-    return sprintf( '2> %s', $ready->[ 1 ] ) if 'PATH' eq $ready->[ 0 ];
+    return sprintf( '2%s %s', $self->{ 'write_mode' }, $ready->[ 1 ] ) if 'PATH' eq $ready->[ 0 ];
     return sprintf( '2> >( %s )', $ready->[ 1 ] );
 }
 
@@ -222,6 +251,7 @@ sub tee_maker {
 
     my $last     = pop @parts;
     my @tee_args = ();
+    push @tee_args, '-a' if $self->{ 'write_mode' } eq '>>';
     for my $p ( @parts ) {
         if ( 'PATH' eq $p->[ 0 ] ) {
             push @tee_args, quotemeta $p->[ 1 ];
@@ -231,10 +261,10 @@ sub tee_maker {
     }
     my $tee_invocation = sprintf '%s %s', quotemeta( $self->{ 'tee' } ), join( ' ', @tee_args );
     if ( 'PATH' eq $last->[ 0 ] ) {
-        $tee_invocation .= ' > ' . quotemeta( $last->[ 1 ] );
+        $tee_invocation .= sprintf ' %s %s', $self->{ 'write_mode' }, quotemeta( $last->[ 1 ] );
     }
     else {
-        $tee_invocation .= ' | ' . $last->[ 1 ];
+        $tee_invocation .= ' > >( ' . $last->[ 1 ] . ' ) ';
     }
     return [ 'CMD', $tee_invocation ];
 }

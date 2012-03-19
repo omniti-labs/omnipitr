@@ -157,7 +157,7 @@ sub get_list_of_all_necessary_compressions {
 
     my %compression = ();
 
-    for my $dst_type ( qw( local remote ) ) {
+    for my $dst_type ( qw( local remote direct ) ) {
         next unless my $dsts = $self->{ 'destination' }->{ $dst_type };
         for my $destination ( @{ $dsts } ) {
             $compression{ $destination->{ 'compression' } } = 1;
