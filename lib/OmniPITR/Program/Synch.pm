@@ -244,7 +244,7 @@ sub prepare_commands_to_run_via_tar {
             for my $d ( @deliveries ) {
                 $cmd->{ 'cmd' } .= " >( $d )";
             }
-            $cmd->{ 'cmd' } .= " | $final";
+            $cmd->{ 'cmd' } .= " > >( $final )";
         }
         push @commands, $cmd;
     }
