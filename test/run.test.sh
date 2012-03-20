@@ -1,6 +1,12 @@
 #!/bin/bash
 
+export use_user="$( id -u -n )"
+export work_dir="$( pwd )"
+
 # cd to where current script resides
+cd "$( dirname "${BASH_SOURCE[0]}" )/.."
+export omnipitr_dir="$( pwd )"
+
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
 # load functions from test-lib
@@ -8,6 +14,8 @@ while read source_file
 do
     source "$source_file"
 done < <( find test-lib/ -type f -name '[0-9]*' | sort -t/ -k2,2 -n )
+
+cd "$work_dir"
 
 identify_current_pg_version
 

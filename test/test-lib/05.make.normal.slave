@@ -20,7 +20,7 @@ make_normal_slave() {
     s{\A \s* (?: [#] \s* )? hot_standby \s* = \s*.*}{hot_standby = off}x;
     ' "$directory/postgresql.conf"
 
-    echo "restore_command = '/opt/omnipitr/bin/omnipitr-restore -t /home/depesz/omnipitr/tmp/restore/ -l /home/depesz/omnipitr/log.${codename} -p /home/depesz/omnipitr/pause.${codename} -s gzip=/home/depesz/omnipitr/archive -v -f /home/depesz/${directory}.finish %f %p'" >> "$directory"/recovery.conf
+    echo "restore_command = '$omnipitr_dir/bin/omnipitr-restore -t $work_dir/omnipitr/tmp/restore/ -l $work_dir/omnipitr/log.${codename} -p $work_dir/omnipitr/pause.${codename} -s gzip=$work_dir/omnipitr/archive -v -f $work_dir/${directory}.finish %f %p'" >> "$directory"/recovery.conf
 
     touch omnipitr/log.${codename}
 

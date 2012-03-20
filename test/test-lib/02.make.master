@@ -20,7 +20,7 @@ make_master_initdb() {
     s/\A \s* (?: [#] \s* )? log_line_prefix \s* = \s*.*/log_line_prefix = \047\%m \%u\@\%d \%p \%r \047/x;
     s/\A \s* (?: [#] \s* )? log_temp_files \s* = \s*.*/log_temp_files = 0/x;
     s/\A \s* (?: [#] \s* )? (log_checkpoints|log_connections|log_disconnections|log_lock_waits|archive_mode) \s* = \s*.*/$1 = on/x;
-    s{\A \s* (?: [#] \s* )? archive_command \s* = \s*.*}{archive_command = \047/opt/omnipitr/bin/omnipitr-archive -t /home/depesz/omnipitr/tmp/archive/ -l /home/depesz/omnipitr/log.master -dl gzip=/home/depesz/omnipitr/archive -dl gzip=/home/depesz/omnipitr/longarchive -db /home/depesz/omnipitr/backup-archive/ -s /home/depesz/omnipitr/state/ -v "\%p"\047}x;
+    s{\A \s* (?: [#] \s* )? archive_command \s* = \s*.*}{archive_command = \047$ENV{omnipitr_dir}/bin/omnipitr-archive -t $ENV{work_dir}/omnipitr/tmp/archive/ -l $ENV{work_dir}/omnipitr/log.master -dl gzip=$ENV{work_dir}/omnipitr/archive -dl gzip=$ENV{work_dir}/omnipitr/longarchive -db $ENV{work_dir}/omnipitr/backup-archive/ -s $ENV{work_dir}/omnipitr/state/ -v "\%p"\047}x;
     s/\A \s* (?: [#] \s* )? max_wal_senders \s* = \s*.*/max_wal_senders = 30/x;
     s/\A \s* (?: [#] \s* )? wal_level \s* = \s*.*/wal_level = \047hot_standby\047/x;
     s/\A \s* (?: [#] \s* )? archive_timeout \s* = \s*.*/archive_timeout = 60/x;
@@ -42,8 +42,8 @@ make_master_make_load_generator_structs() {
     set client_min_messages = warning;
     create user postgres with superuser;
     create user replication with superuser;
-    create database depesz with owner depesz;
-    \c depesz
+    create database $use_user with owner $use_user;
+    \c $use_user
     \set VERBOSITY terse
     set client_min_messages = warning;
     create table t0 (id serial primary key, when_tsz timestamptz default now(), payload text);

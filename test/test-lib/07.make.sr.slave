@@ -28,10 +28,10 @@ make_sr_slave () {
     s{\A \s* (?: [#] \s* )? hot_standby \s* = \s*.*}{hot_standby = on}x;
     ' "$directory/postgresql.conf"
 
-    echo "restore_command = '/opt/omnipitr/bin/omnipitr-restore -sr -t /home/depesz/omnipitr/tmp/sr-restore/ -l /home/depesz/omnipitr/log.${codename} -p /home/depesz/omnipitr/pause.${codename} -s gzip=/home/depesz/omnipitr/archive -v -f /home/depesz/${directory}.finish %f %p'" >> "$directory"/recovery.conf
+    echo "restore_command = '$omnipitr_dir/bin/omnipitr-restore -sr -t $work_dir/omnipitr/tmp/sr-restore/ -l $work_dir/omnipitr/log.${codename} -p $work_dir/omnipitr/pause.${codename} -s gzip=$work_dir/omnipitr/archive -v -f $work_dir/${directory}.finish %f %p'" >> "$directory"/recovery.conf
     echo "standby_mode = 'on'" >> "$directory"/recovery.conf
-    echo "primary_conninfo = 'port=54001 user=depesz'" >> "$directory"/recovery.conf
-    echo "trigger_file = '/home/depesz/${directory}.finish'" >> "$directory"/recovery.conf
+    echo "primary_conninfo = 'port=54001 user=$use_user'" >> "$directory"/recovery.conf
+    echo "trigger_file = '$work_dir/${directory}.finish'" >> "$directory"/recovery.conf
 
     touch omnipitr/log.${codename}
 

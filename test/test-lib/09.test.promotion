@@ -5,7 +5,7 @@ test_promotion () {
     export use_port="$2"
     export directory="data-$codename"
 
-    finish_trigger="/home/depesz/${directory}.finish"
+    finish_trigger="$work_dir/${directory}.finish"
 
     touch "$finish_trigger"
 
