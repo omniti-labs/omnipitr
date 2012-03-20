@@ -1,0 +1,26 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+generate_load	./test-lib/01.metainfo	/^generate_load() {$/;"	f
+get_master_sender_location	./test-lib/07.make.sr.slave	/^get_master_sender_location() {$/;"	f
+get_slave_receiver_location	./test-lib/07.make.sr.slave	/^get_slave_receiver_location() {$/;"	f
+identify_current_pg_version	./test-lib/01.metainfo	/^identify_current_pg_version() {$/;"	f
+make_master	./test-lib/02.make.master	/^make_master() {$/;"	f
+make_master_add_plpgsql	./test-lib/02.make.master	/^make_master_add_plpgsql() {$/;"	f
+make_master_backup	./test-lib/03.make.master.backup	/^make_master_backup() {$/;"	f
+make_master_initdb	./test-lib/02.make.master	/^make_master_initdb() {$/;"	f
+make_master_make_load_generator_structs	./test-lib/02.make.master	/^make_master_make_load_generator_structs() {$/;"	f
+make_master_mkdirs	./test-lib/02.make.master	/^make_master_mkdirs() {$/;"	f
+make_normal_slave	./test-lib/05.make.normal.slave	/^make_normal_slave() {$/;"	f
+make_slave_backup	./test-lib/06.make.slave.backup	/^make_slave_backup() {$/;"	f
+make_sr_slave	./test-lib/07.make.sr.slave	/^make_sr_slave () {$/;"	f
+make_sr_slave_backup	./test-lib/08.make.sr.slave.backup	/^make_sr_slave_backup() {$/;"	f
+make_standalone	./test-lib/04.make_standalone	/^make_standalone() {$/;"	f
+prepare_test_environment	./test-lib/01.metainfo	/^prepare_test_environment() {$/;"	f
+setup_output_formatting	./test-lib/01.metainfo	/^setup_output_formatting() {$/;"	f
+stop_load_generators	./test-lib/01.metainfo	/^stop_load_generators() {$/;"	f
+tail_n_grep_with_timeout	./test-lib/01.metainfo	/^tail_n_grep_with_timeout() {$/;"	f
+test_promotion	./test-lib/09.test.promotion	/^test_promotion () {$/;"	f
