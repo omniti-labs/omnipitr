@@ -191,8 +191,8 @@ sub run {
     $self->{ 'finished_workers' } = {};
 
     while ( 1 ) {
-        $self->handle_finished_workers();
         next if $self->start_new_worker();
+        next if $self->handle_finished_workers();
         last if ( 0 == scalar keys %{ $self->{ 'workers' } } ) and ( 0 == scalar keys %{ $self->{ 'finished_workers' } } );
         sleep 10;    # this will be cancelled by signal, so the sleep time doesn't matter much.
     }
@@ -282,7 +282,7 @@ sub handle_finished_workers {
             $self->{ 'on_finish' }->( $full_data );
         }
     }
-    return;
+    return 1;
 }
 
 1;
