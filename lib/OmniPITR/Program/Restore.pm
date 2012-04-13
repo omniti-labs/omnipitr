@@ -13,7 +13,7 @@ use File::Path qw( mkpath rmtree );
 use File::Copy;
 use Storable;
 use Data::Dumper;
-use Getopt::Long;
+use Getopt::Long qw( :config no_ignore_case );
 use Cwd;
 
 =head1 run()

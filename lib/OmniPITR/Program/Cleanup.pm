@@ -9,7 +9,7 @@ use Carp;
 use OmniPITR::Tools qw( :all );
 use English qw( -no_match_vars );
 use File::Spec;
-use Getopt::Long;
+use Getopt::Long qw( :config no_ignore_case );
 use Cwd;
 
 =head1 run()
