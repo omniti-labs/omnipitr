@@ -76,6 +76,11 @@ I<omnipitr-archive> (with this pidfile) can run at the same time.
 
 Trying to run second copy of I<omnipitr-archive> will result in an error.
 
+=item --parallel-jobs (-PJ)
+
+Number of parallel jobs that I<omnipitr-archive> can spawn to deliver archives
+to remote destinations.
+
 =item --verbose (-v)
 
 Log verbosely what is happening.
