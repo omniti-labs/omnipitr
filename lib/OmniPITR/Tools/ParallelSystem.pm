@@ -191,10 +191,10 @@ sub run {
     $self->{ 'finished_workers' } = {};
 
     while ( 1 ) {
+        last if ( 0 == scalar keys %{ $self->{ 'workers' } } ) and ( 0 == scalar keys %{ $self->{ 'finished_workers' } } ) and ( 0 == scalar @{ $self->{ 'commands' } } );
         next if $self->start_new_worker();
         next if $self->handle_finished_workers();
-        last if ( 0 == scalar keys %{ $self->{ 'workers' } } ) and ( 0 == scalar keys %{ $self->{ 'finished_workers' } } );
-        sleep 10;    # this will be cancelled by signal, so the sleep time doesn't matter much.
+        sleep 1;    # this will be cancelled by signal, so the sleep time doesn't matter much.
     }
     $SIG{ 'CHLD' } = $self->{ 'previous_chld_handler' };
     delete $self->{ 'previous_chld_handler' };
