@@ -94,6 +94,11 @@ I<omnipitr-backup-master> (with this pidfile) can run at the same time.
 
 Trying to run second copy of I<omnipitr-backup-master> will result in an error.
 
+=item --parallel-jobs (-PJ)
+
+Number of parallel jobs that I<omnipitr-backup-master> can spawn to deliver archives
+to remote destinations.
+
 =item --verbose (-v)
 
 Log verbosely what is happening.

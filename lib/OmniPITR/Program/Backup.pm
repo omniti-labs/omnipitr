@@ -5,16 +5,17 @@ use warnings;
 our $VERSION = '0.5.0';
 use base qw( OmniPITR::Program );
 
-use File::Spec;
-use File::Path qw( mkpath rmtree );
-use File::Copy;
-use English qw( -no_match_vars );
-use OmniPITR::Tools qw( ext_for_compression run_command );
-use OmniPITR::Tools::CommandPiper;
-use Data::Dumper;
-use Cwd;
-use Digest;
 use Config;
+use Cwd;
+use Data::Dumper;
+use Digest;
+use English qw( -no_match_vars );
+use File::Copy;
+use File::Path qw( mkpath rmtree );
+use File::Spec;
+use OmniPITR::Tools::CommandPiper;
+use OmniPITR::Tools::ParallelSystem;
+use OmniPITR::Tools qw( ext_for_compression run_command );
 
 =head1 run()
 
@@ -283,9 +284,24 @@ Delivers backups to remote destinations using rsync program.
 sub deliver_to_all_remote_destinations {
     my $self = shift;
     return unless $self->{ 'destination' }->{ 'remote' };
+
+    my $handle_finish = sub {
+        my $job = shift;
+        $self->log->log( 'Copying %s to %s ended in %.6fs', $job->{ 'source_filename' }, $job->{ 'destination_filename' }, $job->{ 'ended' } - $job->{ 'started' } ) if $self->verbose;
+        return unless $job->{ 'status' };
+        $self->log->error( 'Cannot send archive %s to %s: %s', $job->{ 'source_filename' }, $job->{ 'destination_filename' }, $job );
+        $self->{ 'had_errors' } = 1;
+        return;
+    };
+
+    my $runner = OmniPITR::Tools::ParallelSystem->new(
+        'max_jobs'  => $self->{ 'parallel-jobs' },
+        'on_finish' => $handle_finish,
+    );
+
     for my $dst ( @{ $self->{ 'destination' }->{ 'remote' } } ) {
 
-        my $B = $self->{ 'base' }->{ $dst->{ 'compression' } }->[0]->{'path'};
+        my $B = $self->{ 'base' }->{ $dst->{ 'compression' } }->[ 0 ]->{ 'path' };
 
         for my $type ( ( @{ $self->{ 'digests' } }, qw( data xlog ) ) ) {
 
@@ -295,19 +311,20 @@ sub deliver_to_all_remote_destinations {
             $destination_filename =~ s{/*\z}{/};
             $destination_filename .= $filename;
 
-            my $time_msg = sprintf 'Copying %s to %s', $source_filename, $destination_filename;
-            $self->log->time_start( $time_msg ) if $self->verbose;
-
-            my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'rsync-path' }, $source_filename, $destination_filename );
-
-            $self->log->time_finish( $time_msg ) if $self->verbose;
-
-            if ( $response->{ 'error_code' } ) {
-                $self->log->error( 'Cannot send archive %s to %s: %s', $source_filename, $destination_filename, $response );
-                $self->{ 'had_errors' } = 1;
-            }
+            $runner->add_command(
+                'command'              => [ $self->{ 'rsync-path' }, $source_filename, $destination_filename ],
+                'source_filename'      => $source_filename,
+                'destination_filename' => $destination_filename,
+            );
         }
     }
+
+    $ENV{ 'TMPDIR' } = $self->{ 'temp-dir' };
+
+    $self->log->time_start( 'Delivering to all remote destinations' ) if $self->verbose;
+    $runner->run();
+    $self->log->time_finish( 'Delivering to all remote destinations' ) if $self->verbose;
+
     return;
 }
 
@@ -374,25 +391,26 @@ sub _add_tar_consummers {
         my %digesters = ();
         for my $d ( @{ $self->{ 'digests' } } ) {
             my @digest = ( $Config{ 'perlpath' }, '-MDigest', '-le', q{binmode STDIN;print Digest->new("} . $d . q{")->addfile(\*STDIN)->hexdigest().' *'.$ARGV[0]}, $tarball_filename );
-            unshift @digest, $self->{'nice-path'} unless $self->{'not-nice'};
+            unshift @digest, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
             $digesters{ $d } = $compressed->add_stdout_program( @digest );
             $digesters{ $d }->set_write_mode( 'append' );
         }
 
-        for my $destination ( @{ $self->{'base'}->{ $compression_type } } ) {
-            if ( $destination->{'type'} eq 'local' ) {
-                $compressed->add_stdout_file( File::Spec->catfile( $destination->{'path'}, $tarball_filename ) );
-                while (my ($digest_type, $digester) = each %digesters ) {
-                    $digester->add_stdout_file( File::Spec->catfile( $destination->{'path'}, $self->get_archive_filename( $digest_type, $compression_type ) ) );
+        for my $destination ( @{ $self->{ 'base' }->{ $compression_type } } ) {
+            if ( $destination->{ 'type' } eq 'local' ) {
+                $compressed->add_stdout_file( File::Spec->catfile( $destination->{ 'path' }, $tarball_filename ) );
+                while ( my ( $digest_type, $digester ) = each %digesters ) {
+                    $digester->add_stdout_file( File::Spec->catfile( $destination->{ 'path' }, $self->get_archive_filename( $digest_type, $compression_type ) ) );
                 }
                 next;
             }
+
             # it's not local, so it has to be remote now
-            $compressed->add_stdout_program( $self->_get_remote_writer_command( $destination->{'path'}, $tarball_filename ) );
-            while (my ($digest_type, $digester) = each %digesters ) {
+            $compressed->add_stdout_program( $self->_get_remote_writer_command( $destination->{ 'path' }, $tarball_filename ) );
+            while ( my ( $digest_type, $digester ) = each %digesters ) {
                 $digester->add_stdout_program(
                     $self->_get_remote_writer_command(
-                        $destination->{'path'},
+                        $destination->{ 'path' },
                         $self->get_archive_filename( $digest_type, $compression_type ),
                         $data_type eq 'data' ? 'overwrite' : 'append',
                     )
@@ -410,27 +428,28 @@ Helper function returning command line that should be added to deliver data to d
 =cut
 
 sub _get_remote_writer_command {
-    my $self = shift;
-    my $remote_path = shift;
+    my $self             = shift;
+    my $remote_path      = shift;
     my $tarball_filename = shift;
-    my $mode = shift || 'overwrite';
+    my $mode             = shift || 'overwrite';
 
     $self->log->fatal( 'Given destination path is not parseable?! [%s]', $remote_path ) unless $remote_path =~ m{\A([^:]+):(.*)\z};
     my $user_host = $1;
     $remote_path = $2;
     $remote_path =~ s{/*$}{/$tarball_filename};
 
-    my @remote_command = ( );
-    if ( substr( $self->{'remote-cat-path'}, 0, 1) eq '!' ) {
-        push @remote_command, quotemeta( substr( $self->{'remote-cat-path'}, 1) );
-    } else {
-        push @remote_command, quotemeta( $self->{'remote-cat-path'} );
+    my @remote_command = ();
+    if ( substr( $self->{ 'remote-cat-path' }, 0, 1 ) eq '!' ) {
+        push @remote_command, quotemeta( substr( $self->{ 'remote-cat-path' }, 1 ) );
+    }
+    else {
+        push @remote_command, quotemeta( $self->{ 'remote-cat-path' } );
         push @remote_command, '-';
         push @remote_command, $mode eq 'overwrite' ? '>' : '>>';
     }
     push @remote_command, quotemeta( $remote_path );
 
     my $remote_sh = join ' ', @remote_command;
-    return ( $self->{'ssh-path'}, $user_host, $remote_sh );
+    return ( $self->{ 'ssh-path' }, $user_host, $remote_sh );
 }
 1;

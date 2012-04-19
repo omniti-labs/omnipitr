@@ -16,6 +16,7 @@ use POSIX qw( strftime );
 use Sys::Hostname;
 use Cwd qw(abs_path);
 use OmniPITR::Tools qw( run_command ext_for_compression );
+use OmniPITR::Tools::ParallelSystem;
 
 =head1 make_data_archive()
 
@@ -151,6 +152,21 @@ sub uncompress_wal_archive_segments {
 
     $self->log->log( '%s wal segments have to be uncompressed', scalar @wal_segments );
 
+    my $all_ok        = 1;
+    my $handle_finish = sub {
+        my $job = shift;
+        $self->log->log( 'Uncompressing %s ended in %.6fs', $job->{ 'wal_name' }, $job->{ 'ended' } - $job->{ 'started' } ) if $self->verbose;
+        return unless $job->{ 'status' };
+        $self->log->error( 'Error while uncompressing wal segment %s: %s', $job->{ 'wal_name' }, $job );
+        $all_ok = 0;
+        return;
+    };
+
+    my $runner = OmniPITR::Tools::ParallelSystem->new(
+        'max_jobs'  => $self->{ 'parallel-jobs' },
+        'on_finish' => $handle_finish,
+    );
+
     for my $segment ( @wal_segments ) {
         my $old_file = File::Spec->catfile( $old_source, $segment );
         my $new_file = File::Spec->catfile( $new_source, $segment );
@@ -158,11 +174,13 @@ sub uncompress_wal_archive_segments {
         $self->log->log( 'File copied: %s -> %s', $old_file, $new_file );
         my @uncompress = ( $self->{ $self->{ 'source' }->{ 'compression' } . '-path' }, '-d', $new_file );
         unshift @uncompress, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
-        my $response = run_command( $self->{ 'temp-dir' }, @uncompress );
-        if ( $response->{ 'error_code' } ) {
-            $self->log->fatal( 'Error while uncompressing wal segment %s: %s', $new_file, $response );
-        }
+        $runner->add_command(
+            'command'  => \@uncompress,
+            'wal_name' => $new_file,
+        );
     }
+    $runner->run;
+    $self->log->fatal( 'Decompressing of some files failed.' ) unless $all_ok;
     return;
 }
 
@@ -498,6 +516,7 @@ sub read_args {
         'tar-path'           => 'tar',
         'tee-path'           => 'tee',
         'nice-path'          => 'nice',
+        'parallel-jobs'      => 1,
         'psql-path'          => 'psql',
         'rsync-path'         => 'rsync',
         'shell-path'         => 'bash',
@@ -529,6 +548,7 @@ sub read_args {
         'bzip2-path|bp=s',
         'lzma-path|lp=s',
         'nice-path|np=s',
+        'parallel-jobs|PJ=i',
         'psql-path|sp=s',
         'tar-path|tp=s',
         'tee-path|ep=s',
@@ -666,6 +686,10 @@ sub validate_args {
         $self->log->fatal( 'Choosen local destination dir (%s) is not directory. Cannot continue.', $dir ) unless -d $dir;
         $self->log->fatal( 'Choosen local destination dir (%s) is not writable. Cannot continue.',  $dir ) unless -w $dir;
     }
+
+    $self->log->fatal( 'Parallel jobs value not given?!' ) unless defined $self->{ 'parallel-jobs' };
+    $self->log->fatal( 'Parallel jobs is not integer (%s)', $self->{ 'parallel-jobs' } ) unless $self->{ 'parallel-jobs' } =~ m{\A\d+\z};
+    $self->log->fatal( 'Parallel jobs is not >= 1 (%s)', $self->{ 'parallel-jobs' } ) unless $self->{ 'parallel-jobs' } >= 1;
 
     return;
 }

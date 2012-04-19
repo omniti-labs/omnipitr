@@ -118,6 +118,12 @@ on master database.
 Backups on PostgreSQL 9.0+, on slave, without --call-master can fail when later
 used.
 
+=item --parallel-jobs (-PJ)
+
+Number of parallel jobs that I<omnipitr-backup-slave> can spawn to deliver archives
+to remote destinations, or to decompress wal segments from compressed wal
+archive.
+
 =item --verbose (-v)
 
 Log verbosely what is happening.

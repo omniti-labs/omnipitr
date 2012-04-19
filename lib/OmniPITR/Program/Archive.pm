@@ -6,15 +6,15 @@ our $VERSION = '0.5.0';
 use base qw( OmniPITR::Program );
 
 use Carp;
-use OmniPITR::Tools qw( :all );
 use English qw( -no_match_vars );
 use File::Basename;
-use File::Spec;
-use File::Path qw( mkpath rmtree );
 use File::Copy;
-use Storable;
+use File::Path qw( mkpath rmtree );
+use File::Spec;
 use Getopt::Long qw( :config no_ignore_case );
 use OmniPITR::Tools::ParallelSystem;
+use OmniPITR::Tools qw( :all );
+use Storable;
 
 =head1 run()
 

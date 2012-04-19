@@ -231,6 +231,7 @@ sub read_args {
         'tar-path'          => 'tar',
         'tee-path'          => 'tee',
         'nice-path'         => 'nice',
+        'parallel-jobs'     => 1,
         'psql-path'         => 'psql',
         'rsync-path'        => 'rsync',
         'shell-path'        => 'bash',
@@ -256,6 +257,7 @@ sub read_args {
         'log|l=s',
         'filename-template|f=s',
         'pid-file=s',
+        'parallel-jobs|PJ=i',
         'verbose|v',
         'gzip-path|gp=s',
         'bzip2-path|bp=s',
@@ -374,6 +376,10 @@ sub validate_args {
         $self->log->fatal( 'Choosen local destination dir (%s) is not directory. Cannot continue.', $dir ) unless -d $dir;
         $self->log->fatal( 'Choosen local destination dir (%s) is not writable. Cannot continue.',  $dir ) unless -w $dir;
     }
+
+    $self->log->fatal( 'Parallel jobs value not given?!' ) unless defined $self->{ 'parallel-jobs' };
+    $self->log->fatal( 'Parallel jobs is not integer (%s)', $self->{ 'parallel-jobs' } ) unless $self->{ 'parallel-jobs' } =~ m{\A\d+\z};
+    $self->log->fatal( 'Parallel jobs is not >= 1 (%s)', $self->{ 'parallel-jobs' } ) unless $self->{ 'parallel-jobs' } >= 1;
 
     return;
 }
