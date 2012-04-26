@@ -1,5 +1,16 @@
 =head1 OmniPITR
 
+=head2 2012-04-26
+
+=over
+
+=item * Release of version 0.6.0
+
+=item * Support parallelism of delivery to remote destinations, and unpacking of
+wal archives for omnipitr-backup-slave
+
+=back
+
 =head2 2012-03-30
 
 =over

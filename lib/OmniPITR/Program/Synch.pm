@@ -2,7 +2,7 @@ package OmniPITR::Program::Synch;
 use strict;
 use warnings;
 
-our $VERSION = '0.5.0';
+our $VERSION = '0.6.0';
 use base qw( OmniPITR::Program );
 
 use Carp qw( croak );
