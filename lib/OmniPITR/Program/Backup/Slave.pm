@@ -290,9 +290,12 @@ sub make_backup_label_temp_file {
         my $redo_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's REDO location" };
         my $last_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint location" };
         my $timeline      = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's TimeLineID" };
+        my $location_file = $self->convert_wal_location_and_timeline_to_filename( $redo_location, $timeline );
+
+        $self->{ 'wal_range' }->{ 'min' } = $location_file;
 
         my @content_lines = ();
-        push @content_lines, sprintf 'START WAL LOCATION: %s (file %s)', $redo_location, $self->convert_wal_location_and_timeline_to_filename( $redo_location, $timeline );
+        push @content_lines, sprintf 'START WAL LOCATION: %s (file %s)', $redo_location, $location_file;
         push @content_lines, sprintf 'CHECKPOINT LOCATION: %s', $last_location;
         push @content_lines, sprintf 'START TIME: %s', strftime( '%Y-%m-%d %H:%M:%S %Z', localtime time );
         push @content_lines, 'LABEL: OmniPITR_Slave_Hot_Backup';
@@ -346,6 +349,13 @@ sub get_backup_label_from_master {
     );
 
     $self->{ 'backup_file_data' } = [ split( /\n/, $backup_label_content ) ];
+
+    my @start_wal_lines = grep { m{\ASTART WAL LOCATION: \S+ \(file (\S+)\)\s*\z} } @{ $self->{ 'backup_file_data' } };
+    if ( 1 != scalar @start_wal_lines ) {
+        $self->log->fatal( "There is no line with START WAL LOCATION in the .backup file (or there are many), it should't happen" );
+    }
+    $start_wal_lines[ 0 ] =~ s{\ASTART WAL LOCATION: \S+ \(file (\S+)\)\s*\z}{$1};
+    $self->{ 'wal_range' }->{ 'min' } = $start_wal_lines[ 0 ];
 
     $self->wait_for_checkpoint_from_backup_label();
 
