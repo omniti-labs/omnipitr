@@ -114,7 +114,15 @@ sub compress_xlogs {
     my $transform_to = basename( $self->{ 'data-dir' } ) . '/pg_xlog';
     my $transform_command = sprintf 's#^\(%s\|%s\)#%s#', $source_transform_from, $dot_backup_transform_from, $transform_to;
 
-    my @stuff_to_compress = ( basename( $self->{ 'source' }->{ 'path' } ) );
+    my @stuff_to_compress = ();
+    if ( 'none' eq $self->{ 'source' }->{ 'compression' } ) {
+        my $wal_files = $self->_find_interesting_xlogs( $self->{ 'source' }->{ 'path' }, '' );
+        my $dir_name = basename( $self->{ 'source' }->{ 'path' } );
+        push @stuff_to_compress, map { File::Spec->catfile( $dir_name, $_ ) } @{ $wal_files };
+    }
+    else {
+        push @stuff_to_compress, basename( $self->{ 'source' }->{ 'path' } );
+    }
     push @stuff_to_compress, File::Spec->catfile( $self->{ 'temp-dir' }, $self->{ 'dot_backup_filename' } ) if $self->{ 'dot_backup_filename' };
 
     $self->tar_and_compress(
@@ -127,6 +135,31 @@ sub compress_xlogs {
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
 
     return;
+}
+
+=head1 _find_interesting_xlogs()
+
+Internal function that scans source path, and returns arrayref of filenames (without paths) that are xlogs withing interesting wal_range.
+
+=cut
+
+sub _find_interesting_xlogs {
+    my $self = shift;
+    my ( $directory, $extension ) = @_;
+
+    opendir my $dir, $directory or $self->log->fatal( 'Cannot open wal-archive (%s) : %s', $directory, $OS_ERROR );
+    my @wal_segments = sort grep { -f File::Spec->catfile( $directory, $_ ) && /\Q$extension\E\z/ } readdir( $dir );
+    close $dir;
+
+    my @reply = ();
+    for my $segment ( @wal_segments ) {
+        my $base_segment_name = substr( $segment, 0, 24 );
+        next if $base_segment_name lt $self->{ 'wal_range' }->{ 'min' };
+        next if $base_segment_name gt $self->{ 'wal_range' }->{ 'max' };
+        push @reply, $segment;
+    }
+
+    return \@reply;
 }
 
 =head1 uncompress_wal_archive_segments()
@@ -149,10 +182,10 @@ sub uncompress_wal_archive_segments {
 
     mkpath( [ $new_source ], 0, oct( "755" ) );
 
-    opendir my $dir, $old_source or $self->log->fatal( 'Cannot open wal-archive (%s) : %s', $old_source, $OS_ERROR );
-    my $extension = ext_for_compression( $self->{ 'source' }->{ 'compression' } );
-    my @wal_segments = sort grep { -f File::Spec->catfile( $old_source, $_ ) && /\Q$extension\E\z/ } readdir( $dir );
-    close $dir;
+    my @wal_segments = $self->_find_interesting_xlogs(
+        $old_source,
+        ext_for_compression( $self->{ 'source' }->{ 'compression' } ),
+    );
 
     $self->log->log( '%s wal segments have to be uncompressed', scalar @wal_segments );
 
@@ -172,6 +205,7 @@ sub uncompress_wal_archive_segments {
     );
 
     for my $segment ( @wal_segments ) {
+
         my $old_file = File::Spec->catfile( $old_source, $segment );
         my $new_file = File::Spec->catfile( $new_source, $segment );
         copy( $old_file, $new_file ) or $self->log->fatal( 'Cannot copy %s to %s: %s', $old_file, $new_file, $OS_ERROR );
