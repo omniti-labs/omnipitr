@@ -196,7 +196,13 @@ sub run {
         next if $self->handle_finished_workers();
         sleep 1;    # this will be cancelled by signal, so the sleep time doesn't matter much.
     }
+
+    # The no warnings/use warnings "dance" is a workaround for stupid warnings in perl 5.8
+    no warnings;
     $SIG{ 'CHLD' } = $self->{ 'previous_chld_handler' };
+    use warnings;
+    # The no warnings/use warnings "dance" is a workaround for stupid warnings in perl 5.8
+
     delete $self->{ 'previous_chld_handler' };
     return;
 }
