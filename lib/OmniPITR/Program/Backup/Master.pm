@@ -205,7 +205,7 @@ and issues pg_stop_backup() to database.
 
 sub DESTROY {
     my $self = shift;
-    rmtree( [ $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' } ], 0, );
+    rmtree( [ $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' } ], 0, ) if defined $self->{ 'xlogs' };
     $self->stop_pg_backup() if $self->{ 'pg_start_backup_done' };
     $self->SUPER::DESTROY();
     return;
