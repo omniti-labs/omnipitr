@@ -51,6 +51,10 @@ sub finish_pgdata_backup {
     $self->log->log( q{pg_stop_backup() returned %s.}, $stop_backup_output );
     $self->log->fatal( 'Output from pg_stop_backup is not parseable?!' ) unless $stop_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
 
+    my $timeline = substr( $self->{ 'wal_range' }->{ 'min' }, 0, 8 );
+    my $location_file = $self->convert_wal_location_and_timeline_to_filename( $stop_backup_output, $timeline );
+    $self->{ 'wal_range' }->{ 'max' } = $location_file;
+
     return;
 
 }
@@ -214,6 +218,9 @@ sub make_dot_backup_file {
             $final_wal_filename = $minimum_wal_filename;
         }
     }
+
+    # This is set in here only if we're not calling master. If we do, then the max is set in finish_pgdata_backup()
+    $self->{ 'wal_range' }->{ 'max' } = $final_wal_filename;
 
     my $final_wal_filename_re = qr{\A$final_wal_filename};
     $self->wait_for_file( $self->{ 'source' }->{ 'path' }, $final_wal_filename_re );
