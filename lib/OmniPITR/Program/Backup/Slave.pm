@@ -182,12 +182,12 @@ sub uncompress_wal_archive_segments {
 
     mkpath( [ $new_source ], 0, oct( "755" ) );
 
-    my @wal_segments = $self->_find_interesting_xlogs(
+    my $wal_segments = $self->_find_interesting_xlogs(
         $old_source,
         ext_for_compression( $self->{ 'source' }->{ 'compression' } ),
     );
 
-    $self->log->log( '%s wal segments have to be uncompressed', scalar @wal_segments );
+    $self->log->log( '%s wal segments have to be uncompressed', scalar @{ $wal_segments } );
 
     my $all_ok        = 1;
     my $handle_finish = sub {
@@ -204,7 +204,7 @@ sub uncompress_wal_archive_segments {
         'on_finish' => $handle_finish,
     );
 
-    for my $segment ( @wal_segments ) {
+    for my $segment ( @{ $wal_segments } ) {
 
         my $old_file = File::Spec->catfile( $old_source, $segment );
         my $new_file = File::Spec->catfile( $new_source, $segment );
