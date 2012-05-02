@@ -177,7 +177,7 @@ sub uncompress_wal_archive_segments {
     return if 'none' eq $self->{ 'source' }->{ 'compression' };
 
     my $old_source = $self->{ 'source' }->{ 'path' };
-    my $new_source = File::Spec->catfile( $self->{ 'temp-dir' }, 'uncompresses_pg_xlogs' );
+    my $new_source = File::Spec->catfile( $self->{ 'temp-dir' }, 'uncompressed_pg_xlogs' );
     $self->{ 'source' }->{ 'path' } = $new_source;
 
     mkpath( [ $new_source ], 0, oct( "755" ) );
