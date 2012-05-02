@@ -26,11 +26,6 @@ Well, it can be helpful to avoid having to type another command to get to docs
 This has the benefit over command line options that it lets you change the
 options without Pg restart (in omnipitr-restore case at least).
 
-=item * Deliver to multiple destinations in parallel
-
-When delivering wal segments to slave server, and to backup destination - we can
-reduce the time it takes, by delivering it in parallel.
-
 =item * Add a way to specify "primary" destination for wal segments.
 
 This would be useful if you have WAL-slave in the same network, and additional
@@ -40,10 +35,13 @@ destinations wouldn't stop replication to primary destinations.
 =item * Make temp directories inside given temp-dir, based on pid and/or random
 values - to allow easy running (for example) 2 slaves on the same machine.
 
+=item * Make it possible to provide remote source in omnipitr-restore and
+omnipitr-backup-slave (remote, via http/ftp)
+
 =item * Make it possible to provide multiple sources for omnipitr-restore
 
-=item * Add specialized program to serve as archive_cleanup_command - with
-support for compressed walarchive, and pausing removal
+This is for migration purposes - for example, when you're switching your
+walarchive from compressed to not-compressed.
 
 =item * Add --version option to all programs.
 
@@ -62,6 +60,20 @@ xlogs it needs to keep for backup integrity.
 =item * Add support for using ZFS/LVM snapshops.
 
 This has the benefit of keeping required xlogs to a minimum for backups.
+
+=back
+
+=head2 DONE
+
+=over
+
+=item * [0.6.0] Deliver to multiple destinations in parallel
+
+When delivering wal segments to slave server, and to backup destination - we can
+reduce the time it takes, by delivering it in parallel.
+
+=item * [0.4.0] Add specialized program to serve as archive_cleanup_command - with
+support for compressed walarchive, and pausing removal
 
 =back
 
