@@ -506,6 +506,7 @@ I<omnipitr-restore>.
 
 sub pause_xlog_removal {
     my $self = shift;
+    return unless $self->{ 'removal-pause-trigger' };
 
     if ( open my $fh, '>', $self->{ 'removal-pause-trigger' } ) {
         print $fh $PROCESS_ID, "\n";
@@ -529,6 +530,7 @@ segments in I<omnipitr-restore>.
 
 sub unpause_xlog_removal {
     my $self = shift;
+    return unless $self->{ 'removal-pause-trigger' };
     unlink( $self->{ 'removal-pause-trigger' } );
     delete $self->{ 'removal-pause-trigger-created' };
     return;
@@ -713,12 +715,13 @@ sub validate_args {
     $self->log->fatal( 'Provided temp-dir (%s) is not writable!',  $self->{ 'temp-dir' } ) unless -w $self->{ 'temp-dir' };
     $self->log->fatal( 'Provided temp-dir (%s) contains # character!', $self->{ 'temp-dir' } ) if $self->{ 'temp-dir' } =~ /#/;
 
-    $self->log->fatal( 'Removal pause trigger name was not provided!' ) unless defined $self->{ 'removal-pause-trigger' };
-    $self->log->fatal( 'Provided removal pause trigger file (%s) already exists!', $self->{ 'removal-pause-trigger' } ) if -e $self->{ 'removal-pause-trigger' };
+    if ( defined $self->{ 'removal-pause-trigger' } ) {
+        $self->log->fatal( 'Provided removal pause trigger file (%s) already exists!', $self->{ 'removal-pause-trigger' } ) if -e $self->{ 'removal-pause-trigger' };
 
-    $self->log->fatal( 'Directory for provided removal pause trigger (%s) does not exist!',   $self->{ 'removal-pause-trigger' } ) unless -e dirname( $self->{ 'removal-pause-trigger' } );
-    $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not directory!', $self->{ 'removal-pause-trigger' } ) unless -d dirname( $self->{ 'removal-pause-trigger' } );
-    $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not writable!',  $self->{ 'removal-pause-trigger' } ) unless -w dirname( $self->{ 'removal-pause-trigger' } );
+        $self->log->fatal( 'Directory for provided removal pause trigger (%s) does not exist!',   $self->{ 'removal-pause-trigger' } ) unless -e dirname( $self->{ 'removal-pause-trigger' } );
+        $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not directory!', $self->{ 'removal-pause-trigger' } ) unless -d dirname( $self->{ 'removal-pause-trigger' } );
+        $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not writable!',  $self->{ 'removal-pause-trigger' } ) unless -w dirname( $self->{ 'removal-pause-trigger' } );
+    }
 
     my %bad_digest = ();
     for my $digest_type ( @{ $self->{ 'digests' } } ) {
