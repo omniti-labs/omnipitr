@@ -100,8 +100,15 @@ Trying to run second copy of I<omnipitr-backup-slave> will result in an error.
 
 =item --removal-pause-trigger (-p)
 
-name of file to be created to pause removal of old/obsolete segments. Should be
+Name of file to be created to pause removal of old/obsolete segments. Should be
 the same as condigured removal-pause-trigger for L<omnipitr-restore>. 
+
+This can be skipped if source of xlogs (-s) that I<omnipitr-backup-slave> is
+using, is not used by I<omnipitr-restore> running with I<-r> option.
+
+I.e. when you don't have -r option to I<omnipitr-restore>, or you're using
+special walarchive for your backups - you can skip the
+I<--removal-pause-trigger>.
 
 =item --call-master (-cm)
 

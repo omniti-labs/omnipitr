@@ -51,6 +51,10 @@ sub finish_pgdata_backup {
     $self->log->log( q{pg_stop_backup() returned %s.}, $stop_backup_output );
     $self->log->fatal( 'Output from pg_stop_backup is not parseable?!' ) unless $stop_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
 
+    my $timeline = substr( $self->{ 'wal_range' }->{ 'min' }, 0, 8 );
+    my $location_file = $self->convert_wal_location_and_timeline_to_filename( $stop_backup_output, $timeline );
+    $self->{ 'wal_range' }->{ 'max' } = $location_file;
+
     return;
 
 }
@@ -110,7 +114,15 @@ sub compress_xlogs {
     my $transform_to = basename( $self->{ 'data-dir' } ) . '/pg_xlog';
     my $transform_command = sprintf 's#^\(%s\|%s\)#%s#', $source_transform_from, $dot_backup_transform_from, $transform_to;
 
-    my @stuff_to_compress = ( basename( $self->{ 'source' }->{ 'path' } ) );
+    my @stuff_to_compress = ();
+    if ( 'none' eq $self->{ 'source' }->{ 'compression' } ) {
+        my $wal_files = $self->_find_interesting_xlogs( $self->{ 'source' }->{ 'path' }, '' );
+        my $dir_name = basename( $self->{ 'source' }->{ 'path' } );
+        push @stuff_to_compress, map { File::Spec->catfile( $dir_name, $_ ) } @{ $wal_files };
+    }
+    else {
+        push @stuff_to_compress, basename( $self->{ 'source' }->{ 'path' } );
+    }
     push @stuff_to_compress, File::Spec->catfile( $self->{ 'temp-dir' }, $self->{ 'dot_backup_filename' } ) if $self->{ 'dot_backup_filename' };
 
     $self->tar_and_compress(
@@ -123,6 +135,31 @@ sub compress_xlogs {
     $self->log->time_finish( 'Compressing xlogs' ) if $self->verbose;
 
     return;
+}
+
+=head1 _find_interesting_xlogs()
+
+Internal function that scans source path, and returns arrayref of filenames (without paths) that are xlogs withing interesting wal_range.
+
+=cut
+
+sub _find_interesting_xlogs {
+    my $self = shift;
+    my ( $directory, $extension ) = @_;
+
+    opendir my $dir, $directory or $self->log->fatal( 'Cannot open wal-archive (%s) : %s', $directory, $OS_ERROR );
+    my @wal_segments = sort grep { -f File::Spec->catfile( $directory, $_ ) && /\Q$extension\E\z/ } readdir( $dir );
+    close $dir;
+
+    my @reply = ();
+    for my $segment ( @wal_segments ) {
+        my $base_segment_name = substr( $segment, 0, 24 );
+        next if $base_segment_name lt $self->{ 'wal_range' }->{ 'min' };
+        next if $base_segment_name gt $self->{ 'wal_range' }->{ 'max' };
+        push @reply, $segment;
+    }
+
+    return \@reply;
 }
 
 =head1 uncompress_wal_archive_segments()
@@ -140,17 +177,17 @@ sub uncompress_wal_archive_segments {
     return if 'none' eq $self->{ 'source' }->{ 'compression' };
 
     my $old_source = $self->{ 'source' }->{ 'path' };
-    my $new_source = File::Spec->catfile( $self->{ 'temp-dir' }, 'uncompresses_pg_xlogs' );
+    my $new_source = File::Spec->catfile( $self->{ 'temp-dir' }, 'uncompressed_pg_xlogs' );
     $self->{ 'source' }->{ 'path' } = $new_source;
 
     mkpath( [ $new_source ], 0, oct( "755" ) );
 
-    opendir my $dir, $old_source or $self->log->fatal( 'Cannot open wal-archive (%s) : %s', $old_source, $OS_ERROR );
-    my $extension = ext_for_compression( $self->{ 'source' }->{ 'compression' } );
-    my @wal_segments = sort grep { -f File::Spec->catfile( $old_source, $_ ) && /\Q$extension\E\z/ } readdir( $dir );
-    close $dir;
+    my $wal_segments = $self->_find_interesting_xlogs(
+        $old_source,
+        ext_for_compression( $self->{ 'source' }->{ 'compression' } ),
+    );
 
-    $self->log->log( '%s wal segments have to be uncompressed', scalar @wal_segments );
+    $self->log->log( '%s wal segments have to be uncompressed', scalar @{ $wal_segments } );
 
     my $all_ok        = 1;
     my $handle_finish = sub {
@@ -167,7 +204,8 @@ sub uncompress_wal_archive_segments {
         'on_finish' => $handle_finish,
     );
 
-    for my $segment ( @wal_segments ) {
+    for my $segment ( @{ $wal_segments } ) {
+
         my $old_file = File::Spec->catfile( $old_source, $segment );
         my $new_file = File::Spec->catfile( $new_source, $segment );
         copy( $old_file, $new_file ) or $self->log->fatal( 'Cannot copy %s to %s: %s', $old_file, $new_file, $OS_ERROR );
@@ -214,6 +252,9 @@ sub make_dot_backup_file {
             $final_wal_filename = $minimum_wal_filename;
         }
     }
+
+    # This is set in here only if we're not calling master. If we do, then the max is set in finish_pgdata_backup()
+    $self->{ 'wal_range' }->{ 'max' } = $final_wal_filename;
 
     my $final_wal_filename_re = qr{\A$final_wal_filename};
     $self->wait_for_file( $self->{ 'source' }->{ 'path' }, $final_wal_filename_re );
@@ -290,9 +331,12 @@ sub make_backup_label_temp_file {
         my $redo_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's REDO location" };
         my $last_location = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint location" };
         my $timeline      = $self->{ 'CONTROL' }->{ 'initial' }->{ "Latest checkpoint's TimeLineID" };
+        my $location_file = $self->convert_wal_location_and_timeline_to_filename( $redo_location, $timeline );
+
+        $self->{ 'wal_range' }->{ 'min' } = $location_file;
 
         my @content_lines = ();
-        push @content_lines, sprintf 'START WAL LOCATION: %s (file %s)', $redo_location, $self->convert_wal_location_and_timeline_to_filename( $redo_location, $timeline );
+        push @content_lines, sprintf 'START WAL LOCATION: %s (file %s)', $redo_location, $location_file;
         push @content_lines, sprintf 'CHECKPOINT LOCATION: %s', $last_location;
         push @content_lines, sprintf 'START TIME: %s', strftime( '%Y-%m-%d %H:%M:%S %Z', localtime time );
         push @content_lines, 'LABEL: OmniPITR_Slave_Hot_Backup';
@@ -346,6 +390,13 @@ sub get_backup_label_from_master {
     );
 
     $self->{ 'backup_file_data' } = [ split( /\n/, $backup_label_content ) ];
+
+    my @start_wal_lines = grep { m{\ASTART WAL LOCATION: \S+ \(file (\S+)\)\s*\z} } @{ $self->{ 'backup_file_data' } };
+    if ( 1 != scalar @start_wal_lines ) {
+        $self->log->fatal( "There is no line with START WAL LOCATION in the .backup file (or there are many), it should't happen" );
+    }
+    $start_wal_lines[ 0 ] =~ s{\ASTART WAL LOCATION: \S+ \(file (\S+)\)\s*\z}{$1};
+    $self->{ 'wal_range' }->{ 'min' } = $start_wal_lines[ 0 ];
 
     $self->wait_for_checkpoint_from_backup_label();
 
@@ -455,6 +506,7 @@ I<omnipitr-restore>.
 
 sub pause_xlog_removal {
     my $self = shift;
+    return unless $self->{ 'removal-pause-trigger' };
 
     if ( open my $fh, '>', $self->{ 'removal-pause-trigger' } ) {
         print $fh $PROCESS_ID, "\n";
@@ -478,6 +530,7 @@ segments in I<omnipitr-restore>.
 
 sub unpause_xlog_removal {
     my $self = shift;
+    return unless $self->{ 'removal-pause-trigger' };
     unlink( $self->{ 'removal-pause-trigger' } );
     delete $self->{ 'removal-pause-trigger-created' };
     return;
@@ -662,12 +715,13 @@ sub validate_args {
     $self->log->fatal( 'Provided temp-dir (%s) is not writable!',  $self->{ 'temp-dir' } ) unless -w $self->{ 'temp-dir' };
     $self->log->fatal( 'Provided temp-dir (%s) contains # character!', $self->{ 'temp-dir' } ) if $self->{ 'temp-dir' } =~ /#/;
 
-    $self->log->fatal( 'Removal pause trigger name was not provided!' ) unless defined $self->{ 'removal-pause-trigger' };
-    $self->log->fatal( 'Provided removal pause trigger file (%s) already exists!', $self->{ 'removal-pause-trigger' } ) if -e $self->{ 'removal-pause-trigger' };
+    if ( defined $self->{ 'removal-pause-trigger' } ) {
+        $self->log->fatal( 'Provided removal pause trigger file (%s) already exists!', $self->{ 'removal-pause-trigger' } ) if -e $self->{ 'removal-pause-trigger' };
 
-    $self->log->fatal( 'Directory for provided removal pause trigger (%s) does not exist!',   $self->{ 'removal-pause-trigger' } ) unless -e dirname( $self->{ 'removal-pause-trigger' } );
-    $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not directory!', $self->{ 'removal-pause-trigger' } ) unless -d dirname( $self->{ 'removal-pause-trigger' } );
-    $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not writable!',  $self->{ 'removal-pause-trigger' } ) unless -w dirname( $self->{ 'removal-pause-trigger' } );
+        $self->log->fatal( 'Directory for provided removal pause trigger (%s) does not exist!',   $self->{ 'removal-pause-trigger' } ) unless -e dirname( $self->{ 'removal-pause-trigger' } );
+        $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not directory!', $self->{ 'removal-pause-trigger' } ) unless -d dirname( $self->{ 'removal-pause-trigger' } );
+        $self->log->fatal( 'Directory for provided removal pause trigger (%s) is not writable!',  $self->{ 'removal-pause-trigger' } ) unless -w dirname( $self->{ 'removal-pause-trigger' } );
+    }
 
     my %bad_digest = ();
     for my $digest_type ( @{ $self->{ 'digests' } } ) {

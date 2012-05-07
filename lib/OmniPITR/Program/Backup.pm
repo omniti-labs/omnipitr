@@ -355,7 +355,16 @@ sub _tar_command {
         }
     }
 
-    push @tar_command, @{ $ARGS{ 'tar_dir' } };
+    if ( 200 > scalar @{ $ARGS{ 'tar_dir' } } ) {
+        push @tar_command, @{ $ARGS{ 'tar_dir' } };
+    }
+    else {
+        my $tar_list_file = $self->temp_file( 'tar.file.list' );
+        open my $fh, '>', $tar_list_file or $self->log->fatal( 'Cannot write to temporary file?!' );
+        print $fh "$_\n" for @{ $ARGS{ 'tar_dir' } };
+        close $fh;
+        push @tar_command, '--files-from=' . $tar_list_file;
+    }
 
     my $tar = OmniPITR::Tools::CommandPiper->new( @tar_command );
 
