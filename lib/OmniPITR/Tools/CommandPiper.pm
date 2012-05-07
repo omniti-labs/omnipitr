@@ -9,7 +9,7 @@ OmniPITR::Tools::CommandPiper - Class for building complex pipe-based shell comm
 
 =cut
 
-our $VERSION = '0.6.0';
+our $VERSION = '0.7.0';
 
 =head1 SYNOPSIS
 

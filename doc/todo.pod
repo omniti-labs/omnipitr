@@ -50,9 +50,6 @@ walarchive from compressed to not-compressed.
 This is assuming the user is keeping their own xlog archive and will limit
 the ability to restore a standalone database.
 
-=item * Have omnipitr-backup-* look at .backup file to determine exactly what
-xlogs it needs to keep for backup integrity.
-
 =item * Support sending to cloud storage such as Amazon S3
 
 =item * Add support for xz compression (similar to lzma)
@@ -66,6 +63,9 @@ This has the benefit of keeping required xlogs to a minimum for backups.
 =head2 DONE
 
 =over
+
+=item * [0.7.0] Have omnipitr-backup-* look at .backup file to determine exactly what
+xlogs it needs to keep for backup integrity.
 
 =item * [0.6.0] Deliver to multiple destinations in parallel
 
