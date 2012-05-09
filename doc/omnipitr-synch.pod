@@ -309,5 +309,5 @@ server - you should be sure what you want to do not to delete important files.
 
 =head2 COPYRIGHT
 
-The OmniPITR project is Copyright (c) 2011 OmniTI. All rights reserved.
+The OmniPITR project is Copyright (c) 2011-2012 OmniTI. All rights reserved.
 
