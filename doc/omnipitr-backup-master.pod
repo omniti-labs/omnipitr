@@ -65,11 +65,6 @@ Please check L<DIRECT-DESTINATION> part for more details.
 Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment
 variable location)
 
-=item --state-dir (-s)
-
-Name of directory to use as state-directory to handle errors when sending wal
-segments to many locations.
-
 =item --log (-l)
 
 Name of logfile (actually template, as it supports %% L<strftime(3)>
