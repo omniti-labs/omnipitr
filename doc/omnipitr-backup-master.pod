@@ -499,16 +499,16 @@ necessary, but will help if you'd ever need to recover from such backup.
 
 =head3 Minimal setup, with copying file to local directory:
 
-    /.../omnipitr-backup-master -D /mnt/data -l /var/log/omnipitr/backup.log -dl /mnt/backups/
+    /.../omnipitr-backup-master -D /mnt/data -l /var/log/omnipitr/backup.log -dl /mnt/backups/ -x /mnt/dst-backup
 
 =head3 Minimal setup, with compression, and copying file to remote directory over rsync:
 
-    /.../omnipitr-backup-master -D /mnt/data/ -l /var/log/omnipitr/backup.log -dr bzip2=rsync://slave/postgres/backups/
+    /.../omnipitr-backup-master -D /mnt/data/ -l /var/log/omnipitr/backup.log -dr bzip2=rsync://slave/postgres/backups/ -x /mnt/dst-backup
 
 =head3 2 remote, compressed destinations, 1 local, with auto rotated logfile,
 and modified filenames
 
-    /.../omnipitr-backup-master -D /mnt/data/ -l /var/log/omnipitr/backup-^Y-^m-^d.log -dr bzip2=rsync://slave/postgres/backups/ -dr gzip=backups:/mnt/hotbackups/ -dl /mnt/backups/ -f "main-__FILETYPE__-^Y^m^d_^H^M^S.tar__CEXT__"
+    /.../omnipitr-backup-master -D /mnt/data/ -l /var/log/omnipitr/backup-^Y-^m-^d.log -dr bzip2=rsync://slave/postgres/backups/ -dr gzip=backups:/mnt/hotbackups/ -dl /mnt/backups/ -f "main-__FILETYPE__-^Y^m^d_^H^M^S.tar__CEXT__" -x /mnt/dst-backup
 
 =head2 IMPORTANT NOTICES
 
