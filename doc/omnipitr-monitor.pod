@@ -2,7 +2,7 @@
 
 =head2 USAGE
 
-/some/path/omnipitr/bin/omnipitr-monitor --log=... --check=... [--state-dir=...] [options]
+/some/path/omnipitr/bin/omnipitr-monitor [options]
 
 Where:
 
@@ -21,20 +21,51 @@ special character, which requires you to quote the log filename (if it contains
 
     --log '/var/log/omnipitr-^Y-^m-^d.log'
 
+You can provide multiple --log options, in case your system is configured in
+such a way that every tool logs to its own logs.
+
 =item * --check (-c) contains name of check that should be performed.
 
-For list of check, please read L<CHECKS> section.
+For list of checks, please read L<CHECKS> section.
 
-=item * --state-dir (-s) is a name of directory that can be used to store state
+=item * --state-dir (-s) is a name of directory that will be used to store state
 between calls to checks
-
-This is primarily used to report rates or errors - to avoid checking full logs,
-and just check from last known position.
 
 =item * options depend on which check being performed.
 
 Most checks don't have any options. List of options for check is supplied in
 L<CHECKS> section.
+
+Any check can have it's own set of options, but there are four reserved options
+for database connection settings:
+
+=over
+
+=item --database (-d)
+
+Which database to connect to to issue required SQL queries. Defaults to
+template1.
+
+=item --host (-h)
+
+Which host to connect to when connecting to database to backup. Shouldn't really
+be changed in 99% of cases. Defaults to empty string - i.e. use UNIX sockets.
+
+=item --port (-p)
+
+Which port to connect to when connecting to database. Defaults to 5432.
+
+=item --username (-U)
+
+What username to use when connecting to database. Defaults to postgres.
+
+=back
+
+That is - if any check requires connection to database - details of connections
+will be expected to be passed using these options.
+
+And if the check doesn't need database access - it is guaranteed that these
+options (neither long nor short forms) will not be reused for other purposes.
 
 =back
 
@@ -71,7 +102,7 @@ Where value of from is treated as:
 
 =over
 
-=item * Date time in format: ^Y-^m-^d ^H:^M:^S (for example: 2009-12-24
+=item * Date time in format: %Y-%m-%d %H:%M:%S (for example: 2009-12-24
 15:45:32)
 
 =item * interval, in seconds (for example: 300 - means check last 5 minutes)
