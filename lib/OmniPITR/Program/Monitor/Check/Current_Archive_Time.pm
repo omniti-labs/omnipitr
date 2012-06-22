@@ -1,4 +1,4 @@
-package OmniPITR::Program::Monitor::Check::Last_Archive_Age;
+package OmniPITR::Program::Monitor::Check::Current_Archive_Time;
 
 use strict;
 use warnings;
@@ -14,22 +14,16 @@ sub run_check {
     my $self  = shift;
     my $state = shift;
 
-    my $last_archive = undef;
-
     my $S = $state->{'Archive'};
     for my $T ( values %{ $S } ) {
         for my $X ( values %{ $T } ) {
-            next unless defined $X->[1];
-            if (
-                ( ! defined $last_archive ) ||
-                ( $last_archive < $X->[1] )
-            ) {
-                $last_archive = $X->[1];
-            }
+            next if defined $X->[1];
+            printf '%f%s', time() - $X->[0], "\n";
+            return;
         }
     }
 
-    printf '%f%s', time() - $last_archive, "\n";
+    print "0\n";
     return;
 }
 

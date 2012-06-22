@@ -78,7 +78,7 @@ sub setup {
         croak( "$key not given in call to ->setup()." ) unless defined $args{ $key };
         $self->{ $key } = $args{ $key };
     }
-    $self->{ 'state' }->{ 'parsed' }->{ $self->{ 'class' } } = {} unless defined $self->{ 'state' }->{ 'parsed' }->{ $self->{ 'class' } };
+    $self->{ 'state' }->{ $self->{ 'class' } } = {} unless defined $self->{ 'state' }->{ $self->{ 'class' } };
     return;
 }
 
@@ -106,18 +106,40 @@ If the 2nd argument is defined, it sets value for given key to given value, and 
 
 sub state {
     my $self = shift;
-    my $S    = $self->{ 'state' }->{ $self->{ 'class' } };
+    my $S = $self->{ 'state' }->{ $self->{ 'class' } };
+
+    return $S if 0 == scalar @_;
 
     my $key = shift;
-    if ( 0 == scalar @_ ) {
-        return $S->{ $key };
-    }
+    return $S->{ $key } if 0 == scalar @_;
+
     my $value = shift;
-    if ( defined $value ) {
-        return $S->{ $key } = $value;
-    }
+    return $S->{ $key } = $value if defined $value;
+
     delete $S->{ $key };
     return;
+}
+
+=head1 split_xlog_filename()
+
+Splits given xlog filename (24 hex characters) into a pair of timeline and xlog offset.
+
+Both are trimmed of leading 0s to save space on state saving.
+
+=cut
+
+sub split_xlog_filename {
+    my $self = shift;
+    my $xlog_name = shift;
+
+    my ( $timeline, @elements ) = unpack( '(A8)3', $xlog_name );
+    $timeline =~ s/^0*//;
+
+    $elements[ 0 ] =~ s/^0*//;
+    $elements[ 1 ] =~ s/^0{6}//;
+    my $xlog_offset = join '', @elements;
+
+    return( $timeline, $xlog_offset );
 }
 
 1;

@@ -31,6 +31,8 @@ For list of checks, please read L<CHECKS> section.
 =item * --state-dir (-s) is a name of directory that will be used to store state
 between calls to checks
 
+=item * --verbose (-v) shows information about reading lines from log files.
+
 =item * options depend on which check being performed.
 
 Most checks don't have any options. List of options for check is supplied in
@@ -80,6 +82,16 @@ values useful for monitoring in Nagios, Cacti or other tools.
 
 When was the last WAL segment archived. Returns value in seconds being interval
 between "now" and the moment when last archive happened.
+
+Requires path to log from I<omnipitr-archive>
+
+=head3 current-archive-time
+
+This check returns 0 if there is currently no archive happening. If there is
+one, it will return number of seconds that passed since start of archiving.
+
+This might be used, for example, to raise alert if single archive takes more
+than x seconds.
 
 Requires path to log from I<omnipitr-archive>
 

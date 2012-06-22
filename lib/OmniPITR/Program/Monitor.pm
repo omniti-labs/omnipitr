@@ -31,8 +31,21 @@ information - simply check doc for the method you have questions about.
 sub run {
     my $self = shift;
     $self->load_state();
-    $self->read_logs();
-    $self->save_state();
+    $self->save_state() if $self->read_logs();
+
+    my $check_state_dir = File::Spec->catfile( $self->{ 'state-dir' }, 'Check-' . $self->{ 'check' } );
+    if ( !-d $check_state_dir ) {
+        $self->log->fatal( 'Cannot create state dir for check (%s) : %s', $check_state_dir, $OS_ERROR ) unless mkdir $check_state_dir;
+    }
+
+    my $O = $self->{ 'check_object' };
+    $O->setup(
+        'state-dir' => $check_state_dir,
+        'log'       => $self->{ 'log' },
+    );
+
+    $O->get_args();
+    $O->run_check( $self->{ 'state' } );
     return;
 }
 
@@ -54,6 +67,8 @@ sub read_logs {
     # SHORTCUT
 
     my @sorted_files = sort { $F->{ $a }->{ 'start_epoch' } <=> $F->{ $b }->{ 'start_epoch' } } @{ $self->{ 'log_files' } };
+
+    my $any_changes = undef;
 
     for my $filename ( @sorted_files ) {
 
@@ -79,10 +94,11 @@ sub read_logs {
             $i++;
         }
         close $fh;
-        $self->log->log( 'Read %d lines from %s', $i, $filename );
+        $self->log->log( 'Read %d lines from %s', $i, $filename ) if $self->{ 'verbose' };
+        $any_changes = 1 if $i;
     }
 
-    return;
+    return $any_changes;
 }
 
 =head1 parse_line()
@@ -110,7 +126,8 @@ sub parse_line {
 
     my $P = $self->{ 'parser' }->{ $program_name };
     if ( !$P ) {
-        $P = $self->load_dynamic_object( 'OmniPITR::Program::Monitor::Parser', $program_name );
+        my $ignore;
+        ( $P, $ignore ) = $self->load_dynamic_object( 'OmniPITR::Program::Monitor::Parser', $program_name );
         $self->{ 'parser' }->{ $program_name } = $P;
         $P->setup(
             'state' => $self->{ 'state' },
@@ -120,7 +137,7 @@ sub parse_line {
 
     $P->handle_line( $data );
 
-    exit;
+    return;
 }
 
 =head1 get_list_of_log_files()
@@ -294,8 +311,6 @@ sub save_state {
 
     close $fh;
 
-    $self->log->log( 'Saved state: %s', $self->{ 'state' } );
-
     return;
 }
 
@@ -316,9 +331,10 @@ sub read_args {
         'log|l=s@',
         'check|c=s',
         'state-dir|s=s',
+        'verbose|v',
         );
 
-    for my $key ( qw( check state-dir ) ) {
+    for my $key ( qw( check state-dir verbose ) ) {
         next unless defined $args{ $key };
         $self->{ $key } = $args{ $key };
     }
@@ -354,7 +370,7 @@ sub validate_args {
         $path =~ s/\^/\%/g;
     }
 
-    $self->{ 'check_object' } = $self->load_dynamic_object( 'OmniPITR::Program::Monitor::Check', $self->{ 'check' } );
+    ( $self->{ 'check_object' }, $self->{ 'check' } ) = $self->load_dynamic_object( 'OmniPITR::Program::Monitor::Check', $self->{ 'check' } );
 
     return;
 }
@@ -392,7 +408,7 @@ sub load_dynamic_object {
     };
     $self->log->fatal( 'Cannot load class %s: %s', $full_class_name, $EVAL_ERROR ) if $EVAL_ERROR;
 
-    return $object;
+    return $object, $dynamic_part;
 }
 
 1;
