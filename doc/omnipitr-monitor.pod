@@ -139,11 +139,11 @@ Requires path to log from I<omnipitr-master-backup> or I<omnipitr-slave-backup>
 
     .../omnipitr-monitor -l /var/log/omnipitr/restore-^Y-^m-^d.log -c last-restore-age -s /var/lib/omnipitr
 
-=head3 Getting errors for raporting:
+=head3 Getting errors for reporting:
 
     .../omnipitr-monitor -l /var/log/omnipitr/archive-^Y-^m-^d.log -c errors -s /var/lib/omnipitr
 
-=head3 Getting errors for raporting, but checking always only last 10 minutes of
+=head3 Getting errors for reporting, but checking always only last 10 minutes of
 logs:
 
     .../omnipitr-monitor -l /var/log/omnipitr/archive-^Y-^m-^d.log -c errors -s /var/lib/omnipitr --from=600
