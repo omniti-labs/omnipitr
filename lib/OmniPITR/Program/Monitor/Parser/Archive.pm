@@ -55,18 +55,17 @@ sub handle_line {
 
     if ( $D->{ 'line' } =~ m{\ALOG : Called with parameters: .* pg_xlog/([a-f0-9]{24})\z}i ) {
         my ( $timeline, $xlog_offset ) = $self->split_xlog_filename( $1 );
-        $S->{ $timeline }->{ $xlog_offset }->[0] ||= $D->{ 'epoch' };
+        $S->{ $timeline }->{ $xlog_offset }->[ 0 ] ||= $D->{ 'epoch' };
         return;
     }
 
     if ( $D->{ 'line' } =~ m{\ALOG : Segment .*/([a-f0-9]{24}) successfully sent to all destinations\.\z}i ) {
         my ( $timeline, $xlog_offset ) = $self->split_xlog_filename( $1 );
-        $S->{ $timeline }->{ $xlog_offset }->[1] = $D->{ 'epoch' };
+        $S->{ $timeline }->{ $xlog_offset }->[ 1 ] = $D->{ 'epoch' };
         return;
     }
 
     return;
 }
-
 
 1;

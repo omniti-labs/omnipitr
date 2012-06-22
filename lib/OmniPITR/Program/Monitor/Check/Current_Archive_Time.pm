@@ -14,11 +14,11 @@ sub run_check {
     my $self  = shift;
     my $state = shift;
 
-    my $S = $state->{'Archive'};
+    my $S = $state->{ 'Archive' };
     for my $T ( values %{ $S } ) {
         for my $X ( values %{ $T } ) {
-            next if defined $X->[1];
-            printf '%f%s', time() - $X->[0], "\n";
+            next if defined $X->[ 1 ];
+            printf '%f%s', time() - $X->[ 0 ], "\n";
             return;
         }
     }

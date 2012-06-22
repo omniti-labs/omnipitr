@@ -16,15 +16,14 @@ sub run_check {
 
     my $last_archive = undef;
 
-    my $S = $state->{'Archive'};
+    my $S = $state->{ 'Archive' };
     for my $T ( values %{ $S } ) {
         for my $X ( values %{ $T } ) {
-            next unless defined $X->[1];
-            if (
-                ( ! defined $last_archive ) ||
-                ( $last_archive < $X->[1] )
-            ) {
-                $last_archive = $X->[1];
+            next unless defined $X->[ 1 ];
+            if (   ( !defined $last_archive )
+                || ( $last_archive < $X->[ 1 ] ) )
+            {
+                $last_archive = $X->[ 1 ];
             }
         }
     }

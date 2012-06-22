@@ -106,7 +106,7 @@ If the 2nd argument is defined, it sets value for given key to given value, and 
 
 sub state {
     my $self = shift;
-    my $S = $self->{ 'state' }->{ $self->{ 'class' } };
+    my $S    = $self->{ 'state' }->{ $self->{ 'class' } };
 
     return $S if 0 == scalar @_;
 
@@ -129,7 +129,7 @@ Both are trimmed of leading 0s to save space on state saving.
 =cut
 
 sub split_xlog_filename {
-    my $self = shift;
+    my $self      = shift;
     my $xlog_name = shift;
 
     my ( $timeline, @elements ) = unpack( '(A8)3', $xlog_name );
@@ -139,7 +139,7 @@ sub split_xlog_filename {
     $elements[ 1 ] =~ s/^0{6}//;
     my $xlog_offset = join '', @elements;
 
-    return( $timeline, $xlog_offset );
+    return ( $timeline, $xlog_offset );
 }
 
 1;
