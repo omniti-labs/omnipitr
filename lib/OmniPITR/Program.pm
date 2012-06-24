@@ -268,10 +268,10 @@ Otherwise returns stdout of the psql.
 =cut
 
 sub psql {
-    my $self = shift;
+    my $self  = shift;
     my $query = shift;
 
-    unless ( $self->{'psql'} ) {
+    unless ( $self->{ 'psql' } ) {
         my @psql = ();
         push @psql, $self->{ 'psql-path' };
         push @psql, '-qAtX';
@@ -280,7 +280,7 @@ sub psql {
         push @psql, ( '-h', $self->{ 'host' } )     if $self->{ 'host' };
         push @psql, ( '-p', $self->{ 'port' } )     if $self->{ 'port' };
         push @psql, '-c';
-        $self->{'psql'} = \@psql;
+        $self->{ 'psql' } = \@psql;
     }
 
     $self->prepare_temp_directory();
@@ -334,10 +334,10 @@ sub get_tablespaces {
         my $full_name = File::Spec->catfile( $tablespace_dir, $filename );
         next if !-l $full_name;          # It should be a symbolic link
         my $pg_visible = readlink $full_name;
-        my $real_path = Cwd::abs_path( $full_name );
+        my $real_path  = Cwd::abs_path( $full_name );
         $tablespaces{ $filename } = {
             'pg_visible' => $pg_visible,
-            'real_path' => $real_path,
+            'real_path'  => $real_path,
         };
     }
     closedir $dh;

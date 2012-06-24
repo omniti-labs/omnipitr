@@ -19,10 +19,10 @@ sub run_check {
     for my $backup_type ( qw( Backup_Master Backup_Slave ) ) {
         next unless $state->{ $backup_type };
         my $S = $state->{ $backup_type };
-        for my $backup (reverse @{ $S } ) {
-            next unless $backup->[2];
-            if ( ( !defined $last_backup) || ($last_backup< $backup->[2])) {
-                $last_backup = $backup->[2];
+        for my $backup ( reverse @{ $S } ) {
+            next unless $backup->[ 2 ];
+            if ( ( !defined $last_backup ) || ( $last_backup < $backup->[ 2 ] ) ) {
+                $last_backup = $backup->[ 2 ];
             }
             last;
         }
@@ -30,7 +30,8 @@ sub run_check {
 
     if ( defined $last_backup ) {
         printf '%f%s', time() - $last_backup, "\n";
-    } else {
+    }
+    else {
         print "0\n";
     }
     return;

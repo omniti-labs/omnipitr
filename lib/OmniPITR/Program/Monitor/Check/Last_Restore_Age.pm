@@ -29,7 +29,8 @@ sub run_check {
     }
     if ( defined $last_restore ) {
         printf '%f%s', time() - $last_restore, "\n";
-    } else {
+    }
+    else {
         print "0\n";
     }
     return;

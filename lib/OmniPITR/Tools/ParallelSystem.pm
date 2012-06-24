@@ -201,6 +201,7 @@ sub run {
     no warnings;
     $SIG{ 'CHLD' } = $self->{ 'previous_chld_handler' };
     use warnings;
+
     # The no warnings/use warnings "dance" is a workaround for stupid warnings in perl 5.8
 
     delete $self->{ 'previous_chld_handler' };

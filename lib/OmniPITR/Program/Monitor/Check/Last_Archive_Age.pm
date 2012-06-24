@@ -30,7 +30,8 @@ sub run_check {
 
     if ( defined $last_archive ) {
         printf '%f%s', time() - $last_archive, "\n";
-    } else {
+    }
+    else {
         print "0\n";
     }
     return;
