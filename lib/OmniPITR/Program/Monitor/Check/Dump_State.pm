@@ -8,10 +8,16 @@ use English qw( -no_match_vars );
 our $VERSION = '0.7.0';
 use base qw( OmniPITR::Program::Monitor::Check );
 
+use Data::Dumper;
+
 sub run_check {
     my $self  = shift;
     my $state = shift;
-    $self->log->log( 'State = %s', $state );
+    my $d     = Data::Dumper->new( [ $state ], [ 'state' ] );
+    $d->Sortkeys( 1 );
+    $d->Indent( 1 );
+    $d->{ 'xpad' } = '    ';
+    print $d->Dump();
     return;
 }
 

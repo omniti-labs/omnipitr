@@ -31,7 +31,10 @@ information - simply check doc for the method you have questions about.
 sub run {
     my $self = shift;
     $self->load_state();
-    $self->save_state() if $self->read_logs();
+    if ( $self->read_logs() ) {
+        $self->clean_old_state();
+        $self->save_state();
+    }
 
     my $check_state_dir = File::Spec->catfile( $self->{ 'state-dir' }, 'Check-' . $self->{ 'check' } );
     if ( !-d $check_state_dir ) {
@@ -124,18 +127,53 @@ sub parse_line {
         'line'      => $line,
     };
 
-    my $P = $self->{ 'parser' }->{ $program_name };
-    if ( !$P ) {
-        my $ignore;
-        ( $P, $ignore ) = $self->load_dynamic_object( 'OmniPITR::Program::Monitor::Parser', $program_name );
-        $self->{ 'parser' }->{ $program_name } = $P;
-        $P->setup(
-            'state' => $self->{ 'state' },
-            'log'   => $self->{ 'log' },
-        );
+    if ( $line =~ m{^(ERROR|FATAL) : } ) {
+        push @{ $self->{ 'state' }->{ 'errors' }->{ $1 } }, $data;
     }
 
-    $P->handle_line( $data );
+    my $P = $self->{ 'parser' }->{ $program_name };
+    if ( !defined $P ) {
+        my $ignore;
+        ( $P, $ignore ) = $self->load_dynamic_object( 'OmniPITR::Program::Monitor::Parser', $program_name );
+        if ( defined $P ) {
+            $self->{ 'parser' }->{ $program_name } = $P;
+            $P->setup(
+                'state' => $self->{ 'state' },
+                'log'   => $self->{ 'log' },
+            );
+        }
+        else {
+            $self->{ 'parser' }->{ $program_name } = '';
+        }
+    }
+
+    $P->handle_line( $data ) if ref $P;
+
+    return;
+}
+
+=head1 clean_old_state()
+
+Calls ->clean_state() on all parser objects (that were used in current iteration).
+
+This is to remove from state old data, that is of no use currently.
+
+=cut
+
+sub clean_old_state {
+    my $self = shift;
+
+    for my $P ( values %{ $self->{ 'parser' } } ) {
+        next unless ref $P;
+        next unless $P->can( 'clean_state' );
+        $P->clean_state();
+    }
+
+    my $cutoff = time() - 30 * 24 * 60 * 60;    # month ago
+    for my $type ( qw( ERROR FATAL ) ) {
+        next unless defined $self->{ 'state' }->{ 'errors' }->{ $type };
+        $self->{ 'state' }->{ 'errors' }->{ $type } = [ grep { $_->{ 'epoch' } >= $cutoff } @{ $self->{ 'state' }->{ 'errors' }->{ $type } } ];
+    }
 
     return;
 }
@@ -371,6 +409,7 @@ sub validate_args {
     }
 
     ( $self->{ 'check_object' }, $self->{ 'check' } ) = $self->load_dynamic_object( 'OmniPITR::Program::Monitor::Check', $self->{ 'check' } );
+    $self->log->fatal( 'Check code cannot be loaded.' ) unless $self->{ 'check_object' };
 
     return;
 }
@@ -406,7 +445,10 @@ sub load_dynamic_object {
         require $class_filename;
         $object = $full_class_name->new();
     };
-    $self->log->fatal( 'Cannot load class %s: %s', $full_class_name, $EVAL_ERROR ) if $EVAL_ERROR;
+    if ( $EVAL_ERROR ) {
+        $self->log->error( 'Cannot load class %s: %s', $full_class_name, $EVAL_ERROR ) if $self->{ 'verbose' };
+        return ( undef, undef );
+    }
 
     return $object, $dynamic_part;
 }

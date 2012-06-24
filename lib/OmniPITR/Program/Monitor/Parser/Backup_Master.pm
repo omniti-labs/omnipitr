@@ -1,4 +1,4 @@
-package OmniPITR::Program::Monitor::Parser::Backup_Slave;
+package OmniPITR::Program::Monitor::Parser::Backup_Master;
 
 use strict;
 use warnings;

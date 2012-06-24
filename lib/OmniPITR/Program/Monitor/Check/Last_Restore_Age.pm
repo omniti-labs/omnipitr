@@ -1,4 +1,4 @@
-package OmniPITR::Program::Monitor::Check::Last_Archive_Age;
+package OmniPITR::Program::Monitor::Check::Last_Restore_Age;
 
 use strict;
 use warnings;
@@ -14,22 +14,21 @@ sub run_check {
     my $self  = shift;
     my $state = shift;
 
-    my $last_archive = undef;
+    my $last_restore = undef;
 
-    my $S = $state->{ 'Archive' };
+    my $S = $state->{ 'Restore' };
     for my $T ( values %{ $S } ) {
         for my $X ( values %{ $T } ) {
             next unless defined $X->[ 1 ];
-            if (   ( !defined $last_archive )
-                || ( $last_archive < $X->[ 1 ] ) )
+            if (   ( !defined $last_restore )
+                || ( $last_restore < $X->[ 1 ] ) )
             {
-                $last_archive = $X->[ 1 ];
+                $last_restore = $X->[ 1 ];
             }
         }
     }
-
-    if ( defined $last_archive ) {
-        printf '%f%s', time() - $last_archive, "\n";
+    if ( defined $last_restore ) {
+        printf '%f%s', time() - $last_restore, "\n";
     } else {
         print "0\n";
     }

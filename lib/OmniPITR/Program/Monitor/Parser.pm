@@ -78,8 +78,18 @@ sub setup {
         croak( "$key not given in call to ->setup()." ) unless defined $args{ $key };
         $self->{ $key } = $args{ $key };
     }
-    $self->{ 'state' }->{ $self->{ 'class' } } = {} unless defined $self->{ 'state' }->{ $self->{ 'class' } };
+    $self->{ 'state' }->{ $self->{ 'class' } } = $self->empty_state() unless defined $self->{ 'state' }->{ $self->{ 'class' } };
     return;
+}
+
+=head1 empty_state
+
+This method should be overwritten in parsers that assume that their state is something else then hashref.
+
+=cut
+
+sub empty_state {
+    return {};
 }
 
 =head1 log()
