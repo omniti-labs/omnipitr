@@ -45,6 +45,7 @@ sub run {
     $O->setup(
         'state-dir' => $check_state_dir,
         'log'       => $self->{ 'log' },
+        'psql'      => sub { return $self->psql( @_ ) },
     );
 
     $O->get_args();
@@ -361,7 +362,10 @@ Function which handles reading of base arguments ( i.e. without options specific
 sub read_args {
     my $self = shift;
 
-    my %args = ();
+    my %args = (
+        'temp-dir' => $ENV{ 'TMPDIR' } || '/tmp',
+        'psql-path' => 'psql',
+    );
 
     croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
         unless GetOptions(
@@ -370,9 +374,15 @@ sub read_args {
         'check|c=s',
         'state-dir|s=s',
         'verbose|v',
+        'database|d=s',
+        'host|h=s',
+        'port|p=i',
+        'username|U=s',
+        'temp-dir|t=s',
+        'psql-path|pp=s',
         );
 
-    for my $key ( qw( check state-dir verbose ) ) {
+    for my $key ( qw( check state-dir verbose database host port username temp-dir psql-path ) ) {
         next unless defined $args{ $key };
         $self->{ $key } = $args{ $key };
     }

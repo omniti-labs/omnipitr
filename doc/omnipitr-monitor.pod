@@ -33,6 +33,12 @@ between calls to checks
 
 =item * --verbose (-v) shows information about reading lines from log files.
 
+=item * --psql-path (-pp) path to psql - used when getting data from
+database
+
+=item * --temp-dir (-t) - Where to create temporary files (defaults to /tmp
+or I<$TMPDIR> environment variable location)
+
 =item * options depend on which check being performed.
 
 Most checks don't have any options. List of options for check is supplied in
@@ -94,6 +100,17 @@ This might be used, for example, to raise alert if single archive takes more
 than x seconds.
 
 Requires path to log from I<omnipitr-archive>
+
+=head3 archive-queue
+
+Shows number of xlog files that are waiting to be archived. This, in normal
+circumstances, shouldn't be larger than 1, and usually should be 0.
+
+This check will need to connect to master database, so you might need to
+provide database connection parameters and/or psql path.
+
+Information about these options is in USAGE section at the beginning of this
+manual.
 
 =head3 last-restore-age
 
