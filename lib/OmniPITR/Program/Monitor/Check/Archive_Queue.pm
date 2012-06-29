@@ -37,7 +37,7 @@ sub run_check {
     my $lower = hex( $1 );
     my $upper = hex( $last_archived_xlog );
 
-    print $current_xlog - ( 254 * $upper + $lower ), "\n";
+    print $current_xlog - ( 255 * $upper + $lower ), "\n";
 
     return;
 }
@@ -61,7 +61,7 @@ sub split_xlog_filename {
     $elements[ 1 ] =~ s/^0{6}//;
     my $upper = hex( $elements[ 0 ] );
     my $lower = hex( $elements[ 1 ] );
-    return ( $timeline, $upper * 254 + $lower );
+    return ( $timeline, $upper * 255 + $lower );
 }
 
 1;
