@@ -116,7 +116,7 @@ sub parse_line {
     my $line = shift;
 
     my $epoch = $self->extract_epoch( $line );
-    $self->log->fatal( 'Cannot parse line: %s', $line ) unless $line =~ s/\A(.{26}) \+\d+ : (\d+) : omnipitr-(\S+) : //;
+    $self->log->fatal( 'Cannot parse line: %s', $line ) unless $line =~ s/\A(.{26}) [+-]\d+ : (\d+) : omnipitr-(\S+) : //;
     my $timestamp    = $1;
     my $pid          = $2;
     my $program_name = $3;

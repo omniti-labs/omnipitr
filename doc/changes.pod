@@ -1,5 +1,15 @@
 =head1 OmniPITR
 
+=head2 2012-08-08
+
+=over
+
+=item * Fix log line parsing in omnipitr-monitor - the bug in there prevented
+omnipitr-monitor from working when running on server with timezone "before" UTC
+(for example UTC-0400).
+
+=back
+
 =head2 2012-07-02
 
 =over
