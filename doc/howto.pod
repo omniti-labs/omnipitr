@@ -179,7 +179,7 @@ access for master and slave, without password
 On both master and slave machines, please install omnipitr to /opt/omnipitr
 directory, for example using:
 
-    $ svn co https://labs.omniti.com/pgtreats/trunk/omnipitr /opt/omnipitr
+    $ git clone git://github.com/omniti-labs/omnipitr.git
 
 Now, on both machines, check if the installation is OK, that is run sanity
 check:
