@@ -58,6 +58,9 @@ the ability to restore a standalone database.
 
 This has the benefit of keeping required xlogs to a minimum for backups.
 
+=item * report missing statedir on start, and to logs, and not to stderr (or to
+both, but add to logs)
+
 =back
 
 =head2 DONE
