@@ -110,7 +110,7 @@ fi
 if [[ "$WARNINGS_COUNT" -eq 0 && "$ERRORS_COUNT" -eq 0 ]]
 then
     echo "All checked, and looks ok."
-    exit
+    exit 0
 fi
 echo -n "All checked. "
 if [[ "$WARNINGS_COUNT" -eq 0 ]]
@@ -133,3 +133,4 @@ else
 fi
 
 echo
+exit 1
