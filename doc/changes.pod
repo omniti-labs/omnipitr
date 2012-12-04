@@ -10,7 +10,7 @@
 before serving next xlog to PostgreSQL. This is important in cases where slave
 falls back a lot, and it's catching up - but it doesn't start to remove old,
 obsolete wal segments before it will fully catch up. Now, with new option
-(--delete-before) it will delete old wal segments during catchup phase too.
+(--remove-before) it will delete old wal segments during catchup phase too.
 
 =back
 
