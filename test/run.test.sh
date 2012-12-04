@@ -3,11 +3,14 @@
 export use_user="$( id -u -n )"
 export work_dir="$( pwd )"
 
+cd "$( dirname "${BASH_SOURCE[0]}" )"
+export test_dir="$( pwd )"
+
 # cd to where current script resides
-cd "$( dirname "${BASH_SOURCE[0]}" )/.."
+cd ..
 export omnipitr_dir="$( pwd )"
 
-cd "$( dirname "${BASH_SOURCE[0]}" )"
+cd "$test_dir"
 
 # load functions from test-lib
 while read source_file
