@@ -39,6 +39,16 @@ Makes I<omnipitr-restore> remove unneeded wal segments. These are B<not>
 segments that were passed to Pg - I<omnipitr-restore> checks last redo segment
 to make sure this is safe.
 
+=item --remove-before (-rb)
+
+If I<--remove-unneeded> is enabled, this option makes sure that segment removal
+will happen also before returning segment to PostgreSQL.
+
+In case there are many unapplied WAL segments in archive, not having
+I<--remove-before> means that old, obsolete, files will be removed only after
+PostgreSQL will catchup with replication. With I<--remove-before> old files will
+be removed during catching up.
+
 =item --remove-at-a-time (-rt)
 
 When removing old segments, remove at most that many segments before re-entering

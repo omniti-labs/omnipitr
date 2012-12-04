@@ -39,6 +39,8 @@ sub run {
         return;
     };
 
+    $self->do_some_removal() if $self->{ 'remove-before' };
+
     while ( 1 ) {
         $self->check_for_trigger_file();
         $self->try_to_restore_and_exit();
@@ -438,6 +440,7 @@ sub read_args {
         'removal-pause-trigger|p=s',
         'remove-at-a-time|rt=i',
         'remove-unneeded|r',
+        'remove-before|rb',
         'source|s=s',
         'streaming-replication|sr',
         'temp-dir|t=s',
