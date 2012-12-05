@@ -181,7 +181,8 @@ sub get_list_of_segments_to_remove {
     my $self           = shift;
     my $last_important = shift;
 
-    my $extension = ext_for_compression( $self->{ 'source' }->{ 'compression' } ) if $self->{ 'source' }->{ 'compression' };
+    my $extension = undef;
+    $extension = ext_for_compression( $self->{ 'source' }->{ 'compression' } ) if $self->{ 'source' }->{ 'compression' };
     my $dir;
 
     unless ( opendir( $dir, $self->{ 'source' }->{ 'path' } ) ) {

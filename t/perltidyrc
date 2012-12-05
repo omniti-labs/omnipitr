@@ -1,0 +1,16 @@
+--backup-and-modify-in-place
+--backup-file-extension=beforeTidy
+--block-brace-tightness=0
+--brace-tightness=0
+--closing-token-indentation=1
+--continuation-indentation=4
+--indent-columns=4
+--maximum-line-length=195
+--nocuddled-else
+--noopening-brace-on-new-line
+--nooutdent-labels
+--paren-tightness=0
+--square-bracket-tightness=0
+--vertical-tightness=0
+--vertical-tightness-closing=0
+--break-at-old-comma-breakpoints

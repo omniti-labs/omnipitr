@@ -49,11 +49,11 @@ sub check_debug {
     return if 0 == scalar @ARGV;
     return unless '--debug' eq $ARGV[ 0 ];
 
-    warn "DEBUG INFORMATION:\n";
+    carp( "DEBUG INFORMATION:\n" );
     for my $key ( sort keys %ENV ) {
-        warn sprintf( "ENV: '%s' => '%s'\n", $key, $ENV{ $key } );
+        carp( sprintf( "ENV: '%s' => '%s'\n", $key, $ENV{ $key } ) );
     }
-    warn "Command line arguments: [" . join( "] , [", @ARGV ) . "]\n";
+    carp( "Command line arguments: [" . join( "] , [", @ARGV ) . "]\n" );
     shift @ARGV;
 
     return;
@@ -214,25 +214,25 @@ sub get_control_data {
     my $response = run_command( $self->{ 'temp-dir' }, $self->{ 'pgcontroldata-path' }, $self->{ 'data-dir' } );
     if ( $response->{ 'error_code' } ) {
         $handle->( 'Error while getting pg_controldata for %s: %s', $self->{ 'data-dir' }, $response );
-        return undef;
+        return;
     }
 
     my @lines = split( /\s*\n/, $response->{ 'stdout' } );
     for my $line ( @lines ) {
         unless ( $line =~ m{\A([^:]+):\s*(.*)\z} ) {
             $handle->( 'Pg_controldata for %s contained unparseable line: [%s]. Full response: %s', $self->{ 'data-dir' }, $line, $response );
-            return undef;
+            return;
         }
         $control_data->{ $1 } = $2;
     }
 
     unless ( $control_data->{ "Latest checkpoint's REDO location" } ) {
         $handle->( 'Pg_controldata for %s did not contain latest checkpoint redo location. Full response: %s', $self->{ 'data-dir' }, $response );
-        return undef;
+        return;
     }
     unless ( $control_data->{ "Latest checkpoint's TimeLineID" } ) {
         $handle->( 'Pg_controldata for %s did not contain latest checkpoint timeline ID. Full response: %s', $self->{ 'data-dir' }, $response );
-        return undef;
+        return;
     }
 
     return $control_data;

@@ -1,6 +1,8 @@
 package OmniPITR::Pidfile;
+use strict;
+use warnings;
 
-$VERSION = '1.005';
+our $VERSION = '1.005';
 use Fcntl qw( :flock );
 use File::Basename qw( basename );
 require File::Spec;
@@ -13,7 +15,7 @@ sub new {
         my $basename = basename( $0 );
         my $dir = -w "/var/run" ? "/var/run" : File::Spec->tmpdir();
         die "Can't write to $dir\n" unless -w $dir;
-        $pidfile = "$dir/$basename.pid";
+        my $pidfile = "$dir/$basename.pid";
         $self->_verbose( "pidfile: $pidfile\n" );
         $self->{ pidfile } = $pidfile;
     }
@@ -41,12 +43,12 @@ sub _get_pid {
     my $self    = shift;
     my $pidfile = $self->{ pidfile };
     $self->_verbose( "get pid from $pidfile\n" );
-    open( PID, $pidfile ) or die "can't read pid file $pidfile\n";
-    flock( PID, LOCK_SH );
-    my $pid = <PID>;
+    open( my $pid_fh, '<', $pidfile ) or die "can't read pid file $pidfile\n";
+    flock( $pid_fh, LOCK_SH );
+    my $pid = <$pid_fh>;
     chomp( $pid );
-    flock( PID, LOCK_UN );
-    close( PID );
+    flock( $pid_fh, LOCK_UN );
+    close( $pid_fh );
     $self->_verbose( "pid = $pid\n" );
     return $pid;
 }
@@ -73,18 +75,18 @@ sub _create_pidfile {
         }
         else {
             $self->_verbose( "$pid has died - replacing pidfile\n" );
-            open( PID, ">$pidfile" ) or die "Can't write to $pidfile\n";
-            print PID "$$\n";
-            close( PID );
+            open( my $pid_fh, '>', $pidfile ) or die "Can't write to $pidfile\n";
+            print $pid_fh "$$\n";
+            close( $pid_fh );
         }
     }
     else {
         $self->_verbose( "no pidfile $pidfile\n" );
-        open( PID, ">$pidfile" ) or die "Can't write to $pidfile\n";
-        flock( PID, LOCK_EX );
-        print PID "$$\n";
-        flock( PID, LOCK_UN );
-        close( PID );
+        open( my $pid_fh, '>', $pidfile ) or die "Can't write to $pidfile\n";
+        flock( $pid_fh, LOCK_EX );
+        print $pid_fh "$$\n";
+        flock( $pid_fh, LOCK_UN );
+        close( $pid_fh );
         $self->_verbose( "pidfile $pidfile created\n" );
     }
     $self->{ created } = 1;

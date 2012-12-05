@@ -66,7 +66,8 @@ sub get_list_of_segments_to_remove {
     my $self           = shift;
     my $last_important = $self->{ 'segment' };
 
-    my $extension = ext_for_compression( $self->{ 'archive' }->{ 'compression' } ) if $self->{ 'archive' }->{ 'compression' };
+    my $extension = undef;
+    $extension = ext_for_compression( $self->{ 'archive' }->{ 'compression' } ) if $self->{ 'archive' }->{ 'compression' };
     my $dir;
 
     unless ( opendir( $dir, $self->{ 'archive' }->{ 'path' } ) ) {
