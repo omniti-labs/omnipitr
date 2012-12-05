@@ -6,6 +6,15 @@
 
 =over
 
+=item * Make temp directories based on PID, to allow easy running (for example)
+2 slaves on the same machine.
+
+=back
+
+=head2 2012-12-04
+
+=over
+
 =item * Add option to make omnipitr-restore able to remove files from walarchive
 before serving next xlog to PostgreSQL. This is important in cases where slave
 falls back a lot, and it's catching up - but it doesn't start to remove old,

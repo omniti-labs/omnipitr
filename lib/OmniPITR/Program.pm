@@ -105,7 +105,7 @@ sub prepare_temp_directory {
     my $self = shift;
     return if $self->{ 'temp-dir-prepared' };
     my @sub_elements = @_;
-    my $full_temp_dir = File::Spec->catfile( $self->{ 'temp-dir' }, basename( $PROGRAM_NAME ), @sub_elements );
+    my $full_temp_dir = File::Spec->catfile( $self->{ 'temp-dir' }, basename( $PROGRAM_NAME ), $PROCESS_ID, @sub_elements );
     mkpath( $full_temp_dir );
     $self->{ 'temp-dir' }          = $full_temp_dir;
     $self->{ 'temp-dir-prepared' } = 1;

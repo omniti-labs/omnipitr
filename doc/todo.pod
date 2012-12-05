@@ -32,9 +32,6 @@ This would be useful if you have WAL-slave in the same network, and additional
 slave, on a network link that can be down. Problems with non-primary
 destinations wouldn't stop replication to primary destinations.
 
-=item * Make temp directories inside given temp-dir, based on pid and/or random
-values - to allow easy running (for example) 2 slaves on the same machine.
-
 =item * Make it possible to provide remote source in omnipitr-restore and
 omnipitr-backup-slave (remote, via http/ftp)
 
@@ -66,6 +63,9 @@ both, but add to logs)
 =head2 DONE
 
 =over
+
+=item * [1.1.0] Make temp directories inside given temp-dir, based on pid and/or random
+values - to allow easy running (for example) 2 slaves on the same machine.
 
 =item * [0.7.0] Have omnipitr-backup-* look at .backup file to determine exactly what
 xlogs it needs to keep for backup integrity.
