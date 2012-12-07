@@ -8,7 +8,7 @@ Where:
 
 =over
 
-=item * --log (-l) Points to logfile created by I<OmniPITR> tool that should be monitored.
+=item --log (-l) Points to logfile created by I<OmniPITR> tool that should be monitored.
 
 It can contain strftime-type marks - just like --log argument to other
 I<OmniPITR> programs.. Unfortunately due to the %x usage by PostgreSQL, We cannot use %%
@@ -24,22 +24,22 @@ special character, which requires you to quote the log filename (if it contains
 You can provide multiple --log options, in case your system is configured in
 such a way that every tool logs to its own logs.
 
-=item * --check (-c) contains name of check that should be performed.
+=item --check (-c) contains name of check that should be performed.
 
 For list of checks, please read L<CHECKS> section.
 
-=item * --state-dir (-s) is a name of directory that will be used to store state
+=item --state-dir (-s) is a name of directory that will be used to store state
 between calls to checks
 
-=item * --verbose (-v) shows information about reading lines from log files.
+=item --verbose (-v) shows information about reading lines from log files.
 
-=item * --psql-path (-pp) path to psql - used when getting data from
+=item --psql-path (-pp) path to psql - used when getting data from
 database
 
-=item * --temp-dir (-t) - Where to create temporary files (defaults to /tmp
+=item --temp-dir (-t) - Where to create temporary files (defaults to /tmp
 or I<$TMPDIR> environment variable location)
 
-=item * options depend on which check being performed.
+=item options depend on which check being performed.
 
 Most checks don't have any options. List of options for check is supplied in
 L<CHECKS> section.
