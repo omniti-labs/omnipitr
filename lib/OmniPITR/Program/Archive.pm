@@ -269,7 +269,9 @@ sub save_state {
     return;
 }
 
-=head1 read_args()
+=head1 read_args_specification
+
+Defines which options are legal for this program.
 
 Function which does all the parsing, and transformation of command line arguments.
 
@@ -277,59 +279,50 @@ It also verified base facts about passed WAL segment name, but all other validat
 
 =cut
 
-sub read_args {
+sub read_args_specification {
     my $self = shift;
 
-    my @argv_copy = @ARGV;
+    return {
+        'bzip2-path' => { 'type' => 's',  'aliases' => [ 'bp' ], 'default' => 'bzip2', },
+        'data-dir'   => { 'type' => 's',  'aliases' => [ 'D' ],  'default' => '.', },
+        'dst-backup' => { 'type' => 's',  'aliases' => [ 'db' ] },
+        'dst-local'  => { 'type' => 's@', 'aliases' => [ 'dl' ] },
+        'dst-remote' => { 'type' => 's@', 'aliases' => [ 'dr' ] },
+        'gzip-path'  => { 'type' => 's',  'aliases' => [ 'gp' ], 'default' => 'gzip', },
+        'log'        => { 'type' => 's',  'aliases' => [ 'l' ] },
+        'lzma-path'  => { 'type' => 's',  'aliases' => [ 'lp' ], 'default' => 'lzma', },
+        'rsync-path' => { 'type' => 's',  'aliases' => [ 'rp' ], 'default' => 'rsync', },
+        'state-dir'  => { 'type' => 's',  'aliases' => [ 's' ] },
+        'temp-dir' => { 'type' => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
+        'nice-path'      => { 'type'    => 's', 'aliases' => [ 'np' ], 'default' => 'nice', },
+        'parallel-jobs'  => { 'type'    => 'i', 'aliases' => [ 'PJ' ], 'default' => 1, },
+        'pid-file'       => { 'type'    => 's' },
+        'force-data-dir' => { 'aliases' => [ 'f' ] },
+        'verbose'        => { 'aliases' => [ 'v' ] },
+        'not-nice'       => { 'aliases' => [ 'nn' ] },
+    };
 
-    my %args = (
-        'data-dir'      => '.',
-        'temp-dir'      => $ENV{ 'TMPDIR' } || '/tmp',
-        'gzip-path'     => 'gzip',
-        'bzip2-path'    => 'bzip2',
-        'lzma-path'     => 'lzma',
-        'rsync-path'    => 'rsync',
-        'nice-path'     => 'nice',
-        'parallel-jobs' => 1,
-    );
+}
 
-    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
-        unless GetOptions(
-        \%args,
-        'bzip2-path|bp=s',
-        'data-dir|D=s',
-        'dst-backup|db=s',
-        'dst-local|dl=s@',
-        'dst-remote|dr=s@',
-        'force-data-dir|f',
-        'gzip-path|gp=s',
-        'log|l=s',
-        'lzma-path|lp=s',
-        'rsync-path|rp=s',
-        'pid-file=s',
-        'state-dir|s=s',
-        'temp-dir|t=s',
-        'nice-path|np=s',
-        'parallel-jobs|PJ=i',
-        'verbose|v',
-        'not-nice|nn',
-        );
+sub read_args_normalization {
+    my $self = shift;
+    my $args = shift;
 
-    croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
-    $args{ 'log' } =~ tr/^/%/;
+    croak( '--log was not provided - cannot continue.' ) unless $args->{ 'log' };
+    $args->{ 'log' } =~ tr/^/%/;
 
     for my $key ( qw( data-dir dst-backup temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path nice-path force-data-dir rsync-path not-nice parallel-jobs ) ) {
-        $self->{ $key } = $args{ $key };
+        $self->{ $key } = $args->{ $key };
     }
 
     for my $type ( qw( local remote ) ) {
         my $D = [];
         $self->{ 'destination' }->{ $type } = $D;
 
-        next unless defined $args{ 'dst-' . $type };
+        next unless defined $args->{ 'dst-' . $type };
 
         my %temp_for_uniq = ();
-        my @items = grep { !$temp_for_uniq{ $_ }++ } @{ $args{ 'dst-' . $type } };
+        my @items = grep { !$temp_for_uniq{ $_ }++ } @{ $args->{ 'dst-' . $type } };
 
         for my $item ( @items ) {
             my $current = { 'compression' => 'none', };
@@ -342,16 +335,15 @@ sub read_args {
     }
 
     # We do it here so it will actually work for reporing problems in validation
-    $self->{ 'log_template' } = $args{ 'log' };
+    $self->{ 'log_template' } = $args->{ 'log' };
     $self->{ 'log' }          = OmniPITR::Log->new( $self->{ 'log_template' } );
 
     # These could theoretically go into validation, but we need to check if we can get anything to {'segment'}
-    $self->log->fatal( 'WAL segment file name has not been given' ) if 0 == scalar @ARGV;
-    $self->log->fatal( 'More than 1 WAL segment file name has been given' ) if 1 < scalar @ARGV;
+    $self->log->fatal( 'WAL segment file name has not been given' ) if 0 == scalar @{ $args->{ '-arguments' } };
+    $self->log->fatal( 'More than 1 WAL segment file name has been given' ) if 1 < scalar @{ $args->{ '-arguments' } };
+    $self->{ 'segment' } = $args->{ '-arguments' }->[ 0 ];
 
-    $self->{ 'segment' } = shift @ARGV;
-
-    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
+    $self->log->log( 'Called with parameters: %s', join( ' ', @ARGV ) ) if $self->verbose;
 
     return;
 }

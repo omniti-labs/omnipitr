@@ -6,6 +6,7 @@ use English qw( -no_match_vars );
 use OmniPITR::Log;
 use OmniPITR::Pidfile;
 use OmniPITR::Tools qw( run_command );
+use Getopt::Long qw( GetOptionsFromArray :config no_ignore_case );
 use File::Basename;
 use File::Path qw( mkpath rmtree );
 use File::Spec;
@@ -343,6 +344,173 @@ sub get_tablespaces {
     closedir $dh;
 
     return \%tablespaces;
+}
+
+=head1 read_args()
+
+Function which does all the parsing of command line argument.
+
+It should be either overloaded in subclasses, or there should be additional methods:
+
+=over
+
+=item * read_args_specification() - providing specification of options for given program
+
+=item * read_args_normalization()
+
+=back
+
+read_args_specification is supposed to return hashref, where keys are names of options, and values are hashrefs with two optional keys:
+
+=over
+
+=item * default - default value.
+
+=item * aliases - option aliases passed as arrayref
+
+=item * type - Getopt::Long based type. This can be ignored for simple boolean options, or can be something like "s", "s@", "i".
+
+=back
+
+read_args_normalization() is called after option parsing, and only if there
+are no unknown options, there is no --version, nor --help. It is passed
+single hashref, with all parsed options, and default values applied.
+
+=cut
+
+sub read_args {
+    my $self = shift;
+
+    my @argv_copy = @ARGV;
+
+    my $specification = $self->read_args_specification();
+    $specification->{ 'help' }    ||= { 'aliases' => [ '?' ] };
+    $specification->{ 'version' } ||= { 'aliases' => [ 'V' ] };
+
+    # This will contain values for option parsed out from command line and
+    # given files.
+    my $parsed_options = {};
+
+    # This will contain parameters to pass to GetOptionsFromArray() call
+    my @getopt_args = ();
+
+    for my $key ( keys %{ $specification } ) {
+        my $S         = $specification->{ $key };
+        my @all_names = ( $key );
+        push @all_names, @{ $S->{ 'aliases' } } if $S->{ 'aliases' };
+        my $option_spec = join '|', @all_names;
+        $option_spec .= '=' . $S->{ 'type' } if $S->{ 'type' };
+        $parsed_options->{ $key } = $S->{ 'default' };
+
+        # Line below puts to getopt_args full option specification (like:
+        # rsync-path|rp=s) and reference to value in hash with parsed
+        # options that should be used to store parsed value.
+        push @getopt_args, $option_spec, \( $parsed_options->{ $key } );
+    }
+    push @getopt_args, 'config-file|config|cfg=s', sub {
+        unshift @argv_copy, $self->_load_config_file( $_[ 1 ] );
+    };
+
+    my $status = GetOptionsFromArray( \@argv_copy, @getopt_args );
+    if ( !$status ) {
+        $self->show_help_and_die();
+    }
+
+    $self->show_help_and_die() if $parsed_options->{ 'help' };
+
+    if ( $parsed_options->{ 'version' } ) {
+        printf '%s ver. %s%s', basename( $PROGRAM_NAME ), $VERSION, "\n";
+        exit;
+    }
+
+    my @all_keys = keys %{ $parsed_options };
+    for my $key ( @all_keys ) {
+        next if defined $parsed_options->{ $key };
+        next if exists $specification->{ $key }->{ 'default' };
+        delete $parsed_options->{ $key };
+    }
+    $parsed_options->{ '-arguments' } = \@argv_copy;
+    $self->read_args_normalization( $parsed_options );
+    return;
+}
+
+=head3 show_help_and_die()
+
+Just as the name suggests - calling this method will print help for program,
+and exit it with error-code (1).
+
+If there are any arguments, they are treated as arguments to printf()
+function, and are printed to STDERR.
+
+=cut
+
+sub show_help_and_die {
+    my $self = shift;
+    if ( 0 < scalar @_ ) {
+        my ( $msg, @args ) = @_;
+        $msg =~ s/\s*\z/\n\n/;
+        printf STDERR $msg, @args;
+    }
+    print STDERR "HELP PAGE\n\n";
+    exit( 1 );
+}
+
+=head3 _load_config_file()
+
+Loads options from config file.
+
+File name should be passed as argument.
+
+Format of the file is very simple - each line is treates as option with
+optional value.
+
+Examples:
+
+    --verbose
+    --host 127.0.0.1
+    -h=127.0.0.1
+    --host=127.0.0.1
+
+It is important that you don't need to quote the values - value will always
+be up to the end of line (trailing spaces will be removed). So if you'd
+want, for example, to have dst-local set to "/mnt/badly named directory",
+you'd need to quote it when setting from command line:
+
+    omnipitr-archive --dst-local="/mnt/badly named directory"
+
+but not in config:
+
+    --dst-local=/mnt/badly named directory
+
+Empty lines, and comment lines (starting with #) are ignored.
+
+=cut
+
+sub load_config_file {
+    my $self     = shift;
+    my $filename = shift;
+    my @new_args = ();
+    open my $fh, '<', $filename or croak( "Cannot open $filename: $OS_ERROR\n" );
+    while ( <$fh> ) {
+        s/\s*\z//;
+        next if '' eq $_;
+        next if /\A\s*#/;
+        if ( /\A\s*(-[^\s=]*)\z/ ) {
+
+            # -v
+            push @new_args, $1;
+        }
+        elsif ( /\A\s*(-[^\s=]*)\s*[\s=]\s*(.*)\z/ ) {
+
+            # -x=123 or -x 123
+            push @new_args, $1;
+        }
+        else {
+            croak( "Cannot parse line: $_\n" );
+        }
+    }
+    close $fh;
+    return @new_args;
 }
 
 1;
