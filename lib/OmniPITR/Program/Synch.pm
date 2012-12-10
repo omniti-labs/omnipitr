@@ -395,86 +395,63 @@ sub apply_output_mapping {
     return;
 }
 
-=head1 read_args()
+=head1 read_args_specification
 
-Function which does all the parsing, and transformation of command line
-arguments.
-
-=cut
-
-=head1 read_args()
+Defines which options are legal for this program.
 
 =cut
 
-sub read_args {
+sub read_args_specification {
     my $self = shift;
 
-    my @argv_copy = @ARGV;
+    return {
+        'automatic' => { 'aliases' => [ 'a' ], },
+        'compress'  => { 'type'    => 's', 'aliases' => [ 'c' ], },
+        'data-dir'  => { 'type'    => 's', 'aliases' => [ 'D' ], },
+        'database'  => { 'type'    => 's', 'aliases' => [ 'd' ], 'default' => 'postgres', },
+        'host'   => { 'type' => 's',  'aliases' => [ 'h' ], },
+        'log'    => { 'type' => 's',  'aliases' => [ 'l' ], 'default' => '-', },
+        'map'    => { 'type' => 's@', 'aliases' => [ 'm' ], },
+        'output' => { 'type' => 's@', 'aliases' => [ 'o' ], },
+        'pid-file'  => { 'type' => 's', },
+        'port'      => { 'type' => 'i', 'aliases' => [ 'p' ], },
+        'psql-path' => { 'type' => 's', 'aliases' => [ 'pp' ], 'default' => 'psql', },
+        'remote-compressor-path' => { 'type' => 's', 'aliases' => [ 'rcp' ], },
+        'remote-rm-path'         => { 'type' => 's', 'aliases' => [ 'rrp' ], 'default' => 'rm', },
+        'remote-rsync-path'      => { 'type' => 's', 'aliases' => [ 'rsp' ], 'default' => 'rsync', },
+        'remote-tar-path'        => { 'type' => 's', 'aliases' => [ 'rtp' ], 'default' => 'tar', },
+        'rsync-path'             => { 'type' => 's', 'aliases' => [ 'rp' ], 'default' => 'rsync', },
+        'rsync'      => { 'aliases' => [ 'r' ], },
+        'shell-path' => { 'type'    => 's', 'aliases' => [ 'sh' ], 'default' => 'bash', },
+        'ssh-path'   => { 'type'    => 's', 'aliases' => [ 'sp' ], 'default' => 'ssh', },
+        'tar-path'   => { 'type'    => 's', 'aliases' => [ 'tp' ], 'default' => 'tar', },
+        'tee-path'   => { 'type'    => 's', 'aliases' => [ 'ep' ], 'default' => 'tee', },
+        'temp-dir'   => { 'type'    => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
+        'username' => { 'type'    => 's', 'aliases' => [ 'U' ], },
+        'verbose'  => { 'aliases' => [ 'v' ], },
+    };
+}
 
-    my %args = (
-        'database'          => 'postgres',
-        'log'               => '-',
-        'psql-path'         => 'psql',
-        'remote-rm-path'    => 'rm',
-        'remote-rsync-path' => 'rsync',
-        'remote-tar-path'   => 'tar',
-        'tee-path'          => 'tee',
-        'tar-path'          => 'tar',
-        'ssh-path'          => 'ssh',
-        'rsync-path'        => 'rsync',
-        'shell-path'        => 'bash',
-        'temp-dir'          => $ENV{ 'TMPDIR' } || '/tmp',
-    );
+=head1 read_args_normalization
 
-    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-synch.pod' )
-        unless GetOptions(
-        \%args,
-        'automatic|a',
-        'compress|c=s',
-        'database|d=s',
-        'data-dir|D=s',
-        'host|h=s',
-        'log|l=s',
-        'map|m=s@',
-        'output|o=s@',
-        'pid-file=s',
-        'port|p=i',
-        'psql-path|pp=s',
-        'remote-compressor-path|rcp=s',
-        'remote-rm-path|rrp=s',
-        'remote-rsync-path|rsp=s',
-        'remote-tar-path|rtp=s',
-        'rsync-path|rp=s',
-        'rsync|r',
-        'tee-path|ep=s',
-        'tar-path|tp=s',
-        'ssh-path|sp=s',
-        'shell-path|sh=s',
-        'temp-dir|t=s',
-        'username|U=s',
-        'verbose|v',
-        );
+Function called back from OmniPITR::Program::read_args(), with parsed args as hashref.
 
-    croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
-    $args{ 'log' } =~ tr/^/%/;
+Is responsible for putting arguments to correct places, initializing logs, and so on.
 
-    $args{ 'remote-compressor-path' } = $args{ 'compress' } if $args{ 'compress' } && !$args{ 'remote-compressor-path' };
+=cut
 
-    for my $key ( keys %args ) {
+sub read_args_normalization {
+    my $self = shift;
+    my $args = shift;
+
+    $args->{ 'remote-compressor-path' } = $args->{ 'compress' } if $args->{ 'compress' } && !$args->{ 'remote-compressor-path' };
+
+    for my $key ( keys %{ $args } ) {
         next if $key =~ m{ \A log \z }x;    # Skip those, not needed in $self
-        $self->{ $key } = $args{ $key };
+        $self->{ $key } = $args->{ $key };
     }
 
-    # We do it here so it will actually work for reporing problems in validation
-    $self->{ 'log_template' } = $args{ 'log' };
-    if ( $args{ 'log' } eq "-" ) {
-        $self->{ 'log' } = OmniPITR::Log->new( \*STDOUT );
-    }
-    else {
-        $self->{ 'log' } = OmniPITR::Log->new( $self->{ 'log_template' } );
-    }
-
-    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
+    $self->log->log( 'Called with parameters: %s', join( ' ', @ARGV ) ) if $self->verbose;
 
     return;
 }

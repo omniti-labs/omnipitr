@@ -273,10 +273,6 @@ sub save_state {
 
 Defines which options are legal for this program.
 
-Function which does all the parsing, and transformation of command line arguments.
-
-It also verified base facts about passed WAL segment name, but all other validations, are being done in separate function: L<validate_args()>.
-
 =cut
 
 sub read_args_specification {
@@ -304,12 +300,17 @@ sub read_args_specification {
 
 }
 
+=head1 read_args_normalization
+
+Function called back from OmniPITR::Program::read_args(), with parsed args as hashref.
+
+Is responsible for putting arguments to correct places, initializing logs, and so on.
+
+=cut
+
 sub read_args_normalization {
     my $self = shift;
     my $args = shift;
-
-    croak( '--log was not provided - cannot continue.' ) unless $args->{ 'log' };
-    $args->{ 'log' } =~ tr/^/%/;
 
     for my $key ( qw( data-dir dst-backup temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path nice-path force-data-dir rsync-path not-nice parallel-jobs ) ) {
         $self->{ $key } = $args->{ $key };
@@ -333,10 +334,6 @@ sub read_args_normalization {
             push @{ $D }, $current;
         }
     }
-
-    # We do it here so it will actually work for reporing problems in validation
-    $self->{ 'log_template' } = $args->{ 'log' };
-    $self->{ 'log' }          = OmniPITR::Log->new( $self->{ 'log_template' } );
 
     # These could theoretically go into validation, but we need to check if we can get anything to {'segment'}
     $self->log->fatal( 'WAL segment file name has not been given' ) if 0 == scalar @{ $args->{ '-arguments' } };

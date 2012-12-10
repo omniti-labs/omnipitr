@@ -514,6 +514,8 @@ tablespaces placed in:
 
 generated DATA tarball will contain 2 directories:
 
+=over
+
 =item * data - copy of /var/lib/pgsql/data
 
 =item * tablespaces - which contains full directory structure leading to:

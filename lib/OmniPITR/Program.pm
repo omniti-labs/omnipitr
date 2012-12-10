@@ -10,6 +10,7 @@ use Getopt::Long qw( GetOptionsFromArray :config no_ignore_case );
 use File::Basename;
 use File::Path qw( mkpath rmtree );
 use File::Spec;
+use Pod::Usage;
 use Carp;
 
 our $VERSION = '1.0.0';
@@ -350,6 +351,9 @@ sub get_tablespaces {
 
 Function which does all the parsing of command line argument.
 
+Additionally, it starts logger object (and stores it in $self->{'log'}),
+because it works this way in virtually all omnipitr programs.
+
 It should be either overloaded in subclasses, or there should be additional methods:
 
 =over
@@ -430,7 +434,23 @@ sub read_args {
         delete $parsed_options->{ $key };
     }
     $parsed_options->{ '-arguments' } = \@argv_copy;
+
+    croak( '--log was not provided - cannot continue.' ) unless $parsed_options->{ 'log' };
+    $parsed_options->{ 'log' } =~ tr/^/%/;
+
+    $self->{ 'log_template' } = $parsed_options->{ 'log' };
+
+    if ( $self->{ 'log_template' } eq '-' ) {
+        $self->{ 'log' } = OmniPITR::Log->new( \*STDOUT );
+    }
+    else {
+        $self->{ 'log' } = OmniPITR::Log->new( $self->{ 'log_template' } );
+    }
+
+    delete $parsed_options->{ 'log' };
+
     $self->read_args_normalization( $parsed_options );
+
     return;
 }
 
@@ -451,7 +471,13 @@ sub show_help_and_die {
         $msg =~ s/\s*\z/\n\n/;
         printf STDERR $msg, @args;
     }
-    print STDERR "HELP PAGE\n\n";
+    my $doc_path = File::Spec->catfile( $FindBin::Bin, '..', 'doc', basename( $PROGRAM_NAME ) . '.pod' );
+    pod2usage(
+        {
+            '-verbose' => 2,
+            '-input'   => $doc_path,
+        }
+    );
     exit( 1 );
 }
 

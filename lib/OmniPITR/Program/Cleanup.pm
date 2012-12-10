@@ -97,63 +97,55 @@ sub get_list_of_segments_to_remove {
     return @sorted;
 }
 
-=head1 read_args()
+=head1 read_args_specification
 
-Function which does all the parsing, and transformation of command line
-arguments.
-
-It also verified base facts about passed WAL segment name, but all other
-validations, are being done in separate function: L<validate_args()>.
+Defines which options are legal for this program.
 
 =cut
 
-=head1 read_args()
-
-=cut
-
-sub read_args {
+sub read_args_specification {
     my $self = shift;
 
-    my @argv_copy = @ARGV;
+    return {
+        'log'                   => { 'type'    => 's', 'aliases' => [ 'l' ] },
+        'pid-file'              => { 'type'    => 's' },
+        'verbose'               => { 'aliases' => [ 'v' ] },
+        'archive'               => { 'type'    => 's', 'aliases' => [ 'a' ], },
+        'removal-pause-trigger' => { 'type'    => 's', 'aliases' => [ 'p' ], },
+    };
+}
 
-    my %args = ();
+=head1 read_args_normalization
 
-    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-restore.pod' )
-        unless GetOptions(
-        \%args,
-        'log|l=s',
-        'pid-file=s',
-        'archive|a=s',
-        'verbose|v',
-        'removal-pause-trigger|p=s',
-        );
+Function called back from OmniPITR::Program::read_args(), with parsed args as hashref.
 
-    croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
-    $args{ 'log' } =~ tr/^/%/;
+Is responsible for putting arguments to correct places, initializing logs, and so on.
 
-    for my $key ( keys %args ) {
+=cut
+
+sub read_args_normalization {
+    my $self = shift;
+    my $args = shift;
+
+    for my $key ( keys %{ $args } ) {
         next if $key =~ m{ \A (?: archive | log ) \z }x;    # Skip those, not needed in $self
-        $self->{ $key } = $args{ $key };
+        $self->{ $key } = $args->{ $key };
     }
 
-    # We do it here so it will actually work for reporing problems in validation
-    $self->{ 'log_template' } = $args{ 'log' };
-    $self->{ 'log' }          = OmniPITR::Log->new( $self->{ 'log_template' } );
+    $self->log->fatal( 'Archive path not provided!' ) unless $args->{ 'archive' };
 
-    $self->log->fatal( 'Archive path not provided!' ) unless $args{ 'archive' };
-
-    if ( $args{ 'archive' } =~ s/\A(gzip|bzip2|lzma)=// ) {
+    if ( $args->{ 'archive' } =~ s/\A(gzip|bzip2|lzma)=// ) {
         $self->{ 'archive' }->{ 'compression' } = $1;
     }
-    $self->{ 'archive' }->{ 'path' } = $args{ 'archive' };
+    $self->{ 'archive' }->{ 'path' } = $args->{ 'archive' };
 
     # These could theoretically go into validation, but we need to check if we can get anything to put in segment key in $self
-    $self->log->fatal( 'WAL segment name has not been given' ) if 1 > scalar @ARGV;
-    $self->log->fatal( 'Too many arguments given.' ) if 1 < scalar @ARGV;
+    $self->log->fatal( 'WAL segment name has not been given' ) if 0 == scalar @{ $args->{ '-arguments' } };
+    $self->log->fatal( 'Too many arguments given.' ) if 1 < scalar @{ $args->{ '-arguments' } };
 
-    $self->{ 'segment' } = shift @ARGV;
+    $self->{ 'segment' } = $args->{ '-arguments' }->[ 0 ];
 
-    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
+    $self->log->log( 'Called with parameters: %s', join( ' ', @ARGV ) ) if $self->verbose;
 
     return;
 }

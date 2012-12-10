@@ -394,88 +394,71 @@ sub check_for_trigger_file {
     $self->log->fatal( 'Finish trigger (%s) exists, but cannot be open?! : %s', $self->{ 'finish-trigger' }, $OS_ERROR );
 }
 
-=head1 read_args()
+=head1 read_args_specification
 
-Function which does all the parsing, and transformation of command line
-arguments.
-
-It also verified base facts about passed WAL segment name, but all other
-validations, are being done in separate function: L<validate_args()>.
+Defines which options are legal for this program.
 
 =cut
 
-=head1 read_args()
-
-=cut
-
-sub read_args {
+sub read_args_specification {
     my $self = shift;
 
-    my @argv_copy = @ARGV;
+    return {
+        'bzip2-path'          => { 'type' => 's', 'aliases' => [ 'bp' ], 'default' => 'bzip2', },
+        'data-dir'            => { 'type' => 's', 'aliases' => [ 'D' ],  'default' => '.', },
+        'error-pgcontroldata' => { 'type' => 's', 'aliases' => [ 'ep' ], 'default' => 'break', },
+        'finish-trigger'      => { 'type' => 's', 'aliases' => [ 'f' ], },
+        'gzip-path'           => { 'type' => 's', 'aliases' => [ 'gp' ], 'default' => 'gzip', },
+        'log'                 => { 'type' => 's', 'aliases' => [ 'l' ], },
+        'lzma-path'           => { 'type' => 's', 'aliases' => [ 'lp' ], 'default' => 'lzma', },
+        'pgcontroldata-path'  => { 'type' => 's', 'aliases' => [ 'pp' ], 'default' => 'pg_controldata', },
+        'pid-file'            => { 'type' => 's', },
+        'pre-removal-processing' => { 'type' => 's', 'aliases' => [ 'h' ], },
+        'recovery-delay'         => { 'type' => 'i', 'aliases' => [ 'w' ], },
+        'removal-pause-trigger'  => { 'type' => 's', 'aliases' => [ 'p' ], },
+        'remove-at-a-time'       => { 'type' => 'i', 'aliases' => [ 'rt' ], 'default' => '3', },
+        'remove-before'         => { 'aliases' => [ 'rb' ], },
+        'remove-unneeded'       => { 'aliases' => [ 'r' ], },
+        'source'                => { 'type'    => 's', 'aliases' => [ 's' ], },
+        'streaming-replication' => { 'aliases' => [ 'sr' ], },
+        'temp-dir'              => { 'type'    => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
+        'verbose'               => { 'aliases' => [ 'v' ], },
+    };
+}
 
-    my %args = (
-        'bzip2-path'          => 'bzip2',
-        'data-dir'            => '.',
-        'gzip-path'           => 'gzip',
-        'lzma-path'           => 'lzma',
-        'pgcontroldata-path'  => 'pg_controldata',
-        'error-pgcontroldata' => 'break',
-        'remove-at-a-time'    => 3,
-        'temp-dir'            => $ENV{ 'TMPDIR' } || '/tmp',
-    );
+=head1 read_args_normalization
 
-    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-restore.pod' )
-        unless GetOptions(
-        \%args,
-        'bzip2-path|bp=s',
-        'data-dir|D=s',
-        'error-pgcontroldata|ep=s',
-        'finish-trigger|f=s',
-        'gzip-path|gp=s',
-        'log|l=s',
-        'lzma-path|lp=s',
-        'pgcontroldata-path|pp=s',
-        'pid-file=s',
-        'pre-removal-processing|h=s',
-        'recovery-delay|w=i',
-        'removal-pause-trigger|p=s',
-        'remove-at-a-time|rt=i',
-        'remove-unneeded|r',
-        'remove-before|rb',
-        'source|s=s',
-        'streaming-replication|sr',
-        'temp-dir|t=s',
-        'verbose|v',
-        );
+Function called back from OmniPITR::Program::read_args(), with parsed args as hashref.
 
-    croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
-    $args{ 'log' } =~ tr/^/%/;
+Is responsible for putting arguments to correct places, initializing logs, and so on.
 
-    for my $key ( keys %args ) {
+=cut
+
+sub read_args_normalization {
+    my $self = shift;
+    my $args = shift;
+
+    for my $key ( keys %{ $args } ) {
         next if $key =~ m{ \A (?: source | log ) \z }x;    # Skip those, not needed in $self
-        $self->{ $key } = $args{ $key };
+        $self->{ $key } = $args->{ $key };
     }
 
-    # We do it here so it will actually work for reporing problems in validation
-    $self->{ 'log_template' } = $args{ 'log' };
-    $self->{ 'log' }          = OmniPITR::Log->new( $self->{ 'log_template' } );
+    $self->log->fatal( 'Source path not provided!' ) unless $args->{ 'source' };
 
-    $self->log->fatal( 'Source path not provided!' ) unless $args{ 'source' };
-
-    if ( $args{ 'source' } =~ s/\A(gzip|bzip2|lzma)=// ) {
+    if ( $args->{ 'source' } =~ s/\A(gzip|bzip2|lzma)=// ) {
         $self->{ 'source' }->{ 'compression' } = $1;
     }
-    $self->{ 'source' }->{ 'path' } = $args{ 'source' };
+    $self->{ 'source' }->{ 'path' } = $args->{ 'source' };
 
     # These could theoretically go into validation, but we need to check if we can get anything to put in segment* keys in $self
-    $self->log->fatal( 'WAL segment file name and/or destination have not been given' ) if 2 > scalar @ARGV;
-    $self->log->fatal( 'Too many arguments given.' ) if 2 < scalar @ARGV;
+    $self->log->fatal( 'WAL segment file name and/or destination have not been given' ) if 2 > scalar @{ $args->{ '-arguments' } };
+    $self->log->fatal( 'Too many arguments given.' ) if 2 < scalar @{ $args->{ '-arguments' } };
 
-    @{ $self }{ qw( segment segment_destination ) } = @ARGV;
+    @{ $self }{ qw( segment segment_destination ) } = @{ $args->{ '-arguments' } };
 
     $self->{ 'finish' } = '';
 
-    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
+    $self->log->log( 'Called with parameters: %s', join( ' ', @ARGV ) ) if $self->verbose;
 
     return;
 }

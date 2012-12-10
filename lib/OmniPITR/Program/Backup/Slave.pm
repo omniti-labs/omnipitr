@@ -549,95 +549,82 @@ sub DESTROY {
     return;
 }
 
-=head1 read_args()
+=head1 read_args_specification
 
-Function which does all the parsing, and transformation of command line
-arguments.
+Defines which options are legal for this program.
 
 =cut
 
-sub read_args {
+sub read_args_specification {
     my $self = shift;
 
-    my @argv_copy = @ARGV;
+    return {
+        'bzip2-path'  => { 'type'    => 's', 'aliases' => [ 'bp' ], 'default' => 'bzip2', },
+        'call-master' => { 'aliases' => [ 'cm' ], },
+        'data-dir'          => { 'type' => 's',  'aliases' => [ 'D' ], },
+        'database'          => { 'type' => 's',  'aliases' => [ 'd' ], },
+        'digest'            => { 'type' => 's',  'aliases' => [ 'dg' ], },
+        'dst-direct'        => { 'type' => 's@', 'aliases' => [ 'dd' ], },
+        'dst-local'         => { 'type' => 's@', 'aliases' => [ 'dl' ], },
+        'dst-remote'        => { 'type' => 's@', 'aliases' => [ 'dr' ], },
+        'filename-template' => { 'type' => 's',  'aliases' => [ 'f' ], 'default' => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__', },
+        'gzip-path'         => { 'type' => 's',  'aliases' => [ 'gp' ], 'default' => 'gzip', },
+        'host'              => { 'type' => 's',  'aliases' => [ 'h' ], },
+        'log'               => { 'type' => 's',  'aliases' => [ 'l' ], },
+        'lzma-path'         => { 'type' => 's',  'aliases' => [ 'lp' ], 'default' => 'lzma', },
+        'nice-path'         => { 'type' => 's',  'aliases' => [ 'np' ], 'default' => 'nice', },
+        'not-nice'           => { 'aliases' => [ 'nn' ], },
+        'parallel-jobs'      => { 'type'    => 'i', 'aliases' => [ 'PJ' ], 'default' => '1', },
+        'pgcontroldata-path' => { 'type'    => 's', 'aliases' => [ 'pp' ], 'default' => 'pg_controldata', },
+        'pid-file'           => { 'type'    => 's', },
+        'port'                  => { 'type' => 'i', 'aliases' => [ 'P' ], },
+        'psql-path'             => { 'type' => 's', 'aliases' => [ 'sp' ], 'default' => 'psql', },
+        'remote-cat-path'       => { 'type' => 's', 'aliases' => [ 'rcp' ], 'default' => 'cat', },
+        'removal-pause-trigger' => { 'type' => 's', 'aliases' => [ 'p' ], },
+        'rsync-path'            => { 'type' => 's', 'aliases' => [ 'rp' ], 'default' => 'rsync', },
+        'shell-path'            => { 'type' => 's', 'aliases' => [ 'sh' ], 'default' => 'bash', },
+        'source'                => { 'type' => 's', 'aliases' => [ 's' ], },
+        'ssh-path'              => { 'type' => 's', 'aliases' => [ 'ssh' ], 'default' => 'ssh', },
+        'tar-path'              => { 'type' => 's', 'aliases' => [ 'tp' ], 'default' => 'tar', },
+        'tee-path'              => { 'type' => 's', 'aliases' => [ 'ep' ], 'default' => 'tee', },
+        'temp-dir'              => { 'type' => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
+        'username'              => { 'type' => 's', 'aliases' => [ 'U' ], },
+        'verbose' => { 'aliases' => [ 'v' ], },
+    };
+}
 
-    my %args = (
-        'temp-dir' => $ENV{ 'TMPDIR' } || '/tmp',
-        'gzip-path'          => 'gzip',
-        'bzip2-path'         => 'bzip2',
-        'lzma-path'          => 'lzma',
-        'tar-path'           => 'tar',
-        'tee-path'           => 'tee',
-        'nice-path'          => 'nice',
-        'parallel-jobs'      => 1,
-        'psql-path'          => 'psql',
-        'rsync-path'         => 'rsync',
-        'shell-path'         => 'bash',
-        'ssh-path'           => 'ssh',
-        'remote-cat-path'    => 'cat',
-        'pgcontroldata-path' => 'pg_controldata',
-        'filename-template'  => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__',
-    );
+=head1 read_args_normalization
 
-    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-backup-slave.pod' )
-        unless GetOptions(
-        \%args,
-        'database|d=s',
-        'host|h=s',
-        'port|P=i',
-        'username|U=s',
-        'data-dir|D=s',
-        'source|s=s',
-        'dst-local|dl=s@',
-        'dst-remote|dr=s@',
-        'dst-direct|dd=s@',
-        'temp-dir|t=s',
-        'log|l=s',
-        'filename-template|f=s',
-        'removal-pause-trigger|p=s',
-        'pid-file=s',
-        'verbose|v',
-        'gzip-path|gp=s',
-        'bzip2-path|bp=s',
-        'lzma-path|lp=s',
-        'nice-path|np=s',
-        'parallel-jobs|PJ=i',
-        'psql-path|sp=s',
-        'tar-path|tp=s',
-        'tee-path|ep=s',
-        'rsync-path|rp=s',
-        'shell-path|sh=s',
-        'ssh-path|ssh=s',
-        'digest|dg=s',
-        'pgcontroldata-path|pp=s',
-        'not-nice|nn',
-        'call-master|cm',
-        'remote-cat-path|rcp=s',
-        );
+Function called back from OmniPITR::Program::read_args(), with parsed args as hashref.
 
-    croak( '--log was not provided - cannot continue.' ) unless $args{ 'log' };
-    for my $key ( qw( log filename-template ) ) {
-        $args{ $key } =~ tr/^/%/;
-    }
+Is responsible for putting arguments to correct places, initializing logs, and so on.
+
+=cut
+
+sub read_args_normalization {
+    my $self = shift;
+    my $args = shift;
+
+    $args->{ 'filename-template' } =~ tr/^/%/;
 
     $self->{ 'digests' } = [];
-    if ( defined( $args{ digest } ) ) {
-        $self->{ 'digests' } = [ split( /,/, $args{ 'digest' } ) ];
-        delete $args{ 'digest' };
+    if ( defined( $args->{ digest } ) ) {
+        $self->{ 'digests' } = [ split( /,/, $args->{ 'digest' } ) ];
+        delete $args->{ 'digest' };
     }
 
-    for my $key ( grep { !/^dst-(?:local|remote|direct)$/ } keys %args ) {
-        $self->{ $key } = $args{ $key };
+    for my $key ( grep { !/^dst-(?:local|remote|direct)$/ } keys %{ $args } ) {
+        $self->{ $key } = $args->{ $key };
     }
 
     for my $type ( qw( local remote direct ) ) {
         my $D = [];
         $self->{ 'destination' }->{ $type } = $D;
 
-        next unless defined $args{ 'dst-' . $type };
+        next unless defined $args->{ 'dst-' . $type };
 
         my %temp_for_uniq = ();
-        my @items = grep { !$temp_for_uniq{ $_ }++ } @{ $args{ 'dst-' . $type } };
+        my @items = grep { !$temp_for_uniq{ $_ }++ } @{ $args->{ 'dst-' . $type } };
 
         for my $item ( @items ) {
             my $current = { 'compression' => 'none', };
@@ -649,27 +636,23 @@ sub read_args {
         }
     }
 
-    if ( defined $args{ 'source' } && $args{ 'source' } =~ s/\A(gzip|bzip2|lzma)=// ) {
+    if ( defined $args->{ 'source' } && $args->{ 'source' } =~ s/\A(gzip|bzip2|lzma)=// ) {
         $self->{ 'source' } = {
             'compression' => $1,
-            'path'        => $args{ 'source' },
+            'path'        => $args->{ 'source' },
         };
     }
     else {
         $self->{ 'source' } = {
             'compression' => 'none',
-            'path'        => $args{ 'source' },
+            'path'        => $args->{ 'source' },
         };
     }
 
     $self->{ 'filename-template' } = strftime( $self->{ 'filename-template' }, localtime time() );
     $self->{ 'filename-template' } =~ s/__HOSTNAME__/hostname()/ge;
 
-    # We do it here so it will actually work for reporing problems in validation
-    $self->{ 'log_template' } = $args{ 'log' };
-    $self->{ 'log' }          = OmniPITR::Log->new( $self->{ 'log_template' } );
-
-    $self->log->log( 'Called with parameters: %s', join( ' ', @argv_copy ) ) if $self->verbose;
+    $self->log->log( 'Called with parameters: %s', join( ' ', @ARGV ) ) if $self->verbose;
 
     return;
 }
