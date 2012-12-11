@@ -67,6 +67,14 @@ Which port to connect to when connecting to database. Defaults to 5432.
 
 What username to use when connecting to database. Defaults to postgres.
 
+=item --version (-V)
+
+Prints version of I<omnipitr-monitor>, and exists.
+
+=item --help (-?)
+
+Prints this manual, and exists.
+
 =back
 
 That is - if any check requires connection to database - details of connections

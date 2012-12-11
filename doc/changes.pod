@@ -2,6 +2,18 @@
 
 =encoding utf8
 
+=head2 2012-12-11
+
+=over
+
+=item * Provide support for --help option
+
+=item * Add support for config file
+
+=item * Add --version option to all programs.
+
+=back
+
 =head2 2012-12-04
 
 =over

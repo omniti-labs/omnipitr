@@ -151,6 +151,41 @@ finishing recovery
 
 Please check L<ERRORS> section below for more details.
 
+=item --version (-V)
+
+Prints version of I<omnipitr-restore>, and exists.
+
+=item --help (-?)
+
+Prints this manual, and exists.
+
+=item --config-file (--config / --cfg)
+
+Loads options from config file.
+
+Format of the file is very simple - each line is treated as argument with
+optional value.
+
+Examples:
+
+    --verbose
+    --host 127.0.0.1
+    -h=127.0.0.1
+    --host=127.0.0.1
+
+It is important that you don't need to quote the values - value will always
+be up to the end of line (trailing spaces will be removed). So if you'd
+want, for example, to have magic-option set to "/mnt/badly named directory",
+you'd need to quote it when setting from command line:
+
+    /some/omnipitr/program --magic-option="/mnt/badly named directory"
+
+but not in config:
+
+    --magic-option=/mnt/badly named directory
+
+Empty lines, and comment lines (starting with #) are ignored.
+
 =back
 
 =head2 DESCRIPTION

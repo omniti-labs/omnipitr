@@ -9,6 +9,7 @@ use Carp;
 use English qw( -no_match_vars );
 use Getopt::Long qw( :config no_ignore_case pass_through );
 use Storable qw( fd_retrieve store_fd );
+use File::Basename;
 use File::Spec;
 use Fcntl qw( :flock :seek );
 use POSIX qw( strftime );
@@ -367,7 +368,7 @@ sub read_args {
         'psql-path' => 'psql',
     );
 
-    croak( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
+    $self->show_help_and_die( 'Error while reading command line arguments. Please check documentation in doc/omnipitr-archive.pod' )
         unless GetOptions(
         \%args,
         'log|l=s@',
@@ -380,7 +381,16 @@ sub read_args {
         'username|U=s',
         'temp-dir|t=s',
         'psql-path|pp=s',
+        'help|?',
+        'version|V',
         );
+
+    if ( $args{ 'version' } ) {
+        printf '%s ver. %s%s', basename( $PROGRAM_NAME ), $VERSION, "\n";
+        exit;
+    }
+
+    $self->show_help_and_die() if $args{ 'help' };
 
     for my $key ( qw( check state-dir verbose database host port username temp-dir psql-path ) ) {
         next unless defined $args{ $key };

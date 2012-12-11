@@ -17,15 +17,6 @@ pg_controldata
 While definitely good thing, we will still keep code to use pg_controldata as %r
 is not available in 8.2.
 
-=item * Provide support for --help option
-
-Well, it can be helpful to avoid having to type another command to get to docs
-
-=item * Add support for config file
-
-This has the benefit over command line options that it lets you change the
-options without Pg restart (in omnipitr-restore case at least).
-
 =item * Add a way to specify "primary" destination for wal segments.
 
 This would be useful if you have WAL-slave in the same network, and additional
@@ -39,8 +30,6 @@ omnipitr-backup-slave (remote, via http/ftp)
 
 This is for migration purposes - for example, when you're switching your
 walarchive from compressed to not-compressed.
-
-=item * Add --version option to all programs.
 
 =item * Add option to skip archiving of xlogs to omnipitr-backup-*
 
@@ -63,6 +52,17 @@ both, but add to logs)
 =head2 DONE
 
 =over
+
+=item * [1.1.0] Provide support for --help option
+
+Well, it can be helpful to avoid having to type another command to get to docs
+
+=item * [1.1.0] Add support for config file
+
+This has the benefit over command line options that it lets you change the
+options without Pg restart (in omnipitr-restore case at least).
+
+=item * [1.1.0] Add --version option to all programs.
 
 =item * [1.1.0] Make temp directories inside given temp-dir, based on pid and/or random
 values - to allow easy running (for example) 2 slaves on the same machine.

@@ -423,7 +423,8 @@ sub read_args {
     $self->show_help_and_die() if $parsed_options->{ 'help' };
 
     if ( $parsed_options->{ 'version' } ) {
-        printf '%s ver. %s%s', basename( $PROGRAM_NAME ), $VERSION, "\n";
+        # The $self->VERSION below returns value of $VERSION variable in class of $self.
+        printf '%s ver. %s%s', basename( $PROGRAM_NAME ), $self->VERSION, "\n";
         exit;
     }
 
@@ -487,7 +488,7 @@ Loads options from config file.
 
 File name should be passed as argument.
 
-Format of the file is very simple - each line is treates as option with
+Format of the file is very simple - each line is treated as option with
 optional value.
 
 Examples:
