@@ -362,7 +362,7 @@ sub validate_args {
 
     $self->log->fatal( 'Parallel jobs value not given?!' ) unless defined $self->{ 'parallel-jobs' };
     $self->log->fatal( 'Parallel jobs is not integer (%s)', $self->{ 'parallel-jobs' } ) unless $self->{ 'parallel-jobs' } =~ m{\A\d+\z};
-    $self->log->fatal( 'Parallel jobs is not >= 1 (%s)', $self->{ 'parallel-jobs' } ) unless $self->{ 'parallel-jobs' } >= 1;
+    $self->log->fatal( 'Parallel jobs is not >= 1 (%s)',    $self->{ 'parallel-jobs' } ) unless $self->{ 'parallel-jobs' } >= 1;
 
     return;
 }

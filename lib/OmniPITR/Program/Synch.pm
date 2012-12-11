@@ -358,7 +358,7 @@ sub get_list_of_directories_to_process {
 
     for my $ts ( values %{ $self->{ 'tablespaces' } } ) {
         $ts->{ 'pg_visible' } =~ s{/*$}{};
-        $ts->{ 'real_path' }  =~ s{/*$}{};
+        $ts->{ 'real_path' } =~ s{/*$}{};
         my $t = {
             'source'  => $ts->{ 'real_path' },
             'outputs' => []
