@@ -513,7 +513,7 @@ Empty lines, and comment lines (starting with #) are ignored.
 
 =cut
 
-sub load_config_file {
+sub _load_config_file {
     my $self     = shift;
     my $filename = shift;
     my @new_args = ();
