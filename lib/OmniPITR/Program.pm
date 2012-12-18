@@ -6,7 +6,7 @@ use English qw( -no_match_vars );
 use OmniPITR::Log;
 use OmniPITR::Pidfile;
 use OmniPITR::Tools qw( run_command );
-use Getopt::Long qw( GetOptionsFromArray :config no_ignore_case );
+use Getopt::Long qw( :config no_ignore_case );
 use File::Basename;
 use File::Path qw( mkpath rmtree );
 use File::Spec;
@@ -412,10 +412,10 @@ sub read_args {
         push @getopt_args, $option_spec, \( $parsed_options->{ $key } );
     }
     push @getopt_args, 'config-file|config|cfg=s', sub {
-        unshift @argv_copy, $self->_load_config_file( $_[ 1 ] );
+        unshift @ARGV, $self->_load_config_file( $_[ 1 ] );
     };
 
-    my $status = GetOptionsFromArray( \@argv_copy, @getopt_args );
+    my $status = GetOptions( @getopt_args );
     if ( !$status ) {
         $self->show_help_and_die();
     }
@@ -434,7 +434,10 @@ sub read_args {
         next if exists $specification->{ $key }->{ 'default' };
         delete $parsed_options->{ $key };
     }
-    $parsed_options->{ '-arguments' } = \@argv_copy;
+    $parsed_options->{ '-arguments' } = [ @ARGV ];
+
+    # Restore original @ARGV
+    @ARGV = @argv_copy;
 
     croak( '--log was not provided - cannot continue.' ) unless $parsed_options->{ 'log' };
     $parsed_options->{ 'log' } =~ tr/^/%/;
