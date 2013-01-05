@@ -89,6 +89,16 @@ then
     ERRORS[$ERRORS_COUNT]="tar (in \$PATH) is either not gnu tar, or gnu tar earlier than required 1.20"
 fi
 
+# other checks
+
+echo "Ability to fetch over http"
+
+if ! perl -I"$LIB_DIR/" -e 'use OmniPITR::Tools::NetGet; OmniPITR::Tools::NetGet::_pick_download_method()' 2> /dev/null
+then
+    ERRORS_COUNT=$(( 1 + $ERRORS_COUNT ))
+    ERRORS[$ERRORS_COUNT]="There is none of: LWP::UserAgent perl module, wget program nor curl program available"
+fi
+
 # Report of status
 
 if [[ $WARNINGS_COUNT -gt 0 ]]

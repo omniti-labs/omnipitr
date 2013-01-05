@@ -1,6 +1,6 @@
 #!perl -T
 
-use Test::More tests => 29;
+use Test::More tests => 30;
 
 BEGIN {
     use_ok( 'OmniPITR::Log' )                                           || print "Bail out on OmniPITR::Log\n";
@@ -31,6 +31,7 @@ BEGIN {
     use_ok( 'OmniPITR::Program::Synch' )                                || print "Bail out on OmniPITR::Program::Synch\n";
     use_ok( 'OmniPITR::Tools' )                                         || print "Bail out on OmniPITR::Tools\n";
     use_ok( 'OmniPITR::Tools::CommandPiper' )                           || print "Bail out on OmniPITR::Tools::CommandPiper\n";
+    use_ok( 'OmniPITR::Tools::NetGet' )                                 || print "Bail out on OmniPITR::Tools::NetGet\n";
     use_ok( 'OmniPITR::Tools::ParallelSystem' )                         || print "Bail out on OmniPITR::Tools::ParallelSystem\n";
 }
 
