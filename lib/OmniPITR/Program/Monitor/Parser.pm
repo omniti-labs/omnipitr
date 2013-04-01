@@ -5,7 +5,7 @@ use Carp;
 use Data::Dumper;
 use English qw( -no_match_vars );
 
-our $VERSION = '1.0.0';
+our $VERSION = '1.1.0';
 
 =head1 NAME
 

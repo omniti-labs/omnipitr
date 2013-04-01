@@ -2,6 +2,14 @@
 
 =encoding utf8
 
+=head2 2013-04-01
+
+=over
+
+=item * Release of version 1.1.0, including all changes since release 1.0.0
+
+=back
+
 =head2 2012-12-11
 
 =over

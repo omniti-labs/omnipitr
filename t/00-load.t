@@ -34,4 +34,4 @@ BEGIN {
     use_ok( 'OmniPITR::Tools::ParallelSystem' )                         || print "Bail out on OmniPITR::Tools::ParallelSystem\n";
 }
 
-diag( "Testing Pg::SQL::Parser $Pg::SQL::Parser::VERSION, Perl $], $^X" );
+diag( "Testing OmniPITR $OmniPITR::Program::VERSION, Perl $], $^X" );
