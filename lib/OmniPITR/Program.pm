@@ -534,7 +534,7 @@ sub _load_config_file {
         elsif ( /\A\s*(-[^\s=]*)\s*[\s=]\s*(.*)\z/ ) {
 
             # -x=123 or -x 123
-            push @new_args, $1;
+            push @new_args, $1, $2;
         }
         else {
             croak( "Cannot parse line: $_\n" );
