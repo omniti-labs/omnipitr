@@ -224,7 +224,9 @@ Empty lines, and comment lines (starting with #) are ignored.
 =head2 DESCRIPTION
 
 Running this program should be done by cronjob, or manually by database
-administrator.
+administrator. Run this command as the same user as your postgres, or
+else you will have permission issues, such as omnipitr-archive not being
+able to write to the --dst-backup destination.
 
 As a result of running it there are 2 files, usually named
 HOST-data-YYYY-MM-DD.tar and HOST-xlog-YYYY-MM-DD.tar. These files can be
