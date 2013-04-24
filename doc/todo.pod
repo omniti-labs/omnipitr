@@ -50,6 +50,9 @@ both, but add to logs)
 =item * make omnipitr-restore don't care about walarchive writability if -r
 option is not given
 
+=item * make omnipitr-backup-* scripts verify that they are being run as user
+running PostgreSQL
+
 =back
 
 =head2 DONE
