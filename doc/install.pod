@@ -2,7 +2,7 @@
 
 =head2 INSTALLATION
 
-You can get the OmniPITR project from L<https://labs.omniti.com/pgsoltools/trunk/omnipitr>. Within this directory you will find set of directories:
+You can get the OmniPITR project from L<https://github.com/omniti-labs/omnipitr>. Within this directory you will find set of directories:
 
 =over
 

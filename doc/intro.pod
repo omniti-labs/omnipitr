@@ -10,7 +10,7 @@ To make it portable, it was written in Perl, but with assumption that it should 
 
 =head2 INSTALLATION
 
-Simply fetch the directory L<https://labs.omniti.com/pgsoltools/trunk/omnipitr>, and you're done. More details are in I<doc/install.pod>.
+/* Simply fetch the directory L<https://github.com/omniti-labs/omnipitr>, and you're done. More details are in I<doc/install.pod>. */
 
 =head2 USAGE
 
