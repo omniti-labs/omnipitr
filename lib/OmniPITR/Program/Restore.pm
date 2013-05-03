@@ -63,7 +63,7 @@ remove, calling pre-removal hook) is delegated to dedicated methods.
 sub do_some_removal {
     my $self = shift;
 
-    return unless $self->{ 'remove-unneeded' };
+    return unless defined $self->{ 'remove-unneeded' };
 
     if ( $self->{ 'removal-pause-trigger' } && -e $self->{ 'removal-pause-trigger' } ) {
         unless ( $self->{ 'trigger-logged' } ) {
@@ -73,11 +73,17 @@ sub do_some_removal {
         return;
     }
 
-    my $control_data = $self->get_control_data();
-    return unless $control_data;
+    my $last_important;
+    if ( $self->{ 'remove-unneeded' } ) {
+        $last_important = $self->{ 'remove-unneeded' };
+    }
+    else {
+        my $control_data = $self->get_control_data();
+        return unless $control_data;
 
-    my $last_important = $self->get_last_redo_segment( $control_data );
-    return unless $last_important;
+        $last_important = $self->get_last_redo_segment( $control_data );
+        return unless $last_important;
+    }
 
     my @to_be_removed = $self->get_list_of_segments_to_remove( $last_important );
     return if 0 == scalar @to_be_removed;
@@ -417,12 +423,12 @@ sub read_args_specification {
         'recovery-delay'         => { 'type' => 'i', 'aliases' => [ 'w' ], },
         'removal-pause-trigger'  => { 'type' => 's', 'aliases' => [ 'p' ], },
         'remove-at-a-time'       => { 'type' => 'i', 'aliases' => [ 'rt' ], 'default' => '3', },
-        'remove-before'         => { 'aliases' => [ 'rb' ], },
-        'remove-unneeded'       => { 'aliases' => [ 'r' ], },
+        'remove-before'   => { 'aliases' => [ 'rb' ], },
+        'remove-unneeded' => { 'type'    => 's', 'aliases' => [ 'r' ], 'optional' => 1, },
         'source'                => { 'type'    => 's', 'aliases' => [ 's' ], },
         'streaming-replication' => { 'aliases' => [ 'sr' ], },
-        'temp-dir'              => { 'type'    => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
-        'verbose'               => { 'aliases' => [ 'v' ], },
+        'temp-dir' => { 'type' => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
+        'verbose' => { 'aliases' => [ 'v' ], },
     };
 }
 
@@ -453,6 +459,12 @@ sub read_args_normalization {
     # These could theoretically go into validation, but we need to check if we can get anything to put in segment* keys in $self
     $self->log->fatal( 'WAL segment file name and/or destination have not been given' ) if 2 > scalar @{ $args->{ '-arguments' } };
     $self->log->fatal( 'Too many arguments given.' ) if 2 < scalar @{ $args->{ '-arguments' } };
+
+    if (   ( defined $self->{ 'remove-unneeded' } )
+        && ( $self->{ 'remove-unneeded' } !~ /\A[0-9A-F]{16}000000[0-9A-F]{2}\z/i ) )
+    {
+        $self->log->fatal( 'Remove-unneeded value does not look like xlog filename (%s).', $self->{ 'remove-unneeded' } );
+    }
 
     @{ $self }{ qw( segment segment_destination ) } = @{ $args->{ '-arguments' } };
 

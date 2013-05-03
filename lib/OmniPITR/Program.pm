@@ -372,6 +372,8 @@ read_args_specification is supposed to return hashref, where keys are names of o
 
 =item * aliases - option aliases passed as arrayref
 
+=item * optional - wheter value for given argument is optional (i.e. you can have --option, or --option "value").
+
 =item * type - Getopt::Long based type. This can be ignored for simple boolean options, or can be something like "s", "s@", "i".
 
 =back
@@ -403,7 +405,11 @@ sub read_args {
         my @all_names = ( $key );
         push @all_names, @{ $S->{ 'aliases' } } if $S->{ 'aliases' };
         my $option_spec = join '|', @all_names;
-        $option_spec .= '=' . $S->{ 'type' } if $S->{ 'type' };
+        if ( $S->{ 'type' } ) {
+            $option_spec .= $S->{ 'optional' } ? ':' : '=';
+            $option_spec .= $S->{ 'type' };
+        }
+
         $parsed_options->{ $key } = $S->{ 'default' };
 
         # Line below puts to getopt_args full option specification (like:
