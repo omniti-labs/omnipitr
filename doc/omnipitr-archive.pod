@@ -321,5 +321,5 @@ you're doing daily hot backups - you should keep 2 days worth of backup xlogs.
 
 =head2 COPYRIGHT
 
-The OmniPITR project is Copyright (c) 2009-2012 OmniTI. All rights reserved.
+The OmniPITR project is Copyright (c) 2009-2013 OmniTI. All rights reserved.
 

@@ -612,5 +612,5 @@ another replication slave that later on is promoted to standalone.
 
 =head2 COPYRIGHT
 
-The OmniPITR project is Copyright (c) 2009-2012 OmniTI. All rights reserved.
+The OmniPITR project is Copyright (c) 2009-2013 OmniTI. All rights reserved.
 
