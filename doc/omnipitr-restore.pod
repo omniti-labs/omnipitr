@@ -33,11 +33,22 @@ and PostgreSQL slave will become fully functional.
 
 Check L<Finishing recovery> section for more details.
 
-=item --remove-unneeded (-r)
+=item --remove-unneeded (-r) [optional name]
 
 Makes I<omnipitr-restore> remove unneeded wal segments. These are B<not>
 segments that were passed to Pg - I<omnipitr-restore> checks last redo segment
 to make sure this is safe.
+
+This option has optional value being last segment needed in walarchive (i.e.
+all earlier than this can be removed). This is specifically designed, so you
+can put:
+
+    omnipitr-restore ... -r %r ...
+
+as your restore_command in recovery.conf. %r works in PostgreSQL since 8.3
+version, so if you're using older Pg, you can't use it (though you can still
+use -r without value, and let omnipitr-restore find out what it can delete on
+its own).
 
 =item --remove-before (-rb)
 
@@ -449,9 +460,9 @@ mintues):
 
     restore_command='/.../omnipitr-restore -D /mnt/data/ -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ -w 300 -f /tmp/finish.trigger %f %p'
 
-=head3 Setup as above, but with pause trigger defined for doing backups-on-slave and removing unneeded segments
+=head3 Setup as above, but with pause trigger defined for doing backups-on-slave and removing unneeded segments, working on PostgreSQL 8.3 (or newer) and using its "%r" to denote what can be removed:
 
-    restore_command='/.../omnipitr-restore -D /mnt/data/ -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ -w 300 -f /tmp/finish.trigger -r -p /tmp/pause.trigger %f %p'
+    restore_command='/.../omnipitr-restore -D /mnt/data/ -l /var/log/omnipitr/restore.log -s /mnt/wal_restore/ -w 300 -f /tmp/finish.trigger -r %r -p /tmp/pause.trigger %f %p'
 
 =head3 Minimal setup, but with backing up segments to remote server:
 

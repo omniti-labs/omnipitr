@@ -11,12 +11,6 @@ Here are the already known about missing features:
 
 =over
 
-=item * Ability to use %r in omnipitr-restore instead of relying on
-pg_controldata
-
-While definitely good thing, we will still keep code to use pg_controldata as %r
-is not available in 8.2.
-
 =item * Add a way to specify "primary" destination for wal segments.
 
 This would be useful if you have WAL-slave in the same network, and additional
@@ -58,6 +52,12 @@ running PostgreSQL
 =head2 DONE
 
 =over
+
+=item * [1.2.0] Ability to use %r in omnipitr-restore instead of relying on
+pg_controldata
+
+While definitely good thing, we will still keep code to use pg_controldata as %r
+is not available in 8.2.
 
 =item * [1.1.0] Provide support for --help option
 
