@@ -460,7 +460,7 @@ sub read_args_normalization {
     $self->log->fatal( 'WAL segment file name and/or destination have not been given' ) if 2 > scalar @{ $args->{ '-arguments' } };
     $self->log->fatal( 'Too many arguments given.' ) if 2 < scalar @{ $args->{ '-arguments' } };
 
-    if (   ( defined $self->{ 'remove-unneeded' } )
+    if (   ( $self->{ 'remove-unneeded' } )
         && ( $self->{ 'remove-unneeded' } !~ /\A[0-9A-F]{16}000000[0-9A-F]{2}\z/i ) )
     {
         $self->log->fatal( 'Remove-unneeded value does not look like xlog filename (%s).', $self->{ 'remove-unneeded' } );
