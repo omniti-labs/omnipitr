@@ -44,6 +44,15 @@ Used to make hot backup on slave DB server.
 
 General script for I<Nagios>/I<Cacti> type of systems - monitoring, graphing. Provides a way to check for replication lag, last backup timestamp, and other metrics.
 
+=item * omnipitr-cleanup
+
+Removes obsolete wal segments from wal archive, when using streaming
+replication
+
+=item * omnipitr-sync
+
+Send copy of PGDATA to remote locations - even multiple at the same time.
+
 =back
 
 In most of the cases you can simply call the program you want to use with I<--help> option to get brief overview of command line options.
