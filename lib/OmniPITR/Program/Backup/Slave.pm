@@ -68,6 +68,7 @@ with xlogs required to start PostgreSQL from backup.
 
 sub make_xlog_archive {
     my $self = shift;
+    return if $self->{ 'skip-xlogs' };
     $self->wait_for_xlog_archive_to_be_ready();
     $self->compress_xlogs();
     $self->unpause_xlog_removal();
@@ -506,6 +507,7 @@ I<omnipitr-restore>.
 
 sub pause_xlog_removal {
     my $self = shift;
+    return if $self->{ 'skip-xlogs' };
     return unless $self->{ 'removal-pause-trigger' };
 
     if ( open my $fh, '>', $self->{ 'removal-pause-trigger' } ) {
@@ -584,12 +586,13 @@ sub read_args_specification {
         'rsync-path'            => { 'type' => 's', 'aliases' => [ 'rp' ], 'default' => 'rsync', },
         'shell-path'            => { 'type' => 's', 'aliases' => [ 'sh' ], 'default' => 'bash', },
         'source'                => { 'type' => 's', 'aliases' => [ 's' ], },
-        'ssh-path'              => { 'type' => 's', 'aliases' => [ 'ssh' ], 'default' => 'ssh', },
-        'tar-path'              => { 'type' => 's', 'aliases' => [ 'tp' ], 'default' => 'tar', },
-        'tee-path'              => { 'type' => 's', 'aliases' => [ 'ep' ], 'default' => 'tee', },
-        'temp-dir'              => { 'type' => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
-        'username'              => { 'type' => 's', 'aliases' => [ 'U' ], },
-        'verbose' => { 'aliases' => [ 'v' ], },
+        'skip-xlogs' => { 'aliases' => [ 'sx' ], },
+        'ssh-path'   => { 'type'    => 's', 'aliases' => [ 'ssh' ], 'default' => 'ssh', },
+        'tar-path'   => { 'type'    => 's', 'aliases' => [ 'tp' ], 'default' => 'tar', },
+        'tee-path'   => { 'type'    => 's', 'aliases' => [ 'ep' ], 'default' => 'tee', },
+        'temp-dir'   => { 'type'    => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
+        'username' => { 'type'    => 's', 'aliases' => [ 'U' ], },
+        'verbose'  => { 'aliases' => [ 'v' ], },
     };
 }
 
@@ -685,12 +688,14 @@ sub validate_args {
     $self->log->fatal( "Filename template does not contain __FILETYPE__ placeholder!" ) unless $self->{ 'filename-template' } =~ /__FILETYPE__/;
     $self->log->fatal( "Filename template cannot contain / or \\ characters!" ) if $self->{ 'filename-template' } =~ m{[/\\]};
 
-    $self->log->fatal( 'Source of WAL files was not provided!' ) unless defined $self->{ 'source' }->{ 'path' };
-    $self->log->fatal( 'Provided source of wal files (%s) does not exist!',   $self->{ 'source' }->{ 'path' } ) unless -e $self->{ 'source' }->{ 'path' };
-    $self->log->fatal( 'Provided source of wal files (%s) is not directory!', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
-    $self->log->fatal( 'Provided source of wal files (%s) is not readable!',  $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };
+    unless ( $self->{ 'skip-xlogs' } ) {
+        $self->log->fatal( 'Source of WAL files was not provided!' ) unless defined $self->{ 'source' }->{ 'path' };
+        $self->log->fatal( 'Provided source of wal files (%s) does not exist!',   $self->{ 'source' }->{ 'path' } ) unless -e $self->{ 'source' }->{ 'path' };
+        $self->log->fatal( 'Provided source of wal files (%s) is not directory!', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
+        $self->log->fatal( 'Provided source of wal files (%s) is not readable!',  $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };
 
-    $self->{ 'source' }->{ 'path' } = abs_path( $self->{ 'source' }->{ 'path' } );
+        $self->{ 'source' }->{ 'path' } = abs_path( $self->{ 'source' }->{ 'path' } );
+    }
 
     $self->log->fatal( 'Temp-dir was not provided!' ) unless defined $self->{ 'temp-dir' };
     $self->log->fatal( 'Provided temp-dir (%s) does not exist!',   $self->{ 'temp-dir' } ) unless -e $self->{ 'temp-dir' };

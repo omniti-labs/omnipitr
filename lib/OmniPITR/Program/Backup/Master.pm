@@ -42,6 +42,7 @@ with xlogs required to start PostgreSQL from backup.
 
 sub make_xlog_archive {
     my $self = shift;
+    return if $self->{ 'skip-xlogs' };
     $self->wait_for_final_xlog_and_remove_dst_backup();
     $self->compress_xlogs();
     return;
@@ -140,9 +141,6 @@ process.
 This happens after data directory compression, but before compression of
 xlogs.
 
-This function also removes temporary destination for xlogs (dst-backup for
-omnipitr-archive).
-
 =cut
 
 sub stop_pg_backup {
@@ -154,7 +152,6 @@ sub stop_pg_backup {
 
     $self->log->log( q{pg_stop_backup('omnipitr') returned %s.}, $stop_backup_output );
 
-    my $subdir = basename( $self->{ 'data-dir' } );
     delete $self->{ 'pg_start_backup_done' };
 
     return;
@@ -170,12 +167,15 @@ temporary destination for xlogs (dst-backup for omnipitr-archive).
 sub start_pg_backup {
     my $self = shift;
 
-    my $subdir = basename( $self->{ 'data-dir' } );
-    $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . '.real',                 $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . '.real' );
-    $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . ".real/$subdir",         $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . ".real/$subdir" );
-    $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog" );
-    $self->log->fatal( 'Cannot symlink %s to %s: %s', $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' }, $OS_ERROR )
-        unless symlink( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' } );
+    unless ( $self->{ 'skip-xlogs' } ) {
+        my $subdir = basename( $self->{ 'data-dir' } );
+
+        $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . '.real',                 $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . '.real' );
+        $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . ".real/$subdir",         $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . ".real/$subdir" );
+        $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog" );
+        $self->log->fatal( 'Cannot symlink %s to %s: %s', $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' }, $OS_ERROR )
+            unless symlink( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' } );
+    }
 
     my $start_backup_output = $self->psql( "SELECT pg_start_backup('omnipitr')" );
 
@@ -205,7 +205,7 @@ and issues pg_stop_backup() to database.
 
 sub DESTROY {
     my $self = shift;
-    rmtree( [ $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' } ], 0, ) if defined $self->{ 'xlogs' };
+    rmtree( [ $self->{ 'xlogs' } . '.real', $self->{ 'xlogs' } ], 0, ) if ( !$self->{ 'xlogs' } ) && ( defined $self->{ 'xlogs' } );
     $self->stop_pg_backup() if $self->{ 'pg_start_backup_done' };
     $self->SUPER::DESTROY();
     return;
@@ -242,13 +242,14 @@ sub read_args_specification {
         'remote-cat-path' => { 'type' => 's', 'aliases' => [ 'rcp' ], 'default' => 'cat', },
         'rsync-path'      => { 'type' => 's', 'aliases' => [ 'rp' ], 'default' => 'rsync', },
         'shell-path'      => { 'type' => 's', 'aliases' => [ 'sh' ], 'default' => 'bash', },
-        'ssh-path'        => { 'type' => 's', 'aliases' => [ 'ssh' ], 'default' => 'ssh', },
-        'tar-path'        => { 'type' => 's', 'aliases' => [ 'tp' ], 'default' => 'tar', },
-        'tee-path'        => { 'type' => 's', 'aliases' => [ 'ep' ], 'default' => 'tee', },
-        'temp-dir'        => { 'type' => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
-        'username'        => { 'type' => 's', 'aliases' => [ 'U' ], },
-        'verbose' => { 'aliases' => [ 'v' ], },
-        'xlogs'   => { 'type'    => 's', 'aliases' => [ 'x' ], },
+        'skip-xlogs' => { 'aliases' => [ 'sx' ], },
+        'ssh-path'   => { 'type'    => 's', 'aliases' => [ 'ssh' ], 'default' => 'ssh', },
+        'tar-path'   => { 'type'    => 's', 'aliases' => [ 'tp' ], 'default' => 'tar', },
+        'tee-path'   => { 'type'    => 's', 'aliases' => [ 'ep' ], 'default' => 'tee', },
+        'temp-dir'   => { 'type'    => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
+        'username' => { 'type'    => 's', 'aliases' => [ 'U' ], },
+        'verbose'  => { 'aliases' => [ 'v' ], },
+        'xlogs'    => { 'type'    => 's', 'aliases' => [ 'x' ], },
     };
 }
 
@@ -332,15 +333,17 @@ sub validate_args {
     $self->log->fatal( "Filename template does not contain __FILETYPE__ placeholder!" ) unless $self->{ 'filename-template' } =~ /__FILETYPE__/;
     $self->log->fatal( "Filename template cannot contain / or \\ characters!" ) if $self->{ 'filename-template' } =~ m{[/\\]};
 
-    $self->log->fatal( "Xlogs dir (--xlogs) was not given! Cannot work without it" ) unless defined $self->{ 'xlogs' };
-    $self->{ 'xlogs' } =~ s{/+$}{};
-    $self->log->fatal( "Xlogs dir (%s) already exists! It shouldn't.",           $self->{ 'xlogs' } ) if -e $self->{ 'xlogs' };
-    $self->log->fatal( "Xlogs side dir (%s.real) already exists! It shouldn't.", $self->{ 'xlogs' } ) if -e $self->{ 'xlogs' } . '.real';
+    unless ( $self->{ 'skip-xlogs' } ) {
+        $self->log->fatal( "Xlogs dir (--xlogs) was not given! Cannot work without it" ) unless defined $self->{ 'xlogs' };
+        $self->{ 'xlogs' } =~ s{/+$}{};
+        $self->log->fatal( "Xlogs dir (%s) already exists! It shouldn't.",           $self->{ 'xlogs' } ) if -e $self->{ 'xlogs' };
+        $self->log->fatal( "Xlogs side dir (%s.real) already exists! It shouldn't.", $self->{ 'xlogs' } ) if -e $self->{ 'xlogs' } . '.real';
 
-    my $xlog_parent = dirname( $self->{ 'xlogs' } );
-    $self->log->fatal( 'Xlogs dir (%s) parent (%s) does not exist. Cannot continue.',   $self->{ 'xlogs' }, $xlog_parent ) unless -e $xlog_parent;
-    $self->log->fatal( 'Xlogs dir (%s) parent (%s) is not directory. Cannot continue.', $self->{ 'xlogs' }, $xlog_parent ) unless -d $xlog_parent;
-    $self->log->fatal( 'Xlogs dir (%s) parent (%s) is not writable. Cannot continue.',  $self->{ 'xlogs' }, $xlog_parent ) unless -w $xlog_parent;
+        my $xlog_parent = dirname( $self->{ 'xlogs' } );
+        $self->log->fatal( 'Xlogs dir (%s) parent (%s) does not exist. Cannot continue.',   $self->{ 'xlogs' }, $xlog_parent ) unless -e $xlog_parent;
+        $self->log->fatal( 'Xlogs dir (%s) parent (%s) is not directory. Cannot continue.', $self->{ 'xlogs' }, $xlog_parent ) unless -d $xlog_parent;
+        $self->log->fatal( 'Xlogs dir (%s) parent (%s) is not writable. Cannot continue.',  $self->{ 'xlogs' }, $xlog_parent ) unless -w $xlog_parent;
+    }
 
     my %bad_digest = ();
     for my $digest_type ( @{ $self->{ 'digests' } } ) {
