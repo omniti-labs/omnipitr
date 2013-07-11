@@ -1,0 +1,34 @@
+#!/bin/bash
+
+make_master_sx_backup() {
+    $omnipitr_dir/bin/omnipitr-backup-master -dg MD5,SHA-1 -p 54001 -t $work_dir/omnipitr/tmp/backup-master/ -D $work_dir/data-master/ -x $work_dir/omnipitr/backup-archive/ -sx -dl gzip=$work_dir/omnipitr/backup/ -f "master-sx-__FILETYPE__.tar__CEXT__" -l $work_dir/omnipitr/log-sx -v
+
+    if [[ ! -e $work_dir/omnipitr/backup/master-sx-data.tar.gz ]]
+    then
+        echo "$work_dir/omnipitr/backup/master-sx-data.tar.gz does not exist?!" >&2
+        exit 1
+    fi
+
+    if [[ -e $work_dir/omnipitr/backup/master-sx-xlog.tar.gz ]]
+    then
+        echo "$work_dir/omnipitr/backup/master-sx-xlog.tar.gz does exist?!" >&2
+        exit 1
+    fi
+
+    data_size="$( du -k $work_dir/omnipitr/backup/master-sx-data.tar.gz | awk '{print $1}')"
+
+    if (( $data_size < 1024 ))
+    then
+        echo "$work_dir/omnipitr/backup/master-sx-data.tar.gz exists but looks too small to be sensible!" >&2
+        exit 1
+    fi
+
+    # Rotate xlog to make sure there is something in replication archive.
+    echo "create table xxx_tmp as select generate_series(1,10) as i;
+        checkpoint;
+        select pg_switch_xlog();
+        drop table xxx_tmp;
+        checkpoint;
+    " | psql -p 54001 &> /dev/null
+
+}

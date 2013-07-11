@@ -1,0 +1,37 @@
+#!/bin/bash
+
+make_slave_sx_backup() {
+
+    generate_load 5
+
+    if (( pg_major_version >= 9 ))
+    then
+        $omnipitr_dir/bin/omnipitr-backup-slave -dg MD5,SHA-1 -P 54001 -cm -sx -s gzip=$work_dir/omnipitr/archive -p $work_dir/omnipitr/pause.master-slave -t $work_dir/omnipitr/tmp/backup-slave/ -D $work_dir/data-master-slave/ -dl gzip=$work_dir/omnipitr/backup/ -f "master-slave-sx-__FILETYPE__.tar__CEXT__" -l $work_dir/omnipitr/log-backup-slave-sx -v
+    else
+        $omnipitr_dir/bin/omnipitr-backup-slave -dg MD5,SHA-1 -sx -s gzip=$work_dir/omnipitr/archive -p $work_dir/omnipitr/pause.master-slave -t $work_dir/omnipitr/tmp/backup-slave/ -D $work_dir/data-master-slave/ -dl gzip=$work_dir/omnipitr/backup/ -f "master-slave-sx-__FILETYPE__.tar__CEXT__" -l $work_dir/omnipitr/log-backup-slave-sx -v
+    fi
+
+    stop_load_generators
+
+    if [[ ! -e $work_dir/omnipitr/backup/master-slave-sx-data.tar.gz ]]
+    then
+        echo "$work_dir/omnipitr/backup/master-slave-sx-data.tar.gz does not exist?!" >&2
+        exit 1
+    fi
+
+    if [[ -e $work_dir/omnipitr/backup/master-slave-sx-xlog.tar.gz ]]
+    then
+        echo "$work_dir/omnipitr/backup/master-slave-sx-xlog.tar.gz does not exist?!" >&2
+        exit 1
+    fi
+
+
+    data_size="$( du -k $work_dir/omnipitr/backup/master-slave-sx-data.tar.gz | awk '{print $1}')"
+
+    if (( $data_size < 1024 ))
+    then
+        echo "$work_dir/omnipitr/backup/master-slave-sx-data.tar.gz exists but looks too small to be sensible!" >&2
+        exit 1
+    fi
+
+}

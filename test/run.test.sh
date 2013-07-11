@@ -40,6 +40,12 @@ make_master_backup
 
 echo "< Master backup done and looks ok"
 
+echo "> Making backup off master (without xlogs)"
+
+make_master_sx_backup
+
+echo "< Master backup (without xlogs) done and looks ok"
+
 echo "> Starting standalone pg from master backup"
 
 make_standalone master 54002
@@ -57,6 +63,12 @@ echo "> Make backup off normal slave"
 make_slave_backup
 
 echo "< Backup off slave worked"
+
+echo "> Make backup off normal slave (without xlogs)"
+
+make_slave_sx_backup
+
+echo "< Backup off slave (without xlogs) worked"
 
 echo "> Starting standalone pg from slave backup"
 
