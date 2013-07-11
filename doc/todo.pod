@@ -33,9 +33,6 @@ walarchive from compressed to not-compressed.
 
 This has the benefit of keeping required xlogs to a minimum for backups.
 
-=item * report missing statedir on start, and to logs, and not to stderr (or to
-both, but add to logs)
-
 =item * make omnipitr-backup-* scripts verify that they are being run as user
 running PostgreSQL
 
