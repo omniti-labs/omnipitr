@@ -496,7 +496,9 @@ sub validate_args {
 
     $self->log->fatal( 'Given source (%s) is not a directory', $self->{ 'source' }->{ 'path' } ) unless -d $self->{ 'source' }->{ 'path' };
     $self->log->fatal( 'Given source (%s) is not readable',    $self->{ 'source' }->{ 'path' } ) unless -r $self->{ 'source' }->{ 'path' };
-    $self->log->fatal( 'Given source (%s) is not writable',    $self->{ 'source' }->{ 'path' } ) unless -w $self->{ 'source' }->{ 'path' };
+    if ( $self->{ 'remove-unneeded' } ) {
+        $self->log->fatal( 'Given source (%s) is not writable', $self->{ 'source' }->{ 'path' } ) unless -w $self->{ 'source' }->{ 'path' };
+    }
 
     $self->log->fatal( 'Invalid error-pgcontroldata: %s.', $self->{ 'error-pgcontroldata' } ) unless $self->{ 'error-pgcontroldata' } =~ m{\A (?: break | ignore | hang ) \z}x;
 

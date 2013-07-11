@@ -36,9 +36,6 @@ This has the benefit of keeping required xlogs to a minimum for backups.
 =item * report missing statedir on start, and to logs, and not to stderr (or to
 both, but add to logs)
 
-=item * make omnipitr-restore don't care about walarchive writability if -r
-option is not given
-
 =item * make omnipitr-backup-* scripts verify that they are being run as user
 running PostgreSQL
 
@@ -47,6 +44,9 @@ running PostgreSQL
 =head2 DONE
 
 =over
+
+=item * [1.2.0] make omnipitr-restore don't care about walarchive writability if -r
+option is not given
 
 =item * [1.2.0] Add option to skip archiving of xlogs to omnipitr-backup-*
 
