@@ -25,11 +25,6 @@ omnipitr-backup-slave (remote, via http/ftp)
 This is for migration purposes - for example, when you're switching your
 walarchive from compressed to not-compressed.
 
-=item * Add option to skip archiving of xlogs to omnipitr-backup-*
-
-This is assuming the user is keeping their own xlog archive and will limit
-the ability to restore a standalone database.
-
 =item * Support sending to cloud storage such as Amazon S3
 
 =item * Add support for xz compression (similar to lzma)
@@ -52,6 +47,11 @@ running PostgreSQL
 =head2 DONE
 
 =over
+
+=item * [1.2.0] Add option to skip archiving of xlogs to omnipitr-backup-*
+
+This is assuming the user is keeping their own xlog archive and will limit
+the ability to restore a standalone database.
 
 =item * [1.2.0] Ability to use %r in omnipitr-restore instead of relying on
 pg_controldata
