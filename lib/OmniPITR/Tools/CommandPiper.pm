@@ -2,6 +2,9 @@ package OmniPITR::Tools::CommandPiper;
 use strict;
 use warnings;
 use English qw( -no_match_vars );
+use Data::Dumper;
+use File::Spec;
+use File::Temp qw( tempdir );
 
 =head1 NAME
 
@@ -10,6 +13,8 @@ OmniPITR::Tools::CommandPiper - Class for building complex pipe-based shell comm
 =cut
 
 our $VERSION = '1.1.0';
+
+our $fifo_dir = tempdir( 'CommandPiper-' . $$ . '-XXXXXX', 'CLEANUP' => 1, 'TMPDIR' => 1 );
 
 =head1 SYNOPSIS
 
@@ -55,6 +60,7 @@ sub new {
     $self->{ 'stdout_programs' } = [];
     $self->{ 'stderr_files' }    = [];
     $self->{ 'stderr_programs' } = [];
+    $self->{ 'fifos' }           = [];
     return $self;
 }
 
@@ -79,8 +85,7 @@ Any other would switch back to default, which is overwrite.
 sub set_write_mode {
     my $self = shift;
     my $want = shift;
-    $self->{ 'write_mode' } = '>';
-    $self->{ 'write_mode' } = '>>' if $want eq 'append';
+    $self->{ 'write_mode' } = $want eq 'append' ? '>>' : '>';
     return;
 }
 
@@ -174,96 +179,82 @@ Returns stringified command that should be ran via "system" that does all the de
 sub command {
     my $self = shift;
 
-    my $program = join( ' ', map { quotemeta $_ } @{ $self->{ 'cmd' } } );
+    my @fifos = $self->get_all_fifos( 0 );
 
-    my $stderr_redirection = $self->stderr();
-    my $stdout_redirection = $self->stdout();
+    my $fifo_preamble = 'mkfifo ' . join( " ", map { quotemeta( $_->[ 0 ] ) } @fifos ) . "\n";
+    for my $fifo ( @fifos ) {
+        $fifo_preamble .= sprintf "%s &\n", $fifo->[ 1 ]->get_command_with_stdin( $fifo->[ 0 ] );
+    }
+    my $fifo_cleanup = 'rm ' . join( " ", map { quotemeta( $_->[ 0 ] ) } @fifos ) . "\n";
 
-    $program .= ' ' . $stderr_redirection if $stderr_redirection;
-    $program .= ' ' . $stdout_redirection if $stdout_redirection;
-
-    return $program;
+    return $fifo_preamble . $self->get_command_with_stdin() . "\nwait\n" . $fifo_cleanup;
 }
 
-=head1 stdout()
-
-Internal function returning whole stdout redirection for current program, or undef if there are no stdout consummers.
-
-=cut
-
-sub stdout {
-    my $self         = shift;
-    my @stdout_parts = ();
-    push @stdout_parts, map { [ 'PATH', $_ ] } @{ $self->{ 'stdout_files' } };
-    push @stdout_parts, map { [ 'CMD',  $_->command() ] } @{ $self->{ 'stdout_programs' } };
-    return if 0 == scalar @stdout_parts;
-
-    my $ready = $self->tee_maker( @stdout_parts );
-    return sprintf( '%s %s', $self->{ 'write_mode' }, $ready->[ 1 ] ) if 'PATH' eq $ready->[ 0 ];
-    return sprintf( '| %s', $ready->[ 1 ] );
+sub base_program {
+    my $self = shift;
+    return join( ' ', map { quotemeta $_ } @{ $self->{ 'cmd' } } );
 }
 
-=head1 stderr()
+sub get_command_with_stdin {
+    my $self = shift;
+    my $fifo = shift;
 
-Internal function returning whole stderr redirection for current program, or undef if there are no stderr consummers.
+    my $command = $self->base_program();
+    $command .= ' < ' . quotemeta( $fifo ) if defined $fifo;
 
-=cut
+    if ( 0 < scalar @{ $self->{ 'stderr_files' } } ) {
+        croak( "This should never happen. Too many stderr files?!" ) if 1 < scalar @{ $self->{ 'stderr_files' } };
+        $command .= sprintf ' 2%s %s', $self->{ 'write_mode' }, quotemeta( $self->{ 'stderr_files' }->[ 0 ] );
+    }
 
-sub stderr {
-    my $self         = shift;
-    my @stderr_parts = ();
-    push @stderr_parts, map { [ 'PATH', $_ ] } @{ $self->{ 'stderr_files' } };
-    push @stderr_parts, map { [ 'CMD',  $_->command() ] } @{ $self->{ 'stderr_programs' } };
-    return if 0 == scalar @stderr_parts;
+    return $command if 0 == scalar @{ $self->{ 'stdout_files' } };
 
-    my $ready = $self->tee_maker( @stderr_parts );
-    return sprintf( '2%s %s', $self->{ 'write_mode' }, $ready->[ 1 ] ) if 'PATH' eq $ready->[ 0 ];
-    return sprintf( '2> >( %s )', $ready->[ 1 ] );
+    if ( 1 == scalar @{ $self->{ 'stdout_files' } } ) {
+        return sprintf( '%s %s %s', $command, $self->{ 'write_mode' }, quotemeta( $self->{ 'stdout_files' }->[ 0 ] ) );
+    }
+    my $final_file = pop @{ $self->{ 'stdout_files' } };
+    my $tee        = sprintf '%s%s %s %s %s',
+        quotemeta( $self->{ 'tee' } ),
+        $self->{ 'write_mode' } eq '>' ? '' : ' -a',
+        join( ' ', map { quotemeta( $_ ) } @{ $self->{ 'stdout_files' } } ),
+        $self->{ 'write_mode' },
+        quotemeta( $final_file );
+    return "$command | $tee";
 }
 
-=head1 tee_maker()
+sub get_all_fifos {
+    my $self    = shift;
+    my $fifo_id = shift;
 
-Receives array of arrayrefs. Each element is array with two values:
-
-=over
-
-=item 1. type of element "PATH" - path to file, "CMD" - command to run
-
-=item 2. path to file, or command line of program to run.
-
-=back
-
-Returns single item of [ "PATH", "/path/to/file" ] or [ "CMD", "command to run" ] that will deliver data to all receivers.
-
-=cut
-
-sub tee_maker {
-    my $self  = shift;
-    my @parts = @_;
-    if ( 1 == scalar @parts ) {
-        $parts[ 0 ]->[ 1 ] = quotemeta( $parts[ 0 ]->[ 1 ] ) if 'PATH' eq $parts[ 0 ]->[ 0 ];
-        return $parts[ 0 ];
+    my @fifos = ();
+    for my $sub ( @{ $self->{ 'stdout_programs' } }, @{ $self->{ 'stderr_programs' } } ) {
+        push @fifos, $sub->get_all_fifos( $fifo_id + scalar @fifos );
     }
+    while ( my $sub = shift @{ $self->{ 'stdout_programs' } } ) {
+        my $fifo_name = $self->get_fifo_name( $fifo_id + scalar @fifos );
+        push @fifos, [ $fifo_name, $sub ];
+        push @{ $self->{ 'stdout_files' } }, $fifo_name;
+    }
+    while ( my $sub = shift @{ $self->{ 'stderr_programs' } } ) {
+        my $fifo_name = $self->get_fifo_name( $fifo_id + scalar @fifos );
+        push @fifos, [ $fifo_name, $sub ];
+        push @{ $self->{ 'stderr_files' } }, $fifo_name;
+    }
+    if ( 1 < scalar @{ $self->{ 'stderr_files' } } ) {
+        my $final_stderr_file = pop @{ $self->{ 'stderr_files' } };
+        my $stderr_tee = $self->new_subprogram( $self->{ 'tee' }, @{ $self->{ 'stderr_files' } } );
+        $stderr_tee->add_stdout_file( $final_stderr_file );
+        my $fifo_name = $self->get_fifo_name( $fifo_id + scalar @fifos );
+        push @fifos, [ $fifo_name, $stderr_tee ];
+        $self->{ 'stderr_files' } = [ $fifo_name ];
+    }
+    return @fifos;
+}
 
-    my $last     = pop @parts;
-    my @tee_args = ();
-    push @tee_args, '-a' if $self->{ 'write_mode' } eq '>>';
-    for my $p ( @parts ) {
-        if ( 'PATH' eq $p->[ 0 ] ) {
-            push @tee_args, quotemeta $p->[ 1 ];
-            next;
-        }
-        push @tee_args, sprintf( '>( %s )', $p->[ 1 ] );
-    }
-    my $tee_invocation = sprintf '%s %s', quotemeta( $self->{ 'tee' } ), join( ' ', @tee_args );
-    if ( 'PATH' eq $last->[ 0 ] ) {
-        $tee_invocation .= sprintf ' %s %s', $self->{ 'write_mode' }, quotemeta( $last->[ 1 ] );
-    }
-    else {
-        $tee_invocation .= ' > >( ' . $last->[ 1 ] . ' ) ';
-    }
-    return [ 'CMD', $tee_invocation ];
+sub get_fifo_name {
+    my $self = shift;
+    my $id   = shift;
+    return File::Spec->catfile( $fifo_dir, "fifo-" . $id );
 }
 
 1;
-
