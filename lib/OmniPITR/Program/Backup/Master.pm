@@ -228,6 +228,7 @@ sub read_args_specification {
         'dst-direct'        => { 'type'    => 's@', 'aliases' => [ 'dd' ], },
         'dst-local'         => { 'type'    => 's@', 'aliases' => [ 'dl' ], },
         'dst-remote'        => { 'type'    => 's@', 'aliases' => [ 'dr' ], },
+        'dst-pipe'          => { 'type'    => 's@', 'aliases' => [ 'dp' ], },
         'filename-template' => { 'type'    => 's',  'aliases' => [ 'f' ],  'default' => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__', },
         'gzip-path'         => { 'type'    => 's',  'aliases' => [ 'gp' ], 'default' => 'gzip', },
         'host'              => { 'type'    => 's',  'aliases' => [ 'h' ], },
@@ -273,11 +274,11 @@ sub read_args_normalization {
         delete $args->{ 'digest' };
     }
 
-    for my $key ( grep { !/^dst-(?:local|remote|direct)$/ } keys %{ $args } ) {
+    for my $key ( grep { !/^dst-(?:local|remote|direct|pipe)$/ } keys %{ $args } ) {
         $self->{ $key } = $args->{ $key };
     }
 
-    for my $type ( qw( local remote direct ) ) {
+    for my $type ( qw( local remote direct pipe ) ) {
         my $D = [];
         $self->{ 'destination' }->{ $type } = $D;
 
@@ -327,7 +328,10 @@ sub validate_args {
 
     $self->{ 'data-dir' } = abs_path( $self->{ 'data-dir' } );
 
-    my $dst_count = scalar( @{ $self->{ 'destination' }->{ 'local' } } ) + scalar( @{ $self->{ 'destination' }->{ 'remote' } } ) + scalar( @{ $self->{ 'destination' }->{ 'direct' } } );
+    my $dst_count = 0;
+    for my $dst_type ( qw( local remote direct pipe ) ) {
+        $dst_count += scalar( @{ $self->{ 'destination' }->{ $dst_type } } );
+    }
     $self->log->fatal( "No --dst-* has been provided!" ) if 0 == $dst_count;
 
     $self->log->fatal( "Filename template does not contain __FILETYPE__ placeholder!" ) unless $self->{ 'filename-template' } =~ /__FILETYPE__/;

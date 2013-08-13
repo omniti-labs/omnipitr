@@ -132,6 +132,11 @@ sub choose_base_local_destinations {
         push @{ $base->{ $type } }, { 'type' => 'direct', 'path' => $dst->{ 'path' } };
     }
 
+    for my $dst ( @{ $self->{ 'destination' }->{ 'pipe' } } ) {
+        my $type = $dst->{ 'compression' };
+        push @{ $base->{ $type } }, { 'type' => 'pipe', 'path' => $dst->{ 'path' } };
+    }
+
     return;
 }
 
@@ -237,14 +242,17 @@ sub tar_and_compress {
     $self->log->log( 'Actual command to make tarballs: %s', $tar ) if $self->verbose;
 
     my @full_command = ();
-    push @full_command, 'exec', quotemeta( $self->{ 'shell-path' } );
-    push @full_command, '-c',   quotemeta( $tar );
+    push @full_command, quotemeta( $self->{ 'shell-path' } );
+    push @full_command, '-c',   quotemeta( $tar . ";wait");
     push @full_command, '>',    quotemeta( $self->temp_file( 'full_tar.stdout' ) );
     push @full_command, '2>',   quotemeta( $self->temp_file( 'full_tar.stderr' ) );
 
     my $previous_dir = getcwd;
     chdir $ARGS{ 'work_dir' } if $ARGS{ 'work_dir' };
+    $self->log->log('cd ' . getcwd() );
+    $self->log->log(join( ' ', @full_command ) );
     my $retval = system( join( ' ', @full_command ) );
+    system("ps uxf");
     chdir $previous_dir if $ARGS{ 'work_dir' };
 
     my @files = (
@@ -340,7 +348,7 @@ sub _tar_command {
 
     my @tar_command = ( $self->{ 'tar-path' }, 'cf', '-' );
     unshift @tar_command, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
-    unshift @tar_command, 'exec';
+    # unshift @tar_command, 'exec';
 
     if ( $ARGS{ 'excludes' } ) {
         push @tar_command, map { '--exclude=' . $_ } @{ $ARGS{ 'excludes' } };
@@ -414,7 +422,15 @@ sub _add_tar_consummers {
                 next;
             }
 
-            # it's not local, so it has to be remote now
+            if ( $destination->{ 'type' } eq 'pipe' ) {
+                $compressed->add_stdout_program( $destination->{ 'path' }, $tarball_filename );
+                while ( my ( $digest_type, $digester ) = each %digesters ) {
+                    $digester->add_stdout_program( $destination->{ 'path' }, $self->get_archive_filename( $digest_type, $compression_type ) );
+                }
+                next;
+            }
+
+            # it's not local, nor pipe, so it has to be remote now
             $compressed->add_stdout_program( $self->_get_remote_writer_command( $destination->{ 'path' }, $tarball_filename ) );
             while ( my ( $digest_type, $digester ) = each %digesters ) {
                 $digester->add_stdout_program(
