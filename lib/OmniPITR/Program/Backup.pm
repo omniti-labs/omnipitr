@@ -234,11 +234,16 @@ sub tar_and_compress {
 
     my $tar = $self->_tar_command( %ARGS );
 
-    $self->log->log( 'Actual command to make tarballs: %s', $tar ) if $self->verbose;
+    $self->log->log( 'Script to make tarballs:%s%s', "\n", $tar ) if $self->verbose;
+
+    my $script_file = $self->temp_file( 'tar.script' );
+    open my $scr_fh, '>', $script_file or croak( "Cannot write to $script_file?!" );
+    print $scr_fh $tar;
+    close $scr_fh;
 
     my @full_command = ();
-    push @full_command, 'exec', quotemeta( $self->{ 'shell-path' } );
-    push @full_command, '-c',   quotemeta( $tar );
+    push @full_command, quotemeta( $self->{ 'shell-path' } );
+    push @full_command, quotemeta( $script_file );
     push @full_command, '>',    quotemeta( $self->temp_file( 'full_tar.stdout' ) );
     push @full_command, '2>',   quotemeta( $self->temp_file( 'full_tar.stderr' ) );
 
@@ -340,7 +345,6 @@ sub _tar_command {
 
     my @tar_command = ( $self->{ 'tar-path' }, 'cf', '-' );
     unshift @tar_command, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
-    unshift @tar_command, 'exec';
 
     if ( $ARGS{ 'excludes' } ) {
         push @tar_command, map { '--exclude=' . $_ } @{ $ARGS{ 'excludes' } };
