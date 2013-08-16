@@ -254,10 +254,7 @@ sub tar_and_compress {
 
     my $previous_dir = getcwd;
     chdir $ARGS{ 'work_dir' } if $ARGS{ 'work_dir' };
-    $self->log->log('cd ' . getcwd() );
-    $self->log->log(join( ' ', @full_command ) );
     my $retval = system( join( ' ', @full_command ) );
-    system("ps uxf");
     chdir $previous_dir if $ARGS{ 'work_dir' };
 
     my @files = (

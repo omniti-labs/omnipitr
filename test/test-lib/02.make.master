@@ -3,6 +3,7 @@ make_master_mkdirs() {
     mkdir data-master omnipitr
     mkdir omnipitr/{longarchive,archive,state,backup,tmp}
     mkdir omnipitr/tmp/{archive,backup-master,backup-slave,restore}
+    export TMPDIR="$(pwd)/omnipitr/tmp"
     chmod 700 data-master
 }
 
