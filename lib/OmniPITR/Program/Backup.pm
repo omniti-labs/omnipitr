@@ -249,8 +249,8 @@ sub tar_and_compress {
     my @full_command = ();
     push @full_command, quotemeta( $self->{ 'shell-path' } );
     push @full_command, quotemeta( $script_file );
-    push @full_command, '>',    quotemeta( $self->temp_file( 'full_tar.stdout' ) );
-    push @full_command, '2>',   quotemeta( $self->temp_file( 'full_tar.stderr' ) );
+    push @full_command, '>', quotemeta( $self->temp_file( 'full_tar.stdout' ) );
+    push @full_command, '2>', quotemeta( $self->temp_file( 'full_tar.stderr' ) );
 
     my $previous_dir = getcwd;
     chdir $ARGS{ 'work_dir' } if $ARGS{ 'work_dir' };
