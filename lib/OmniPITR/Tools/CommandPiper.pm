@@ -222,7 +222,7 @@ sub command {
     # Get list of all fifos that are necesarry to create, so we can run "mkfifo" on it.
     my @fifos = $self->get_all_fifos( 0 );
 
-    my $fifo_preamble = 'mkfifo ' . join( " ", map { quotemeta( $_->[ 0 ] ) } @fifos ) . "\n";
+    my $fifo_preamble = scalar( @fifos ) ? 'mkfifo ' . join( " ", map { quotemeta( $_->[ 0 ] ) } @fifos ) . "\n" : '';
 
     # This loop actually writes (well, appends to the $fifo_preamble variable) fifo'ed commands, like:
     #     md5sum - < /tmp/CommandPiper-26195-oCZ7Sw/fifo-0 > /tmp/checksum.txt &
@@ -231,7 +231,7 @@ sub command {
     }
 
     # we need to remove the fifos afterwards.
-    my $fifo_cleanup = 'rm ' . join( " ", map { quotemeta( $_->[ 0 ] ) } @fifos ) . "\n";
+    my $fifo_cleanup = scalar( @fifos ) ? 'rm ' . join( " ", map { quotemeta( $_->[ 0 ] ) } @fifos ) . "\n" : '';
 
     return $fifo_preamble . $self->get_command_with_stdin() . "\nwait\n" . $fifo_cleanup;
 }
