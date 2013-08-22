@@ -109,6 +109,25 @@ sub send_to_destinations {
         }
     }
 
+    if ( my $dst_list = $self->{ 'destination' }->{ 'pipe' } ) {
+        for my $dst ( @{ $dst_list } ) {
+            next if $self->segment_already_sent( 'pipe', $dst );
+
+            my $local_file = $dst->{ 'compression' } eq 'none' ? $self->{ 'segment' } : $self->get_temp_filename_for( $dst->{ 'compression' } );
+
+            my $is_backup = undef;
+
+            $runner->add_command(
+                'command'               => [ $dst->{ 'path' }, basename( $local_file ) ],
+                'is_backup'             => undef,
+                'local_file'            => $local_file,
+                'destination_file_path' => 'pipe to ' . $dst->{ 'path' },
+                'destination_type'      => 'pipe',
+                'dst_path'              => $dst->{ 'path' },
+            );
+        }
+    }
+
     $ENV{ 'TMPDIR' } = $self->{ 'temp-dir' };
 
     $runner->run();
@@ -284,6 +303,7 @@ sub read_args_specification {
         'dst-backup' => { 'type' => 's',  'aliases' => [ 'db' ] },
         'dst-local'  => { 'type' => 's@', 'aliases' => [ 'dl' ] },
         'dst-remote' => { 'type' => 's@', 'aliases' => [ 'dr' ] },
+        'dst-pipe'   => { 'type' => 's@', 'aliases' => [ 'dp' ] },
         'gzip-path'  => { 'type' => 's',  'aliases' => [ 'gp' ], 'default' => 'gzip', },
         'log'        => { 'type' => 's',  'aliases' => [ 'l' ] },
         'lzma-path'  => { 'type' => 's',  'aliases' => [ 'lp' ], 'default' => 'lzma', },
@@ -316,7 +336,7 @@ sub read_args_normalization {
         $self->{ $key } = $args->{ $key };
     }
 
-    for my $type ( qw( local remote ) ) {
+    for my $type ( qw( local remote pipe ) ) {
         my $D = [];
         $self->{ 'destination' }->{ $type } = $D;
 
@@ -377,7 +397,10 @@ sub validate_args {
         }
     }
 
-    my $dst_count = scalar( @{ $self->{ 'destination' }->{ 'local' } } ) + scalar( @{ $self->{ 'destination' }->{ 'remote' } } );
+    my $dst_count = 0;
+    for my $dst_type ( qw( local remote pipe ) ) {
+        $dst_count += scalar( @{ $self->{ 'destination' }->{ $dst_type } } );
+    }
     $self->log->fatal( "No --dst-* has been provided!" ) if 0 == $dst_count;
 
     if ( 1 < $dst_count ) {
