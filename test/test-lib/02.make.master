@@ -1,10 +1,18 @@
 #!/bin/bash
 make_master_mkdirs() {
     mkdir data-master omnipitr
-    mkdir omnipitr/{longarchive,archive,state,backup,tmp}
+    mkdir omnipitr/{longarchive,archive,state,backup,tmp,dst-pipe-archive}
     mkdir omnipitr/tmp/{archive,backup-master,backup-slave,restore}
     export TMPDIR="$(pwd)/omnipitr/tmp"
     chmod 700 data-master
+}
+
+create_temporary_script_for_dst_pipe() {
+    cat > "$work_dir/omnipitr/tmp/helper-dst-pipe-archive.sh" << END_OF_SCRIPT
+#!/usr/bin/env bash
+cat - > "$work_dir/omnipitr/dst-pipe-archive/\$1"
+END_OF_SCRIPT
+    chmod 755 "$work_dir/omnipitr/tmp/helper-dst-pipe-archive.sh"
 }
 
 make_master_initdb() {
@@ -21,7 +29,7 @@ make_master_initdb() {
     s/\A \s* (?: [#] \s* )? log_line_prefix \s* = \s*.*/log_line_prefix = \047\%m \%u\@\%d \%p \%r \047/x;
     s/\A \s* (?: [#] \s* )? log_temp_files \s* = \s*.*/log_temp_files = 0/x;
     s/\A \s* (?: [#] \s* )? (log_checkpoints|log_connections|log_disconnections|log_lock_waits|archive_mode) \s* = \s*.*/$1 = on/x;
-    s{\A \s* (?: [#] \s* )? archive_command \s* = \s*.*}{archive_command = \047$ENV{omnipitr_dir}/bin/omnipitr-archive -t $ENV{work_dir}/omnipitr/tmp/archive/ -PJ 5 -l $ENV{work_dir}/omnipitr/log.master -dl gzip=$ENV{work_dir}/omnipitr/archive -dl gzip=$ENV{work_dir}/omnipitr/longarchive -db $ENV{work_dir}/omnipitr/backup-archive/ -s $ENV{work_dir}/omnipitr/state/ -v "\%p"\047}x;
+    s{\A \s* (?: [#] \s* )? archive_command \s* = \s*.*}{archive_command = \047$ENV{omnipitr_dir}/bin/omnipitr-archive -t $ENV{work_dir}/omnipitr/tmp/archive/ -PJ 5 -l $ENV{work_dir}/omnipitr/log.master -dl gzip=$ENV{work_dir}/omnipitr/archive -dl gzip=$ENV{work_dir}/omnipitr/longarchive -db $ENV{work_dir}/omnipitr/backup-archive/ -dp gzip=$ENV{work_dir}/omnipitr/tmp/helper-dst-pipe-archive.sh -s $ENV{work_dir}/omnipitr/state/ -v "\%p"\047}x;
     s/\A \s* (?: [#] \s* )? max_wal_senders \s* = \s*.*/max_wal_senders = 30/x;
     s/\A \s* (?: [#] \s* )? wal_level \s* = \s*.*/wal_level = \047hot_standby\047/x;
     s/\A \s* (?: [#] \s* )? archive_timeout \s* = \s*.*/archive_timeout = 60/x;
@@ -100,8 +108,36 @@ make_master_make_load_generator_structs() {
 
 }
 
+verify_archived_xlogs() {
+    while true
+    do
+        all_xlogs="$( find "$work_dir/omnipitr/archive" -type f -printf '%f\n' )"
+        xlog_count="$( echo "$all_xlogs" | wc -l )"
+        if (( $xlog_count > 4 ))
+        then
+            break
+        fi
+        sleep 1
+    done
+
+    # sleep 1 - allow for dst-pipe call
+    while read -r xlog_filename
+    do
+        archive_md5="$( md5sum "$work_dir/omnipitr/archive/$xlog_filename" | cut -d\  -f1 )"
+        pipe_md5="$( md5sum "$work_dir/omnipitr/dst-pipe-archive/$xlog_filename" | cut -d\  -f1 )"
+        if [[ $archive_md5 != $pipe_md5 ]]
+        then
+            echo "Checking md5sum of $work_dir/omnipitr/archive/$xlog_filename and $work_dir/omnipitr/dst-pipe-archive/$xlog_filename showed difference ?!" >&2
+            exit 1
+        fi
+    done <<< "$all_xlogs"
+
+}
+
 make_master() {
     make_master_mkdirs
+
+    create_temporary_script_for_dst_pipe
 
     make_master_initdb
 

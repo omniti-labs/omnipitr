@@ -76,6 +76,9 @@ Specifies path to program that should receive whole backup on stdin.
 The program will be called multiple times (for each file separately). Name of
 the file will be given as first, and only, argument to the program.
 
+If the file is to be compressed (using standard compression=/path syntax)
+- given file name will contain compression extension.
+
 =item --temp-dir (-t)
 
 Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment

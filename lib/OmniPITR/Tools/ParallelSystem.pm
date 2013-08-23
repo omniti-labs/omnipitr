@@ -249,8 +249,8 @@ sub start_new_worker {
 
     open( STDOUT, '>&', $stdout_fh );
     open( STDERR, '>&', $stderr_fh );
-    if ( $new_command->{'destination_type'} eq 'pipe' ) {
-        open my $fh, '<', $new_command->{'local_file'} or die 'Cannot read from: ' . $new_command->{'local_file'} . ': ' . $OS_ERROR;
+    if ( $new_command->{ 'destination_type' } eq 'pipe' ) {
+        open my $fh, '<', $new_command->{ 'local_file' } or die 'Cannot read from: ' . $new_command->{ 'local_file' } . ': ' . $OS_ERROR;
         open( STDIN, '<&', $fh );
     }
     exec( @{ $new_command->{ 'command' } } );

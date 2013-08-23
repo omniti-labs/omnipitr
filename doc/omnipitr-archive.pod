@@ -46,6 +46,16 @@ will receive copy of every wal segment rotated.
 The sole purpose of this option is to make I<omnipitr-master-backup> working. If
 you do not intend to make hot backups on master - you can safely not use it.
 
+=item --dst-pipe (-dp)
+
+Specifies path to program that should receive xlog on stdin.
+
+The program will be called multiple times (for each xlog separately). Name of
+the xlog will be given as first, and only, argument to the program.
+
+If the file is to be compressed (using standard compression=/path syntax)
+- given file name will contain compression extension.
+
 =item --temp-dir (-t)
 
 Where to create temporary files (defaults to /tmp or I<$TMPDIR> environment

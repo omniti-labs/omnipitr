@@ -25,8 +25,6 @@ omnipitr-backup-slave (remote, via http/ftp)
 This is for migration purposes - for example, when you're switching your
 walarchive from compressed to not-compressed.
 
-=item * Support sending to cloud storage such as Amazon S3
-
 =item * Add support for xz compression (similar to lzma)
 
 =item * Add support for using ZFS/LVM snapshops.
@@ -41,6 +39,9 @@ running PostgreSQL
 =head2 DONE
 
 =over
+
+=item * [1.2.0] Support sending to cloud storage such as Amazon S3 - it's done
+via --dst-pipe option.
 
 =item * [1.2.0] make omnipitr-restore don't care about walarchive writability if -r
 option is not given

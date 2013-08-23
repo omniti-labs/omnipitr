@@ -34,6 +34,12 @@ make_master
 
 echo "< Master ready"
 
+echo "> Check dst-pipe in omnipitr-archive"
+
+verify_archived_xlogs
+
+echo "< Check dst-pipe in omnipitr-archive"
+
 echo "> Making backup off master"
 
 make_master_backup
