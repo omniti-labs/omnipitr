@@ -2,6 +2,24 @@
 
 =encoding utf8
 
+=head2 2013-08-23
+
+=over
+
+=item * Release of version 1.2.0
+
+=item * --dst-pipe for omnipitr-backup-master, omnipitr-backup-slave and
+omnipitr-archive
+
+=item * support for using %r in omnipitr-restore for cleanup purposes
+
+=item * --skip-xlog option to disable creation of xlog tarball from backup
+processes
+
+=item * various bugfixes
+
+=back
+
 =head2 2013-04-01
 
 =over

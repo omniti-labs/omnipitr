@@ -7,7 +7,7 @@ use Digest::MD5;
 use File::Temp qw( tempfile );
 use base qw( Exporter );
 
-our $VERSION     = '1.1.0';
+our $VERSION     = '1.2.0';
 our @EXPORT_OK   = qw( file_md5sum run_command ext_for_compression );
 our %EXPORT_TAGS = ( 'all' => \@EXPORT_OK );
 
