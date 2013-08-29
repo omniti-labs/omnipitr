@@ -6,13 +6,14 @@ our $VERSION = '1.2.0';
 use base qw( OmniPITR::Program );
 
 use Config;
-use Cwd;
+use Cwd qw(abs_path getcwd);
 use Data::Dumper;
 use Digest;
 use English qw( -no_match_vars );
 use File::Copy;
 use File::Path qw( mkpath rmtree );
 use File::Spec;
+use File::Basename;
 use OmniPITR::Tools::CommandPiper;
 use OmniPITR::Tools::ParallelSystem;
 use OmniPITR::Tools qw( ext_for_compression run_command );
@@ -408,7 +409,7 @@ sub _add_tar_consummers {
 
         my %digesters = ();
         for my $d ( @{ $self->{ 'digests' } } ) {
-            my @digest = ( $Config{ 'perlpath' }, '-MDigest', '-le', q{binmode STDIN;print Digest->new("} . $d . q{")->addfile(\*STDIN)->hexdigest().' *'.$ARGV[0]}, $tarball_filename );
+            my @digest = ( File::Spec->catfile( abs_path( $FindBin::Bin ), 'omnipitr-checksum' ), '-d', $d, '-f', $tarball_filename );
             unshift @digest, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
             $digesters{ $d } = $compressed->add_stdout_program( @digest );
             $digesters{ $d }->set_write_mode( 'append' );
