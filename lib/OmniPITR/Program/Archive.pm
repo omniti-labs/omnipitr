@@ -29,7 +29,7 @@ Name of called method should be self explanatory, and if you need further inform
 sub run {
     my $self = shift;
     $self->read_state();
-    $self->prepare_temp_directory( basename( $self->{ 'segment' } ) );
+    $self->prepare_temp_directory();
     $self->make_all_necessary_compressions();
     $self->log->time_start( 'Segment delivery' ) if $self->verbose;
     $self->send_to_destinations();
