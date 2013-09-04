@@ -30,6 +30,7 @@ Constructor also handles pid file creation, in case it was requested.
 sub new {
     my $class = shift;
     my $self = bless {}, $class;
+    $self->{ 'meta' } = { 'started_at' => time() };
     $self->check_debug();
     $self->read_args();
     $self->validate_args();

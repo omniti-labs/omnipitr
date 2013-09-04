@@ -268,7 +268,7 @@ sub make_dot_backup_file {
 
     my @content_lines = @{ $self->{ 'backup_file_data' } };
     splice( @content_lines, 1, 0, sprintf 'STOP WAL LOCATION: %s (file %s)', $final_location, $final_wal_filename );
-    splice( @content_lines, 4, 0, sprintf 'STOP TIME: %s', strftime( '%Y-%m-%d %H:%M:%S %Z', localtime time ) );
+    splice( @content_lines, 4, 0, sprintf 'STOP TIME: %s', strftime( '%Y-%m-%d %H:%M:%S %Z', localtime $self->{ 'meta' }->{ 'started_at' } ) );
 
     my $content = join( "\n", @content_lines ) . "\n";
 

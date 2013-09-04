@@ -297,7 +297,7 @@ sub read_args_normalization {
         }
     }
 
-    $self->{ 'filename-template' } = strftime( $self->{ 'filename-template' }, localtime time() );
+    $self->{ 'filename-template' } = strftime( $self->{ 'filename-template' }, localtime $self->{ 'meta' }->{ 'started_at' } );
     $self->{ 'filename-template' } =~ s/__HOSTNAME__/hostname()/ge;
 
     $self->log->log( 'Called with parameters: %s', join( ' ', @ARGV ) ) if $self->verbose;
