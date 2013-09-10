@@ -177,13 +177,13 @@ sub start_pg_backup {
             unless symlink( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' } );
     }
 
-    my $start_backup_output = $self->psql( "SELECT pg_start_backup('omnipitr')" );
-
+    my $start_backup_output = $self->psql( "SELECT w, pg_xlogfile_name(w) from (select pg_start_backup('omnipitr') as w ) as x" );
     $start_backup_output =~ s/\s*\z//;
-    $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $start_backup_output );
-    $self->log->fatal( 'Output from pg_start_backup is not parseable?!' ) unless $start_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
 
-    my ( $part_1, $part_2 ) = ( $1, $2 );
+    $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $start_backup_output );
+    $self->log->fatal( 'Output from pg_start_backup is not parseable?!' ) unless $start_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\|([0-9A-F]{24})\z};
+
+    my ( $part_1, $part_2, $min_xlog ) = ( $1, $2, $3 );
     $part_2 =~ s/(.{1,6})\z//;
     my $part_3 = $1;
 
@@ -192,6 +192,8 @@ sub start_pg_backup {
 
     $self->{ 'stop_backup_filename_re' } = $backup_filename_re;
     delete $self->{ 'pg_start_backup_done' };
+
+    $self->{ 'meta' }->{ 'xlog-min' } = $min_xlog;
 
     return;
 }
