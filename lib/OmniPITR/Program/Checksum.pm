@@ -24,8 +24,8 @@ Name of called method should be self explanatory, and if you need further inform
 
 sub run {
     my $self = shift;
-    $self->{'digest'}->addfile( \*STDIN );
-    printf "%s *%s\n", $self->{'digest'}->hexdigest, $self->{'filename'};
+    $self->{ 'digest' }->addfile( \*STDIN );
+    printf "%s *%s\n", $self->{ 'digest' }->hexdigest, $self->{ 'filename' };
     return;
 }
 
