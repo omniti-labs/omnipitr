@@ -14,6 +14,7 @@ use File::Copy;
 use File::Path qw( mkpath rmtree );
 use File::Spec;
 use File::Basename;
+use FindBin;
 use OmniPITR::Tools::CommandPiper;
 use OmniPITR::Tools::ParallelSystem;
 use OmniPITR::Tools qw( ext_for_compression run_command );
