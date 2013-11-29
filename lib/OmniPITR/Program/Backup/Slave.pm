@@ -268,7 +268,7 @@ sub make_dot_backup_file {
 
     my @content_lines = @{ $self->{ 'backup_file_data' } };
     splice( @content_lines, 1, 0, sprintf 'STOP WAL LOCATION: %s (file %s)', $final_location, $final_wal_filename );
-    splice( @content_lines, 4, 0, sprintf 'STOP TIME: %s', strftime( '%Y-%m-%d %H:%M:%S %Z', localtime time ) );
+    splice( @content_lines, 4, 0, sprintf 'STOP TIME: %s', strftime( '%Y-%m-%d %H:%M:%S %Z', localtime $self->{ 'meta' }->{ 'started_at' } ) );
 
     my $content = join( "\n", @content_lines ) . "\n";
 
@@ -335,6 +335,7 @@ sub make_backup_label_temp_file {
         my $location_file = $self->convert_wal_location_and_timeline_to_filename( $redo_location, $timeline );
 
         $self->{ 'wal_range' }->{ 'min' } = $location_file;
+        $self->{ 'meta' }->{ 'xlog-min' } = $location_file;
 
         my @content_lines = ();
         push @content_lines, sprintf 'START WAL LOCATION: %s (file %s)', $redo_location, $location_file;
@@ -365,15 +366,17 @@ backup_label file content .
 sub get_backup_label_from_master {
     my $self = shift;
 
-    my $start_backup_output = $self->psql( "SELECT pg_start_backup('omnipitr_slave_backup_with_master_callback')" );
+    my $start_backup_output = $self->psql( "SELECT w, pg_xlogfile_name(w) from (select pg_start_backup('omnipitr_slave_backup_with_master_callback') as w ) as x" );
 
     $start_backup_output =~ s/\s*\z//;
     $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $start_backup_output );
-    $self->log->fatal( 'Output from pg_start_backup is not parseable?!' ) unless $start_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\z};
+    $self->log->fatal( 'Output from pg_start_backup is not parseable?!' ) unless $start_backup_output =~ m{\A([0-9A-F]+)/([0-9A-F]{1,8})\|([0-9A-F]{24})\z};
 
-    my ( $part_1, $part_2 ) = ( $1, $2 );
+    my ( $part_1, $part_2, $min_xlog ) = ( $1, $2, $3 );
     $part_2 =~ s/(.{1,6})\z//;
     my $part_3 = $1;
+
+    $self->{ 'meta' }->{ 'xlog-min' } = $min_xlog;
 
     my $expected_filename_suffix = sprintf '%08s%08s.%08s.backup', $part_1, $part_2, $part_3;
 
@@ -653,7 +656,7 @@ sub read_args_normalization {
         };
     }
 
-    $self->{ 'filename-template' } = strftime( $self->{ 'filename-template' }, localtime time() );
+    $self->{ 'filename-template' } = strftime( $self->{ 'filename-template' }, localtime $self->{ 'meta' }->{ 'started_at' } );
     $self->{ 'filename-template' } =~ s/__HOSTNAME__/hostname()/ge;
 
     $self->log->log( 'Called with parameters: %s', join( ' ', @ARGV ) ) if $self->verbose;

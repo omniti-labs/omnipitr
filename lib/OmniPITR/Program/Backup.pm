@@ -6,13 +6,15 @@ our $VERSION = '1.2.0';
 use base qw( OmniPITR::Program );
 
 use Config;
-use Cwd;
+use Cwd qw(abs_path getcwd);
 use Data::Dumper;
 use Digest;
 use English qw( -no_match_vars );
 use File::Copy;
 use File::Path qw( mkpath rmtree );
 use File::Spec;
+use File::Basename;
+use FindBin;
 use OmniPITR::Tools::CommandPiper;
 use OmniPITR::Tools::ParallelSystem;
 use OmniPITR::Tools qw( ext_for_compression run_command );
@@ -29,7 +31,11 @@ then it makes actual backup, and delivers to all destinations.
 
 sub run {
     my $self = shift;
+
+    $self->log->time_start( 'Whole backup procedure' ) if $self->verbose;
+
     $self->get_list_of_all_necessary_compressions();
+
     $self->choose_base_local_destinations();
 
     $self->log->time_start( 'Making data archive' ) if $self->verbose;
@@ -42,8 +48,121 @@ sub run {
 
     $self->deliver_to_all_remote_destinations();
 
+    $self->log->time_start( 'Delivering meta files' ) if $self->verbose;
+    $self->deliver_metadata_file();
+    $self->log->time_finish( 'Delivering meta files' ) if $self->verbose;
+
+    $self->log->time_finish( 'Whole backup procedure' ) if $self->verbose;
     $self->log->log( 'All done.' );
     return;
+}
+
+=head1 deliver_metadata_file()
+
+There is new bit of information - metadata file.
+
+This file will have the same name schema as all other files, but it's FILETYPE is "meta".
+
+In this file there are two bits of information:
+
+=over
+
+=item * Min-Xlog: minimal xlog filename that is required to restore this backup
+
+=item * Started-epoch: when this backup has been started, given as UTC-based epoch time.
+
+=back
+
+Since these files are different from others, and they get delivered only
+after everything else (data, xlogs, checksums) have been delivered,
+delivering them had to be added separately.
+
+In future, I might want to refactor this method, but for now it simply works.
+
+=cut
+
+sub deliver_metadata_file {
+    my $self = shift;
+
+    my $meta_info_content = sprintf(
+        'Min-Xlog: %s%sStarted-epoch: %s%s',
+        $self->{ 'meta' }->{ 'xlog-min' },
+        "\n",
+        $self->{ 'meta' }->{ 'started_at' },
+        "\n",
+    );
+
+    for my $dst ( @{ $self->{ 'destination' }->{ 'local' } } ) {
+        my $base_filename = $self->get_archive_filename( 'meta', $dst->{ 'compression' } );
+        my $meta_filename = File::Spec->catfile( $dst->{ 'path' }, $base_filename );
+
+        if ( open my $fh, '>', $meta_filename ) {
+            print $fh $meta_info_content;
+            close $fh;
+        }
+        else {
+            $self->log->fatal( "Cannot write to meta file (%s): %s", $meta_filename, $OS_ERROR );
+        }
+    }
+
+    for my $dst ( @{ $self->{ 'destination' }->{ 'pipe' } } ) {
+        my $base_filename = $self->get_archive_filename( 'meta', $dst->{ 'compression' } );
+        my $full_command = sprintf '%s %s', quotemeta( $dst->{ 'path' } ), quotemeta( $base_filename );
+
+        if ( open my $fh, '|-', $full_command ) {
+            print $fh $meta_info_content;
+            close $fh;
+        }
+        else {
+            $self->log->fatal( "Cannot write to pipe (%s): %s", $full_command, $OS_ERROR );
+        }
+    }
+
+    for my $dst ( @{ $self->{ 'destination' }->{ 'direct' } } ) {
+        my $base_filename = $self->get_archive_filename( 'meta', $dst->{ 'compression' } );
+        my @remote_command = $self->_get_remote_writer_command( $dst->{ 'path' }, $base_filename );
+        my $full_command = join( ' ', map { quotemeta $_ } @remote_command );
+
+        if ( open my $fh, '|-', $full_command ) {
+            print $fh $meta_info_content;
+            close $fh;
+        }
+        else {
+            $self->log->fatal( "Cannot write to pipe (%s): %s", $full_command, $OS_ERROR );
+        }
+    }
+
+    # If there are no remote destinations, we can skip the rest
+    return 1 if ( !defined $self->{ 'destination' }->{ 'remote' } ) || ( 0 == scalar @{ $self->{ 'destination' }->{ 'remote' } } );
+
+    my %saved = ();
+
+    for my $dst ( @{ $self->{ 'destination' }->{ 'remote' } } ) {
+        my $base_filename = $self->get_archive_filename( 'meta', $dst->{ 'compression' } );
+        if ( !$saved{ $dst - { 'compression' } } ) {
+            my $temp_file_path = $self->temp_file( $base_filename );
+            $saved{ $dst->{ 'compression' } } = $temp_file_path;
+            if ( open my $fh, '>', $temp_file_path ) {
+                print $fh $meta_info_content;
+                close $fh;
+            }
+            else {
+                $self->log->fatal( 'Cannot write temp meta file (%s): %s', $temp_file_path, $OS_ERROR );
+            }
+        }
+        my $source_filename      = $saved{ $dst->{ 'compression' } };
+        my $destination_filename = $dst->{ 'path' };
+        $destination_filename =~ s{/*\z}{/};
+        $destination_filename .= $base_filename;
+
+        my @command = ( $self->{ 'rsync-path' }, $source_filename, $destination_filename );
+        my $result = run_command( $self->{ 'temp-dir' }, @command );
+
+        $self->log->fatal( 'Sending meta data to dst failed: %s', { 'dst' => $dst, 'result' => $result, } ) if $result->{ 'error_code' };
+
+    }
+
+    return 1;
 }
 
 =head1 make_xlog_archive()
@@ -408,7 +527,7 @@ sub _add_tar_consummers {
 
         my %digesters = ();
         for my $d ( @{ $self->{ 'digests' } } ) {
-            my @digest = ( $Config{ 'perlpath' }, '-MDigest', '-le', q{binmode STDIN;print Digest->new("} . $d . q{")->addfile(\*STDIN)->hexdigest().' *'.$ARGV[0]}, $tarball_filename );
+            my @digest = ( File::Spec->catfile( abs_path( $FindBin::Bin ), 'omnipitr-checksum' ), '-d', $d, '-f', $tarball_filename );
             unshift @digest, $self->{ 'nice-path' } unless $self->{ 'not-nice' };
             $digesters{ $d } = $compressed->add_stdout_program( @digest );
             $digesters{ $d }->set_write_mode( 'append' );
