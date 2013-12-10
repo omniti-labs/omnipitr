@@ -171,7 +171,7 @@ sub clean_old_state {
         $P->clean_state();
     }
 
-    my $cutoff = time() - 3 * 24 * 60 * 60;    # month ago
+    my $cutoff = time() - 3 * 24 * 60 * 60;    # 3 days ago
     for my $type ( qw( ERROR FATAL ) ) {
         next unless defined $self->{ 'state' }->{ 'errors' }->{ $type };
         $self->{ 'state' }->{ 'errors' }->{ $type } = [ grep { $_->{ 'epoch' } >= $cutoff } @{ $self->{ 'state' }->{ 'errors' }->{ $type } } ];
