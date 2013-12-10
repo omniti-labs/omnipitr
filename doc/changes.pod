@@ -2,6 +2,25 @@
 
 =encoding utf8
 
+=head2 2013-12-10
+
+=over
+
+=item * change retention of error messages in omnipitr-monitor cache to 3 days
+(from 30). This is to make sure that the cache file will not be too big.
+
+=back
+
+=head2 2013-11-29
+
+=over
+
+=item * *meta* files are generated for backups. These files contain
+information when backup has started, and what is the minimal xlog file
+required for recovery from it.
+
+=back
+
 =head2 2013-08-23
 
 =over
