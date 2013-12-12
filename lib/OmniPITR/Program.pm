@@ -6,11 +6,13 @@ use English qw( -no_match_vars );
 use OmniPITR::Log;
 use OmniPITR::Pidfile;
 use OmniPITR::Tools qw( run_command );
+use POSIX qw( strftime );
 use Getopt::Long qw( :config no_ignore_case );
 use File::Basename;
 use File::Path qw( mkpath rmtree );
 use File::Spec;
 use Pod::Usage;
+use Sys::Hostname;
 use Carp;
 
 our $VERSION = '1.2.0';
@@ -30,7 +32,11 @@ Constructor also handles pid file creation, in case it was requested.
 sub new {
     my $class = shift;
     my $self = bless {}, $class;
-    $self->{ 'meta' } = { 'started_at' => time() };
+    $self->{ 'meta' } = {
+        'started_at' => time(),
+        'hostname'   => hostname(),
+    };
+    $self->{ 'meta' }->{ 'timezone' } = strftime( '%Z', localtime( $self->{ 'meta' }->{ 'started_at' } ) );
     $self->check_debug();
     $self->read_args();
     $self->validate_args();

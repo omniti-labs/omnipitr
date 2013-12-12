@@ -2,6 +2,14 @@
 
 =encoding utf8
 
+=head2 2013-12-12
+
+=over
+
+=item * Added timezone and hostname information to meta files
+
+=back
+
 =head2 2013-12-10
 
 =over

@@ -85,10 +85,14 @@ sub deliver_metadata_file {
     my $self = shift;
 
     my $meta_info_content = sprintf(
-        'Min-Xlog: %s%sStarted-epoch: %s%s',
+        'Min-Xlog: %s%sStarted-epoch: %s%sTimezone: %s%sHostname: %s%s',
         $self->{ 'meta' }->{ 'xlog-min' },
         "\n",
         $self->{ 'meta' }->{ 'started_at' },
+        "\n",
+        $self->{ 'meta' }->{ 'timezone' },
+        "\n",
+        $self->{ 'meta' }->{ 'hostname' },
         "\n",
     );
 

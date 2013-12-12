@@ -13,7 +13,6 @@ use File::Path;
 use Getopt::Long qw( :config no_ignore_case );
 use Carp;
 use POSIX qw( strftime );
-use Sys::Hostname;
 use Cwd qw(abs_path);
 use OmniPITR::Tools qw( run_command ext_for_compression );
 use OmniPITR::Tools::ParallelSystem;
@@ -657,7 +656,7 @@ sub read_args_normalization {
     }
 
     $self->{ 'filename-template' } = strftime( $self->{ 'filename-template' }, localtime $self->{ 'meta' }->{ 'started_at' } );
-    $self->{ 'filename-template' } =~ s/__HOSTNAME__/hostname()/ge;
+    $self->{ 'filename-template' } =~ s/__HOSTNAME__/$self->{ 'meta' }->{ 'hostname' }/g;
 
     $self->log->log( 'Called with parameters: %s', join( ' ', @ARGV ) ) if $self->verbose;
 

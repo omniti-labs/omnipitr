@@ -9,7 +9,6 @@ use Carp;
 use OmniPITR::Tools qw( run_command );
 use English qw( -no_match_vars );
 use File::Basename;
-use Sys::Hostname;
 use POSIX qw( strftime );
 use File::Spec;
 use File::Path qw( mkpath rmtree );
@@ -300,7 +299,7 @@ sub read_args_normalization {
     }
 
     $self->{ 'filename-template' } = strftime( $self->{ 'filename-template' }, localtime $self->{ 'meta' }->{ 'started_at' } );
-    $self->{ 'filename-template' } =~ s/__HOSTNAME__/hostname()/ge;
+    $self->{ 'filename-template' } =~ s/__HOSTNAME__/$self->{ 'meta' }->{ 'hostname' }/g;
 
     $self->log->log( 'Called with parameters: %s', join( ' ', @ARGV ) ) if $self->verbose;
 
