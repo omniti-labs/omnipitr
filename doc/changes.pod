@@ -2,6 +2,16 @@
 
 =encoding utf8
 
+=head2 2013-12-13
+
+=over
+
+=item * Added omnipitr-backup-cleanup - program to remove old backups, and
+xlogs from walarchive, leaving consistent state (all backups can be restored
+using xlogs from walarchive).
+
+=back
+
 =head2 2013-12-12
 
 =over
