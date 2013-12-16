@@ -2,7 +2,7 @@ package OmniPITR::Program::Backup::Master;
 use strict;
 use warnings;
 
-our $VERSION = '1.2.0';
+our $VERSION = '1.3.0';
 use base qw( OmniPITR::Program::Backup );
 
 use Carp;

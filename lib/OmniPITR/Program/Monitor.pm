@@ -2,7 +2,7 @@ package OmniPITR::Program::Monitor;
 use strict;
 use warnings;
 
-our $VERSION = '1.2.0';
+our $VERSION = '1.3.0';
 use base qw( OmniPITR::Program );
 
 use Carp;

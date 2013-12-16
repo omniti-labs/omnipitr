@@ -1,0 +1,152 @@
+=head1 OmniPITR - omnipitr-backup-cleanup
+
+=head2 USAGE
+
+/some/path/omnipitr/bin/omnipitr-backup-cleanup [options]
+
+Options:
+
+=over
+
+=item --archive (-a)
+
+Where archived wal segments are kept.
+
+Check L<Storage dir specification> for more details.
+
+=item --backup-dir (-b)
+
+Location of backup directory.
+
+Check L<Storage dir specification> for more details.
+
+=item --filename-template (-f)
+
+Template for naming output files. Should be the same as was used for making
+the backup by L<omnipitr-backup-master> or L<omnipitr-backup-slave>.
+
+Defaults to the same value that these scripts use, so if you didn't change it
+for making backups, you don't need to specify it in here.
+
+=item --keep-days (-k)
+
+How long to keep backups. Defaults to 7 days.
+
+=item --log (-l)
+
+Name of logfile (actually template, as it supports %% L<strftime(3)>
+markers. Unfortunately due to the %x usage by PostgreSQL, We cannot use %%
+macros directly. Instead - any occurence of ^ character in log dir will be first
+changed to %, and later on passed to strftime.
+
+Please note that on some systems (Solaris for example) default shell treats ^ as
+special character, which requires you to quote the log filename (if it contains
+^ character). So you'd better write it as:
+
+    --log '/var/log/omnipitr-^Y-^m-^d.log'
+
+=item --verbose (-v)
+
+Log verbosely what is happening.
+
+=item --version (-V)
+
+Prints version of I<omnipitr-backup-cleanup>, and exists.
+
+=item --help (-?)
+
+Prints this manual, and exists.
+
+=item --config-file (--config / --cfg)
+
+Loads options from config file.
+
+Format of the file is very simple - each line is treated as argument with
+optional value.
+
+Examples:
+
+    --verbose
+    --archive /mnt/wal_archive
+    --backup-dir /mnt/backups
+    --log /tmp/log
+
+It is important that you don't need to quote the values - value will always
+be up to the end of line (trailing spaces will be removed). So if you'd
+want, for example, to have magic-option set to "/mnt/badly named directory",
+you'd need to quote it when setting from command line:
+
+    /some/omnipitr/program --magic-option="/mnt/badly named directory"
+
+but not in config:
+
+    --magic-option=/mnt/badly named directory
+
+Empty lines, and comment lines (starting with #) are ignored.
+
+=back
+
+=head2 DESCRIPTION
+
+Call to I<omnipitr-backup-cleanup> should (generally) be in some kind of
+scheduler - like crontab.
+
+Set of options that you prefer depends on your situation, but at the very
+least you need three options:
+
+=over
+
+=item * --backup-dir= - where are your backups. Please note that you have to
+have backups made with OmniPITR v.1.3.0 at least, as previous versions didn't
+have "meta" files.
+
+=item * --archive-dir= - where are xlog files. These should be xlogs generated
+by the same system that the backups are for.
+
+=item * --log= - where to store logs about removal. You can use "-" as log
+value, it will redirect logs to stdout.
+
+=back
+
+=head3 Storage dir specification
+
+Directory is, in simplest situation, just a path. Usually, though, you will
+have some kind of compression on one or both of the directories (backups,
+archives).
+
+In case of compression, you use the same syntax in every other omnipitr-*
+program - that is you prefix path with compression type and "=" sign.
+
+Allowed compression types:
+
+=over
+
+=item * gzip
+
+Used file extension is .gz
+
+=item * bzip2
+
+Used file extension is .bz2
+
+=item * lzma
+
+Used file extension is .lzma
+
+=back
+
+=head2 EXAMPLES
+
+=head3 Minimal setup:
+
+    /path/to/omnipitr-backup-cleanup -a /mnt/wal_archive -b /mnt/backups -l -
+
+=head3 Compressed archive and backup dir, non default number of days to keep
+backups, and store logs
+
+    /path/to/omnipitr-backup-cleanup -a gzip=/mnt/wal_archive -b gzip=/mnt/backups -l /var/log/omnipitr-backup-cleanup.log -v -k 3
+
+=head2 COPYRIGHT
+
+The OmniPITR project is Copyright (c) 2009-2013 OmniTI. All rights reserved.
+

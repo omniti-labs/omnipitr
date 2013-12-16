@@ -13,7 +13,7 @@ OmniPITR::Tools::ParallelSystem - Class for running multiple shell commands in p
 
 =cut
 
-our $VERSION = '1.2.0';
+our $VERSION = '1.3.0';
 
 =head1 SYNOPSIS
 
