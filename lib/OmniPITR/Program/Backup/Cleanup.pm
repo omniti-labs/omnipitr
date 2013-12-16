@@ -28,6 +28,8 @@ about.
 
 sub run {
     my $self = shift;
+    $self->{ 'stats' }->{ 'removed_size' }  = 0;
+    $self->{ 'stats' }->{ 'removed_count' } = 0;
     $self->log->time_start( 'Backup cleanup' ) if $self->verbose;
 
     $self->find_and_read_all_meta_files();
@@ -41,6 +43,8 @@ sub run {
     $self->delete_old_xlogs();
     $self->log->time_finish( 'Delete xlogs' ) if $self->verbose;
 
+    $self->log->log( '%sRemoved %d files, total: %.1fMB', $self->{ 'dry-run' } ? '(dry-run) ' : '', $self->{ 'stats' }->{ 'removed_count' },
+        $self->{ 'stats' }->{ 'removed_size' } / ( 1024 * 1024 ) );
     $self->log->time_finish( 'Backup cleanup' ) if $self->verbose;
     return;
 }
@@ -71,10 +75,9 @@ sub delete_old_xlogs {
     }
 
     $self->log->log( '%d xlogs to be removed, from %s to %s', scalar @xlogs, $xlogs[ 0 ], $xlogs[ -1 ] ) if $self->verbose;
-    foreach my $file ( @xlogs ) {
-        my $full_path = File::Spec->catfile( $self->{ 'archive' }->{ 'path' }, $file );
-        unlink File::Spec->catfile( $full_path ) or $self->log->error( "Could not unlink %s: %s", $full_path, $OS_ERROR );
-    }
+
+    $self->remove_file( 'xlog', File::Spec->catfile( $self->{ 'archive' }->{ 'path' }, $_ ) ) for @xlogs;
+
     return;
 }
 
@@ -95,19 +98,42 @@ sub delete_old_backups {
     $self->log->log( '%d backups to remove.', scalar @{ $self->{ 'delete_backups' } } ) if $self->verbose;
 
     for my $backup ( @{ $self->{ 'delete_backups' } } ) {
-        $self->log->log( '- Based on [%s]:', $backup->{ 'file_name' } ) if $self->verbose;
-        my $re                = $backup->{ 'backup_file_matcher' };
+        my $re = $backup->{ 'backup_file_matcher' };
+        $self->log->log( '- Backup files matching %s/%s', $self->{ 'backup-dir' }->{ 'path' }, "$re" ) if $self->verbose;
         my @this_backup_files = sort
             grep { -f }
             map { File::Spec->catfile( $self->{ 'backup-dir' }->{ 'path' }, $_ ) }
             grep { $_ =~ $re } @{ $self->{ 'all_backup_files' } };
 
-        foreach my $file ( @this_backup_files ) {
-            $self->log->log( '    - %s', $file ) if $self->verbose;
-            unlink $file or $self->log->error( "Could not unlink %s: %s", $file, $OS_ERROR );
-        }
+        $self->remove_file( 'backup', $_ ) for @this_backup_files;
     }
 
+    return;
+}
+
+=head1 remove_file()
+
+Helper function which runs unlink on a file, reporting error when needed.
+
+This function exists, so that "dry-run" check can be in one place.
+
+=cut
+
+sub remove_file {
+    my $self = shift;
+    my ( $type, $filename ) = @_;
+
+    my ( $size ) = ( stat( $filename ) )[ 7 ];
+
+    if ( $self->{ 'dry-run' } ) {
+        $self->log->log( '(dry-run) Removing %s file: %s', $type, $filename );
+    }
+    elsif ( !unlink $filename ) {
+        $self->log->error( "Could not unlink %s: %s", $filename, $OS_ERROR );
+        return;
+    }
+    $self->{ 'stats' }->{ 'removed_size' } += $size;
+    $self->{ 'stats' }->{ 'removed_count' }++;
     return;
 }
 
@@ -311,8 +337,9 @@ sub read_args_specification {
         'verbose'    => { 'aliases' => [ 'v' ] },
         'archive'    => { 'type'    => 's', 'aliases' => [ 'a' ], },
         'backup-dir' => { 'type'    => 's', 'aliases' => [ 'b' ], },
-        'keep-days'         => { 'type' => 'i', 'aliases' => [ 'k' ], 'default' => 7, },
-        'filename-template' => { 'type' => 's', 'aliases' => [ 'f' ], 'default' => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__', },
+        'keep-days'         => { 'type'    => 'i', 'aliases' => [ 'k' ], 'default' => 7, },
+        'filename-template' => { 'type'    => 's', 'aliases' => [ 'f' ], 'default' => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__', },
+        'dry-run'           => { 'aliases' => [ 'd' ] },
     };
 }
 
