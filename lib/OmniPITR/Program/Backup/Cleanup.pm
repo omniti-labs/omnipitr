@@ -44,7 +44,7 @@ sub run {
     $self->log->time_finish( 'Delete xlogs' ) if $self->verbose;
 
     $self->log->log( '%sRemoved %d files, total: %.1fMB', $self->{ 'dry-run' } ? '(dry-run) ' : '', $self->{ 'stats' }->{ 'removed_count' },
-        $self->{ 'stats' }->{ 'removed_size' } / ( 1024 * 1024 ) );
+        $self->{ 'stats' }->{ 'removed_size' } / ( 1024 * 1024 ) ) if $self->verbose;
     $self->log->time_finish( 'Backup cleanup' ) if $self->verbose;
     return;
 }
