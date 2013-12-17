@@ -32,6 +32,28 @@ for making backups, you don't need to specify it in here.
 
 How long to keep backups. Defaults to 7 days.
 
+=item --truncate (-t)
+
+If the file is larger than --truncate, it will be removed in steps. Each step
+will remove --truncate bytes from the end of file, until the file will be
+smaller than --truncate. At this time the remaining part of file will be
+removed normally.
+
+If the value is 0 (default) - then regardless of size, file will be removed in
+one step.
+
+This is to prevent huge IO on certain filesystems (ext3 on Linux for example)
+when removing huge files.
+
+=item --sleep (-s)
+
+How many miliseconds to wait between truncate runs.
+
+When the truncating method is not used (--truncate 0, or file is too small)
+- there is no wait. But if truncating happens, after each truncate sleep of
+given number of miliseconds is used to make the removal take longer, but with
+lower I/O impact.
+
 =item --log (-l)
 
 Name of logfile (actually template, as it supports %% L<strftime(3)>

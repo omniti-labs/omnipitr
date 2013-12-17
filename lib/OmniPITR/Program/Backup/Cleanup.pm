@@ -2,13 +2,14 @@ package OmniPITR::Program::Backup::Cleanup;
 use strict;
 use warnings;
 
-our $VERSION = '1.3.0';
+our $VERSION = '1.3.1';
 use base qw( OmniPITR::Program );
 
 use Carp;
 use English qw( -no_match_vars );
 use OmniPITR::Tools qw( ext_for_compression );
 use File::Spec;
+use Time::HiRes qw( usleep );
 use POSIX qw( strftime tzset );
 
 =head1 run()
@@ -127,6 +128,20 @@ sub remove_file {
     my ( $type, $filename ) = @_;
 
     my ( $size ) = ( stat( $filename ) )[ 7 ];
+
+    if (   ( !$self->{ 'dry-run' } )
+        && ( $size > $self->{ 'truncate' } )
+        && ( $self->{ 'truncate' } > 0 ) )
+    {
+        while ( 1 ) {
+            my $new_size = $size - $self->{ 'truncate' };
+            $self->log->log( 'Truncating %s from %s to %s.', $filename, $size, $new_size );
+            truncate $filename, $new_size;
+            usleep( $self->{ 'sleep' } );
+            $size = ( stat( $filename ) )[ 7 ];
+            last if $size < $self->{ 'truncate' };
+        }
+    }
 
     if ( $self->{ 'dry-run' } ) {
         $self->log->log( '(dry-run) Removing %s file: %s', $type, $filename );
@@ -342,6 +357,8 @@ sub read_args_specification {
         'backup-dir' => { 'type'    => 's', 'aliases' => [ 'b' ], },
         'keep-days'         => { 'type'    => 'i', 'aliases' => [ 'k' ], 'default' => 7, },
         'filename-template' => { 'type'    => 's', 'aliases' => [ 'f' ], 'default' => '__HOSTNAME__-__FILETYPE__-^Y-^m-^d.tar__CEXT__', },
+        'truncate'          => { 'type'    => 'i', 'aliases' => [ 't' ], 'default' => 0, },
+        'sleep'             => { 'type'    => 'i', 'aliases' => [ 's' ], 'default' => 500, },
         'dry-run'           => { 'aliases' => [ 'd' ] },
     };
 }
@@ -362,6 +379,9 @@ sub read_args_normalization {
         next if $key =~ m{ \A (?: archive | log | backup-dir ) \z }x;    # Skip those, not needed in $self
         $self->{ $key } = $args->{ $key };
     }
+
+    # sleep is in miliseconds, but we need microseconds for Time::HiRes::usleep
+    $self->{ 'sleep' } *= 1000;
 
     $self->log->fatal( 'Archive path not provided!' ) unless $args->{ 'archive' };
 
