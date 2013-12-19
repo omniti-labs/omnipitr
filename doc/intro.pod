@@ -53,6 +53,10 @@ replication
 
 Send copy of PGDATA to remote locations - even multiple at the same time.
 
+=item * omnipitr-backup-cleanup 
+
+This can be called from scheduler (crontab) to enforce retention period (7 days is default) for backups and related WAL archive files. 
+
 =back
 
 In most of the cases you can simply call the program you want to use with I<--help> option to get brief overview of command line options.
