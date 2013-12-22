@@ -2,6 +2,18 @@
 
 =encoding utf8
 
+=head2 2013-12-22
+
+=over
+
+=item * Release of version 1.3.2
+
+=item * Fix for handling --skip-xlog together with remote destinations (-dr)
+in omnipitr-backup-*. Bug reported
+(https://github.com/omniti-labs/omnipitr/issues/13) by Otto Bretz
+
+=back
+
 =head2 2013-12-17
 
 =over

@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 use English qw( -no_match_vars );
 
-our $VERSION = '1.3.1';
+our $VERSION = '1.3.2';
 
 =head1 NAME
 

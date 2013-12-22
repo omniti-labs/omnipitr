@@ -2,7 +2,7 @@ package OmniPITR::Program::Backup;
 use strict;
 use warnings;
 
-our $VERSION = '1.3.1';
+our $VERSION = '1.3.2';
 use base qw( OmniPITR::Program );
 
 use Config;
@@ -143,7 +143,7 @@ sub deliver_metadata_file {
 
     for my $dst ( @{ $self->{ 'destination' }->{ 'remote' } } ) {
         my $base_filename = $self->get_archive_filename( 'meta', $dst->{ 'compression' } );
-        if ( !$saved{ $dst - { 'compression' } } ) {
+        if ( !$saved{ $dst->{ 'compression' } } ) {
             my $temp_file_path = $self->temp_file( $base_filename );
             $saved{ $dst->{ 'compression' } } = $temp_file_path;
             if ( open my $fh, '>', $temp_file_path ) {
@@ -436,7 +436,9 @@ sub deliver_to_all_remote_destinations {
 
         my $B = $self->{ 'base' }->{ $dst->{ 'compression' } }->[ 0 ]->{ 'path' };
 
-        for my $type ( ( @{ $self->{ 'digests' } }, qw( data xlog ) ) ) {
+        my @types_to_transfer = ( @{ $self->{ 'digests' } }, 'data' );
+        push @types_to_transfer, 'xlog' unless $self->{ 'skip-xlogs' };
+        for my $type ( @types_to_transfer ) {
 
             my $filename = $self->get_archive_filename( $type, $dst->{ 'compression' } );
             my $source_filename = File::Spec->catfile( $B, $filename );
