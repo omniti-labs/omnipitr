@@ -82,7 +82,7 @@ done
 
 echo "Tar version"
 
-tar_version_ok="$( LC_ALL=C tar --version 2>/dev/null | head -n 1 | egrep '^tar \(GNU tar\) [0-9]*\.[0-9]*$' | awk '$NF >= 1.2 {print "OK"}' )"
+tar_version_ok="$( LC_ALL=C tar --version 2>/dev/null | head -n 1 | egrep '^tar \(GNU tar\) [0-9]*(\.[0-9]*)*$' | awk '{print $NF}' | awk -F. '$1>1 || ( $1 == 1 && $2>=20 ) {print "OK"}' )"
 if [[ "$tar_version_ok" != "OK" ]]
 then
     ERRORS_COUNT=$(( 1 + $ERRORS_COUNT ))

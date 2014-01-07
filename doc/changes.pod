@@ -2,6 +2,15 @@
 
 =encoding utf8
 
+=head2 2014-01-07
+
+=over
+
+=item * Fix for version checking for x.y.z versions of tar. Per report
+( https://github.com/omniti-labs/omnipitr/issues/14 ) from David Johnston.
+
+=back
+
 =head2 2013-12-22
 
 =over
