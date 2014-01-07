@@ -109,9 +109,13 @@ To start Wal replication you will need to:
 
 =item 3. Transfer the backup to slave server(s)
 
-=item 4. Start PostgreSQL recovery from hot-backup: I<omnipitr-restore>
+=item 4. Uncompress backup using normal tar commands.
+
+=item 5. Start PostgreSQL recovery from hot-backup: I<omnipitr-restore>
 
 =back
+
+Alternativaly steps 2-4 can be replaced by usage of I<omnipitr-synch> tool.
 
 Afterwards you can/should monitor replication parameters with
 I<omnipitr-monitor>, and that would be all. Of course you can do hot-backups on
