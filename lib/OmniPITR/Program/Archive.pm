@@ -204,6 +204,9 @@ sub make_all_necessary_compressions {
             $self->log->fatal( 'Error while compressing with %s : %s', $compression, $response );
         }
 
+        my ( $atime, $mtime ) = ( stat( $self->{ 'segment' } ) )[ 8, 9 ];
+        utime $mtime, $mtime, $compressed_filename || $self->log->fatal( 'Error while updating atime/mtime to %s/%s: %s', $atime, $mtime, $! );
+
         $self->{ 'state' }->{ 'compressed' }->{ $compression } = file_md5sum( $compressed_filename );
         $self->save_state();
     }
