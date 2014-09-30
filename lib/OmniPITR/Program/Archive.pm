@@ -99,7 +99,7 @@ sub send_to_destinations {
             $destination_file_path .= '/' . basename( $local_file );
 
             $runner->add_command(
-                'command'               => [ $self->{ 'rsync-path' }, $local_file, $destination_file_path ],
+                'command'               => [ $self->{ 'rsync-path' }, '-t', $local_file, $destination_file_path ],
                 'is_backup'             => $is_backup,
                 'local_file'            => $local_file,
                 'destination_file_path' => $destination_file_path,
