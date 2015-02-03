@@ -260,11 +260,11 @@ sub start_new_worker {
         my $str_command = join( ' ', @{ $new_command->{ 'command' } } );
         printf $stderr_fh "Couldn't run: %s : %s\n", $str_command, $err_msg;
 
-        # Current process can't call EXIT, as doing so would call destructors on
+        # Current process can't call exit(), as doing so would call destructors on
         # all objects, which in turn would remove temporary directory, which
         # would remove the stderr-catch file, that is used to communicate to
         # main process.
-        kill( 'SIGKILL', $PROCESS_ID );
+        POSIX::_exit(1);
     }
 }
 
