@@ -253,7 +253,19 @@ sub start_new_worker {
         open my $fh, '<', $new_command->{ 'local_file' } or die 'Cannot read from: ' . $new_command->{ 'local_file' } . ': ' . $OS_ERROR;
         open( STDIN, '<&', $fh );
     }
-    exec( @{ $new_command->{ 'command' } } );
+
+    unless ( exec( @{ $new_command->{ 'command' } } ) ) {
+
+        my $err_msg = $OS_ERROR;
+        my $str_command = join( ' ', @{ $new_command->{ 'command' } } );
+        printf $stderr_fh "Couldn't run: %s : %s\n", $str_command, $err_msg;
+
+        # Current process can't call EXIT, as doing so would call destructors on
+        # all objects, which in turn would remove temporary directory, which
+        # would remove the stderr-catch file, that is used to communicate to
+        # main process.
+        kill( 'SIGKILL', $PROCESS_ID );
+    }
 }
 
 =head2 handle_finished_workers()
