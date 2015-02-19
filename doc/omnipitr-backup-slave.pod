@@ -158,7 +158,7 @@ For details please check L<CHECKSUMMING> below.
 
 =item --skip-xlogs (-sx)
 
-Make I<omnipitr-backup-master> skip creation of xlog tarball - only data
+Make I<omnipitr-backup-slave> skip creation of xlog tarball - only data
 tarball will be created. This is useful if you have set proper walarchive.
 
 =item --gzip-path (-gp)
