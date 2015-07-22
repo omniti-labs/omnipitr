@@ -385,7 +385,7 @@ sub read_args_normalization {
 
     $self->log->fatal( 'Archive path not provided!' ) unless $args->{ 'archive' };
 
-    if ( $args->{ 'archive' } =~ s/\A(gzip|bzip2|lzma)=// ) {
+    if ( $args->{ 'archive' } =~ s/\A(gzip|bzip2|lzma|lz4|xz)=// ) {
         $self->{ 'archive' }->{ 'compression' } = $1;
         $self->{ 'archive' }->{ 'extension' }   = ext_for_compression( $1 );
     }
@@ -393,7 +393,7 @@ sub read_args_normalization {
 
     $self->log->fatal( 'Backup path not provided!' ) unless $args->{ 'backup-dir' };
 
-    if ( $args->{ 'backup-dir' } =~ s/\A(gzip|bzip2|lzma)=// ) {
+    if ( $args->{ 'backup-dir' } =~ s/\A(gzip|bzip2|lzma|lz4|xz)=// ) {
         $self->{ 'backup-dir' }->{ 'compression' } = $1;
         $self->{ 'backup-dir' }->{ 'extension' }   = ext_for_compression( $1 );
     }
