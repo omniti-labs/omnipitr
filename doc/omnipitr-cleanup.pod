@@ -122,6 +122,14 @@ Used file extension is .bz2
 
 Used file extension is .lzma
 
+=item * lz4
+
+Used file extension is .lz4
+
+=item * xz
+
+Used file extension is .xz
+
 =back
 
 =head2 EXAMPLES

@@ -134,7 +134,7 @@ sub read_args_normalization {
 
     $self->log->fatal( 'Archive path not provided!' ) unless $args->{ 'archive' };
 
-    if ( $args->{ 'archive' } =~ s/\A(gzip|bzip2|lzma)=// ) {
+    if ( $args->{ 'archive' } =~ s/\A(gzip|bzip2|lzma|lz4|xz)=// ) {
         $self->{ 'archive' }->{ 'compression' } = $1;
     }
     $self->{ 'archive' }->{ 'path' } = $args->{ 'archive' };

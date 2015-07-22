@@ -25,6 +25,8 @@ sub ext_for_compression {
     return '.gz'   if $compression eq 'gzip';
     return '.bz2'  if $compression eq 'bzip2';
     return '.lzma' if $compression eq 'lzma';
+    return '.lz4'  if $compression eq 'lz4';
+    return '.xz'   if $compression eq 'xz';
     croak 'Unknown compression type: ' . $compression;
 }
 
