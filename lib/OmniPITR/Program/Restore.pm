@@ -417,6 +417,8 @@ sub read_args_specification {
         'gzip-path'           => { 'type' => 's', 'aliases' => [ 'gp' ], 'default' => 'gzip', },
         'log'                 => { 'type' => 's', 'aliases' => [ 'l' ], },
         'lzma-path'           => { 'type' => 's', 'aliases' => [ 'lp' ], 'default' => 'lzma', },
+        'lz4-path'            => { 'type' => 's', 'aliases' => [ 'll' ], 'default' => 'lz4', },
+        'xz-path'             => { 'type' => 's', 'aliases' => [ 'xz' ], 'default' => 'xz', },
         'pgcontroldata-path'  => { 'type' => 's', 'aliases' => [ 'pp' ], 'default' => 'pg_controldata', },
         'pid-file'            => { 'type' => 's', },
         'pre-removal-processing' => { 'type' => 's', 'aliases' => [ 'h' ], },
@@ -451,7 +453,7 @@ sub read_args_normalization {
 
     $self->log->fatal( 'Source path not provided!' ) unless $args->{ 'source' };
 
-    if ( $args->{ 'source' } =~ s/\A(gzip|bzip2|lzma)=// ) {
+    if ( $args->{ 'source' } =~ s/\A(gzip|bzip2|lzma|lz4|xz)=// ) {
         $self->{ 'source' }->{ 'compression' } = $1;
     }
     $self->{ 'source' }->{ 'path' } = $args->{ 'source' };

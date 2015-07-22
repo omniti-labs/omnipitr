@@ -310,6 +310,8 @@ sub read_args_specification {
         'gzip-path'  => { 'type' => 's',  'aliases' => [ 'gp' ], 'default' => 'gzip', },
         'log'        => { 'type' => 's',  'aliases' => [ 'l' ] },
         'lzma-path'  => { 'type' => 's',  'aliases' => [ 'lp' ], 'default' => 'lzma', },
+        'lz4-path'   => { 'type' => 's',  'aliases' => [ 'll' ], 'default' => 'lz4', },
+        'xz-path'    => { 'type' => 's',  'aliases' => [ 'xz' ], 'default' => 'xz', },
         'rsync-path' => { 'type' => 's',  'aliases' => [ 'rp' ], 'default' => 'rsync', },
         'state-dir'  => { 'type' => 's',  'aliases' => [ 's' ] },
         'temp-dir' => { 'type' => 's', 'aliases' => [ 't' ], 'default' => $ENV{ 'TMPDIR' } || '/tmp', },
@@ -335,7 +337,7 @@ sub read_args_normalization {
     my $self = shift;
     my $args = shift;
 
-    for my $key ( qw( data-dir dst-backup temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path nice-path force-data-dir rsync-path not-nice parallel-jobs ) ) {
+    for my $key ( qw( data-dir dst-backup temp-dir state-dir pid-file verbose gzip-path bzip2-path lzma-path lz4-path xz-path nice-path force-data-dir rsync-path not-nice parallel-jobs ) ) {
         $self->{ $key } = $args->{ $key };
     }
 
@@ -350,7 +352,7 @@ sub read_args_normalization {
 
         for my $item ( @items ) {
             my $current = { 'compression' => 'none', };
-            if ( $item =~ s/\A(gzip|bzip2|lzma)=// ) {
+            if ( $item =~ s/\A(gzip|bzip2|lzma|lz4|xz)=// ) {
                 $current->{ 'compression' } = $1;
             }
             $current->{ 'path' } = $item;
@@ -385,7 +387,7 @@ sub validate_args {
     }
 
     if ( $self->{ 'dst-backup' } ) {
-        if ( $self->{ 'dst-backup' } =~ m{\A(gzip|bzip2|lzma)=} ) {
+        if ( $self->{ 'dst-backup' } =~ m{\A(gzip|bzip2|lzma|lz4|xz)=} ) {
             $self->log->fatal( 'dst-backup cannot be compressed! [%]', $self->{ 'dst-backup' } );
         }
         unless ( $self->{ 'dst-backup' } =~ m{\A/} ) {

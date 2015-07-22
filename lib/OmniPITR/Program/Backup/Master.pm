@@ -235,6 +235,8 @@ sub read_args_specification {
         'host'              => { 'type'    => 's',  'aliases' => [ 'h' ], },
         'log'               => { 'type'    => 's',  'aliases' => [ 'l' ], },
         'lzma-path'         => { 'type'    => 's',  'aliases' => [ 'lp' ], 'default' => 'lzma', },
+        'lz4-path'          => { 'type'    => 's',  'aliases' => [ 'll' ], 'default' => 'lz4', },
+        'xz-path'           => { 'type'    => 's',  'aliases' => [ 'xz' ], 'default' => 'xz', },
         'nice-path'         => { 'type'    => 's',  'aliases' => [ 'np' ], 'default' => 'nice', },
         'not-nice'          => { 'aliases' => [ 'nn' ], },
         'parallel-jobs'     => { 'type'    => 'i',  'aliases' => [ 'PJ' ], 'default' => '1', },
@@ -290,7 +292,7 @@ sub read_args_normalization {
 
         for my $item ( @items ) {
             my $current = { 'compression' => 'none', };
-            if ( $item =~ s/\A(gzip|bzip2|lzma)=// ) {
+            if ( $item =~ s/\A(gzip|bzip2|lzma|lz4|xz)=// ) {
                 $current->{ 'compression' } = $1;
             }
             $current->{ 'path' } = $item;

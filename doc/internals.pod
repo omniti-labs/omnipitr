@@ -149,6 +149,10 @@ in later part of this document)
 
 =item * lzma - very slow, not very common, but best compression ratio
 
+=item * lz4 - very quick, not very common, but best speed
+
+=item * xz - slower, 30% smaller than gzip and 15% smaller than bzip2.
+
 =back
 
 When choosing which compression method to use, you have to remember that
@@ -318,8 +322,8 @@ with gzip, and two remote deliveries (rsync over ssh).
 This timing information can be later used for debugging or tuning.
 
 Aside from all of this, I<omnipitr-archive>, like any other OmniPITR program,
-lets you point to programs that it uses. That is - nice, gzip, bzip2, lzma and
-rsync.
+lets you point to programs that it uses. That is - nice, gzip, bzip2, lzma, lz4,
+ xz and rsync.
 
 It is important to note that if path to given program is not provided,
 I<omnipitr-archive> (like any program from OmniPITR) simply lets shell find it

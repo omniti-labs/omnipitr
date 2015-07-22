@@ -119,6 +119,16 @@ variable.
 Full path to lzma program - in case you can't set proper PATH environment
 variable.
 
+=item --lz4-path (-ll)
+
+Full path to lz4 program - in case you can't set proper PATH environment
+variable.
+
+=item --xz-path (-xz)
+
+Full path to xz program - in case you can't set proper PATH environment
+variable.
+
 =item --rsync-path (-rp)
 
 Full path to rsync program - in case you can't set proper PATH environment
@@ -263,6 +273,14 @@ Compresses with bzip2 program, used file extension is .bz2
 =item * lzma
 
 Compresses with lzma program, used file extension is .lzma
+
+=item * lz4
+
+Compresses with lz4 program, used file extension is .lz4
+
+=item * xz
+
+Compresses with xz program, used file extension is .xz
 
 =back
 

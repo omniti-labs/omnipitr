@@ -138,6 +138,16 @@ variable.
 Full path to lzma program - in case you can't set proper PATH environment
 variable.
 
+=item --lz4-path (-ll)
+
+Full path to lz4 program - in case you can't set proper PATH environment
+variable.
+
+=item --xz-path (-xz)
+
+Full path to xz program - in case you can't set proper PATH environment
+variable.
+
 =item --pgcontroldata-path (-pp)
 
 Full path to pg_controldata program - in case you can't set proper PATH
@@ -276,6 +286,14 @@ Decompresses with bzip2 program, used file extension is .bz2
 
 Decompresses with lzma program, used file extension is .lzma
 
+=item * lz4
+
+Decompresses with lz4 program, used file extension is .lz4
+
+=item * xz
+
+Decompresses with xz program, used file extension is .xz
+
 =back
 
 If you want to pass any extra arguments to compression program, you can either:
@@ -298,6 +316,8 @@ All of supported compression programs use environment variables:
 =item * bzip2 - BZIP2
 
 =item * lzma - XZ_OPT
+
+=item * xz - XZ_OPT
 
 =back
 
