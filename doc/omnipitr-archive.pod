@@ -280,7 +280,7 @@ Compresses with lz4 program, used file extension is .lz4
 
 =item * xz
 
-Compresses with zx program, used file extension is .xz
+Compresses with xz program, used file extension is .xz
 
 =back
 
