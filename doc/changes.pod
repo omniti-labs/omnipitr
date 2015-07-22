@@ -2,6 +2,16 @@
 
 =encoding utf8
 
+=head2 2015-07-22
+
+=over
+
+=item * Release of version 1.3.3
+
+=item * Add support for xz and lz4 compressions, thanks to Michael Pirogov
+
+=back
+
 =head2 2014-01-07
 
 =over

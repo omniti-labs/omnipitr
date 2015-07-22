@@ -15,7 +15,7 @@ use Pod::Usage;
 use Sys::Hostname;
 use Carp;
 
-our $VERSION = '1.3.2';
+our $VERSION = '1.3.3';
 
 =head1 new()
 

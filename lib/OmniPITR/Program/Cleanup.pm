@@ -2,7 +2,7 @@ package OmniPITR::Program::Cleanup;
 use strict;
 use warnings;
 
-our $VERSION = '1.3.2';
+our $VERSION = '1.3.3';
 use base qw( OmniPITR::Program );
 
 use Carp;

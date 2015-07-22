@@ -5,7 +5,7 @@ use warnings;
 use Carp;
 use English qw( -no_match_vars );
 
-our $VERSION = '1.3.2';
+our $VERSION = '1.3.3';
 use base qw( OmniPITR::Program::Monitor::Check );
 
 use Data::Dumper;
