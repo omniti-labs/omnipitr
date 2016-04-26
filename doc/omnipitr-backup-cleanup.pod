@@ -67,6 +67,11 @@ special character, which requires you to quote the log filename (if it contains
 
     --log '/var/log/omnipitr-^Y-^m-^d.log'
 
+=item --dry-run (-d)
+
+If this option is provided, instead of actually removing files
+I<omnipitr-backup-cleanup> will only log information on what would be deleted.
+
 =item --verbose (-v)
 
 Log verbosely what is happening.

@@ -2,6 +2,14 @@
 
 =encoding utf8
 
+=head2 2015-04-26
+
+=over
+
+=item * Add missing documentation for --dry-run for omnipitr-backup-cleanup
+
+=back
+
 =head2 2015-07-22
 
 =over
