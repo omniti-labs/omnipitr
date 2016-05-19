@@ -165,7 +165,7 @@ path), which is the default.
 sub validate_args {
     my $self = shift;
 
-    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{\A([a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?|[a-fA-F0-9]{8}\.history)\z};
+    $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{\A(?:[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup|\.partial)?|[a-fA-F0-9]{8}\.history)\z};
 
     $self->log->fatal( 'Given archive (%s) is not a directory', $self->{ 'archive' }->{ 'path' } ) unless -d $self->{ 'archive' }->{ 'path' };
     $self->log->fatal( 'Given archive (%s) is not readable',    $self->{ 'archive' }->{ 'path' } ) unless -r $self->{ 'archive' }->{ 'path' };
