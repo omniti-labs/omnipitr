@@ -416,7 +416,7 @@ sub validate_args {
     }
 
     $self->log->fatal( 'Given segment name is not valid (%s)', $self->{ 'segment' } )
-        unless basename( $self->{ 'segment' } ) =~ m{\A(?:[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup)?|[a-fA-F0-9]{8}\.history)\z};
+        unless basename( $self->{ 'segment' } ) =~ m{\A(?:[a-fA-F0-9]{24}(?:\.[a-fA-F0-9]{8}\.backup|\.partial)?|[a-fA-F0-9]{8}\.history)\z};
     my $segment_file_name = $self->{ 'segment' };
     $segment_file_name = File::Spec->catfile( $self->{ 'data-dir' }, $self->{ 'segment' } ) unless $self->{ 'segment' } =~ m{^/};
 
