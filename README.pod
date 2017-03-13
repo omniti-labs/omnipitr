@@ -72,3 +72,7 @@ here: http://lists.omniti.com/mailman/listinfo/pgtreats-users/
 =head2 COPYRIGHT
 
 The OmniPITR project is Copyright (c) 2009-2013 OmniTI. All rights reserved.
+
+=head2 LICENCE INFORMATION
+
+https://github.com/omniti-labs/omnipitr/blob/master/doc/LICENSE
