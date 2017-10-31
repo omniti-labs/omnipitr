@@ -80,7 +80,7 @@ our $fifo_dir = tempdir( 'CommandPiper-' . $$ . '-XXXXXX', 'CLEANUP' => 1, 'TMPD
 
 =head2 new()
 
-Object contstructor.
+Object constructor.
 
 Given options are treated as program that is run to generate stdout.
 
@@ -131,7 +131,7 @@ Sets path to tee program, when using tee is required.
 
     $program->set_tee_path( '/opt/gnu/bin/tee' );
 
-Value of tee path will be automaticaly copied to all newly created stdout and stderr programs.
+Value of tee path will be automatically copied to all newly created stdout and stderr programs.
 
 =cut
 
@@ -219,7 +219,7 @@ Alternatively, the command can be written to text file, and run with
 sub command {
     my $self = shift;
 
-    # Get list of all fifos that are necesarry to create, so we can run "mkfifo" on it.
+    # Get list of all fifos that are necessary to create, so we can run "mkfifo" on it.
     my @fifos = $self->get_all_fifos( 0 );
 
     my $fifo_preamble = scalar( @fifos ) ? 'mkfifo ' . join( " ", map { quotemeta( $_->[ 0 ] ) } @fifos ) . "\n" : '';
@@ -252,7 +252,7 @@ sub base_program {
 
 This is the most important part of the code.
 
-In here, there is single line genreated that runs current program adding all
+In here, there is single line generated that runs current program adding all
 necessary stdout and stderr redirections.
 
 Optional $fifo argument is treated as place where current program should
@@ -325,7 +325,7 @@ sub get_command_with_stdin {
 
 To generate output script we need first to generate all fifos.
 
-Since the command itself is built from tree-like datastrusture, we need to
+Since the command itself is built from tree-like data structure, we need to
 parse it depth-first, and find all cases where fifo is needed, and add it to
 list of fifos to be created.
 Actual lines to generate "mkfifo .." and "... < fifo" commands are in
@@ -404,7 +404,7 @@ sub get_all_fifos {
         # be provided by ">" or ">>" redirect.
         my $final_stderr_file = pop @{ $self->{ 'stderr_files' } };
 
-        # We're creatibg subprogram for the tee and all (but last one) files
+        # We're creating subprogram for the tee and all (but last one) files
         my $stderr_tee = $self->new_subprogram( $self->{ 'tee' }, @{ $self->{ 'stderr_files' } } );
 
         # The last file gets attached to tee as stdout file, so in final
