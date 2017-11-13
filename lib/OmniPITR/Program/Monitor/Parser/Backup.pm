@@ -5,7 +5,7 @@ use warnings;
 use Carp;
 use English qw( -no_match_vars );
 
-our $VERSION = '1.3.3';
+our $VERSION = '2.0.0';
 use base qw( OmniPITR::Program::Monitor::Parser );
 
 =head1 Backup_Slave/Backup_Master *base* state data structure
