@@ -205,7 +205,7 @@ sub prepare_commands_to_run_via_tar {
         push @tar_cmd, '--exclude=postmaster.pid';
         push @tar_cmd, '--exclude=pg_wal/0*';
         push @tar_cmd, '--exclude=pg_wal/archive_status/*';
-        push @tar_cmd, '--exclude=pg_log';
+        push @tar_cmd, '--exclude=log';
         push @tar_cmd, '.';
 
         my $tar_cmd = join ' ', @tar_cmd;
@@ -283,7 +283,7 @@ sub prepare_commands_to_run_via_rsync {
             push @cmd, '--exclude=/postmaster.pid';
             push @cmd, '--exclude=/pg_wal/0*';
             push @cmd, '--exclude=/pg_wal/archive_status/*';
-            push @cmd, '--exclude=/pg_log';
+            push @cmd, '--exclude=/log';
             push @cmd, $src;
             push @cmd, $dst_path;
             my $full_cmd = join ' ', map { quotemeta } @cmd;

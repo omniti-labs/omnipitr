@@ -9,7 +9,7 @@ test_promotion () {
 
     touch "$finish_trigger"
 
-    response="$( tail_n_grep_with_timeout 120 "database system is ready to accept connections" "tail -n 50 -f $directory/pg_log/pg.log" )"
+    response="$( tail_n_grep_with_timeout 120 "database system is ready to accept connections" "tail -n 50 -f $directory/log/pg.log" )"
     if ! ( echo "$response" | grep -q "database system is ready to accept connections" )
     then
         echo "Promotion didn't work for $codename." >&2

@@ -112,8 +112,8 @@ sub compress_pgdata {
     my $self = shift;
     $self->log->time_start( 'Compressing $PGDATA' ) if $self->verbose;
 
-    my @excludes = qw( pg_log/* pg_wal/0* pg_wal/archive_status/* postmaster.pid );
-    for my $dir ( qw( pg_log pg_wal ) ) {
+    my @excludes = qw( log/* pg_wal/0* pg_wal/archive_status/* postmaster.pid );
+    for my $dir ( qw( log pg_wal ) ) {
         push @excludes, $dir if -l File::Spec->catfile( $self->{ 'data-dir' }, $dir );
     }
 

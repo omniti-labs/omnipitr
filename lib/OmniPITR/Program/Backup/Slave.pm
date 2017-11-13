@@ -479,8 +479,8 @@ sub compress_pgdata {
     my $transform_to = basename( $self->{ 'data-dir' } );
     my $transform_command = sprintf 's#^%s/#%s/#', $transform_from, $transform_to;
 
-    my @excludes = qw( pg_log/* pg_wal/0* pg_wal/archive_status/* recovery.conf postmaster.pid );
-    for my $dir ( qw( pg_log pg_wal ) ) {
+    my @excludes = qw( log/* pg_wal/0* pg_wal/archive_status/* recovery.conf postmaster.pid );
+    for my $dir ( qw( log pg_wal ) ) {
         push @excludes, $dir if -l File::Spec->catfile( $self->{ 'data-dir' }, $dir );
     }
 
