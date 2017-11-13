@@ -203,8 +203,8 @@ sub prepare_commands_to_run_via_tar {
         push @tar_cmd, quotemeta( $self->{ 'tar-path' } );
         push @tar_cmd, 'cf', '-';
         push @tar_cmd, '--exclude=postmaster.pid';
-        push @tar_cmd, '--exclude=pg_xlog/0*';
-        push @tar_cmd, '--exclude=pg_xlog/archive_status/*';
+        push @tar_cmd, '--exclude=pg_wal/0*';
+        push @tar_cmd, '--exclude=pg_wal/archive_status/*';
         push @tar_cmd, '--exclude=pg_log';
         push @tar_cmd, '.';
 
@@ -281,8 +281,8 @@ sub prepare_commands_to_run_via_rsync {
             push @cmd, '--delete';
             push @cmd, '--delete-excluded';
             push @cmd, '--exclude=/postmaster.pid';
-            push @cmd, '--exclude=/pg_xlog/0*';
-            push @cmd, '--exclude=/pg_xlog/archive_status/*';
+            push @cmd, '--exclude=/pg_wal/0*';
+            push @cmd, '--exclude=/pg_wal/archive_status/*';
             push @cmd, '--exclude=/pg_log';
             push @cmd, $src;
             push @cmd, $dst_path;

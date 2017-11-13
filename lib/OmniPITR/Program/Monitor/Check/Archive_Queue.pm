@@ -14,7 +14,7 @@ sub run_check {
     my $self  = shift;
     my $state = shift;
 
-    my $x = $self->psql( 'select pg_xlogfile_name(pg_current_xlog_location())' );
+    my $x = $self->psql( 'select pg_walfile_name(pg_current_wal_lsn())' );
     $x =~ s/\s*\z//;
     my ( $timeline, $current_xlog ) = $self->split_xlog_filename( $x );
 

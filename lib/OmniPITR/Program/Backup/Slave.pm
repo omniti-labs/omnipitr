@@ -111,7 +111,7 @@ sub compress_xlogs {
     $dot_backup_transform_from =~ s{^/*}{};
     $dot_backup_transform_from =~ s{/*$}{};
 
-    my $transform_to = basename( $self->{ 'data-dir' } ) . '/pg_xlog';
+    my $transform_to = basename( $self->{ 'data-dir' } ) . '/pg_wal';
     my $transform_command = sprintf 's#^\(%s\|%s\)#%s#', $source_transform_from, $dot_backup_transform_from, $transform_to;
 
     my @stuff_to_compress = ();
@@ -177,7 +177,7 @@ sub uncompress_wal_archive_segments {
     return if 'none' eq $self->{ 'source' }->{ 'compression' };
 
     my $old_source = $self->{ 'source' }->{ 'path' };
-    my $new_source = File::Spec->catfile( $self->{ 'temp-dir' }, 'uncompressed_pg_xlogs' );
+    my $new_source = File::Spec->catfile( $self->{ 'temp-dir' }, 'uncompressed_pg_wals' );
     $self->{ 'source' }->{ 'path' } = $new_source;
 
     mkpath( [ $new_source ], 0, oct( "755" ) );
@@ -365,7 +365,7 @@ backup_label file content .
 sub get_backup_label_from_master {
     my $self = shift;
 
-    my $start_backup_output = $self->psql( "SELECT w, pg_xlogfile_name(w) from (select pg_start_backup('omnipitr_slave_backup_with_master_callback') as w ) as x" );
+    my $start_backup_output = $self->psql( "SELECT w, pg_walfile_name(w) from (select pg_start_backup('omnipitr_slave_backup_with_master_callback') as w ) as x" );
 
     $start_backup_output =~ s/\s*\z//;
     $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $start_backup_output );
@@ -479,8 +479,8 @@ sub compress_pgdata {
     my $transform_to = basename( $self->{ 'data-dir' } );
     my $transform_command = sprintf 's#^%s/#%s/#', $transform_from, $transform_to;
 
-    my @excludes = qw( pg_log/* pg_xlog/0* pg_xlog/archive_status/* recovery.conf postmaster.pid );
-    for my $dir ( qw( pg_log pg_xlog ) ) {
+    my @excludes = qw( pg_log/* pg_wal/0* pg_wal/archive_status/* recovery.conf postmaster.pid );
+    for my $dir ( qw( pg_log pg_wal ) ) {
         push @excludes, $dir if -l File::Spec->catfile( $self->{ 'data-dir' }, $dir );
     }
 

@@ -117,14 +117,14 @@ by archive-command from PostgreSQL, i.e.:
 
 =over
 
-=item * Current directory contains pg_xlog directory
+=item * Current directory contains pg_wal directory
 
 =item * Segment is unpacked
 
-=item * Segment is in pg_xlog directory
+=item * Segment is in pg_wal directory
 
 =item * Handler program is called with segment name like
-'pg_xlog/000000010000000500000073'
+'pg_wal/000000010000000500000073'
 
 =back
 
@@ -136,7 +136,7 @@ sub handle_pre_removal_processing {
     return 1 unless $self->{ 'pre-removal-processing' };
 
     $self->prepare_temp_directory();
-    my $xlog_dir  = File::Spec->catfile( $self->{ 'temp-dir' }, 'pg_xlog' );
+    my $xlog_dir  = File::Spec->catfile( $self->{ 'temp-dir' }, 'pg_wal' );
     my $xlog_file = File::Spec->catfile( $xlog_dir,             $segment_name );
     mkpath( $xlog_dir );
 
@@ -153,7 +153,7 @@ sub handle_pre_removal_processing {
     my $previous_dir = getcwd();
     chdir $self->{ 'temp-dir' };
 
-    my $full_command = $self->{ 'pre-removal-processing' } . " pg_xlog/$segment_name";
+    my $full_command = $self->{ 'pre-removal-processing' } . " pg_wal/$segment_name";
 
     $comment = 'Running pre-removal-processing command: ' . $full_command;
 

@@ -26,7 +26,7 @@ make_normal_slave() {
 
     pg_ctl -D "$directory/" -s start
 
-    last_archived_segment="$( tac omnipitr/log.master | grep -E -o -m 1 'Segment ./pg_xlog/[0-9A-F]{24} successfully sent to all destinations.' | tr ' ' / | cut -d/ -f4 )"
+    last_archived_segment="$( tac omnipitr/log.master | grep -E -o -m 1 'Segment ./pg_wal/[0-9A-F]{24} successfully sent to all destinations.' | tr ' ' / | cut -d/ -f4 )"
 
     response="$( tail_n_grep_with_timeout 100 "Segment $last_archived_segment restored" "tail -n 50 -f omnipitr/log.${codename}" )"
 

@@ -2,6 +2,19 @@
 
 =encoding utf8
 
+=head2 2017-??-??
+
+=over
+
+=item * Release of version 2.0.0
+
+=item * Make OmniPITR work with PostgreSQL 10
+
+=item * This version of OmniPITR will *not* work properly with PostgreSQL 9.x
+or earlier.
+
+=back
+
 =head2 2015-04-26
 
 =over

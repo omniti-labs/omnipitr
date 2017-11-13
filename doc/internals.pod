@@ -67,7 +67,7 @@ segments.
 
 Let me explain this in example.
 
-In PGDATA/pg_xlog there is set of files, which could be named like this:
+In PGDATA/pg_wal there is set of files, which could be named like this:
 
 =over
 
@@ -120,7 +120,7 @@ this will be under different name, so it doesn't matter)
 
 =item * archive_command will be called sequentially, in order of WAL segments.
 
-=item * if, for whatever reason, archiving will fail - your pg_xlog directory
+=item * if, for whatever reason, archiving will fail - your pg_wal directory
 will get bigger and bigger - as PostgreSQL will be creating new WAL segments to
 accomodate new writes to database, but it will not reuse old segments because
 archiving is failing (until it will stop failing, where PostgreSQL will quickly
@@ -193,7 +193,7 @@ to do it follow basically this logic:
 =over
 
 =item * if given destination doesn't use compression - use simple copy from
-pg_xlog/ directory (source of wal segments) to final destination
+pg_wal/ directory (source of wal segments) to final destination
 
 =item * if given destination requires compression that wasn't done before -
 compress source wal segment (without modifying source file, as it will be used
@@ -299,21 +299,21 @@ bit larger, but B<a lot> more useful.
 For example. This is snippet of log, about two WAL files being archived,
 without --verbose:
 
-    2011-01-20 20:25:40.079230 +0000 : 28544 : omnipitr-archive : LOG : Segment ./pg_xlog/00000001000000DE00000092 successfully sent to all destinations.
-    2011-01-20 20:27:05.547792 +0000 : 28770 : omnipitr-archive : LOG : Segment ./pg_xlog/00000001000000DE00000093 successfully sent to all destinations.
+    2011-01-20 20:25:40.079230 +0000 : 28544 : omnipitr-archive : LOG : Segment ./pg_wal/00000001000000DE00000092 successfully sent to all destinations.
+    2011-01-20 20:27:05.547792 +0000 : 28770 : omnipitr-archive : LOG : Segment ./pg_wal/00000001000000DE00000093 successfully sent to all destinations.
 
 Simple and to the point. But with --verbose, it looks like this:
 
-    2011-01-20 20:25:37.359384 +0000 : 28544 : omnipitr-archive : LOG : Called with parameters: -v -l /var/log/omnipitr/omnipitr-^Y-^m-^d.log -s /var/lib/pgsql/omnipitr/state/ -t /var/tmp/ -dr gzip=db2:/mnt/db/prod/walarchive/ -dr db2:/mnt/db/prod/db2-walarchive/ -db /var/lib/pgsql/omnipitr/backup.xlogs pg_xlog/00000001000000DE00000092
+    2011-01-20 20:25:37.359384 +0000 : 28544 : omnipitr-archive : LOG : Called with parameters: -v -l /var/log/omnipitr/omnipitr-^Y-^m-^d.log -s /var/lib/pgsql/omnipitr/state/ -t /var/tmp/ -dr gzip=db2:/mnt/db/prod/walarchive/ -dr db2:/mnt/db/prod/db2-walarchive/ -db /var/lib/pgsql/omnipitr/backup.xlogs pg_wal/00000001000000DE00000092
     2011-01-20 20:25:38.705074 +0000 : 28544 : omnipitr-archive : LOG : Timer [Compressing with gzip] took: 1.299s
     2011-01-20 20:25:39.418690 +0000 : 28544 : omnipitr-archive : LOG : Timer [Sending /var/tmp/omnipitr-archive/00000001000000DE00000092/00000001000000DE00000092.gz to db2:/mnt/db/prod/walarchive/00000001000000DE00000092.gz] took: 0.657s
-    2011-01-20 20:25:40.033344 +0000 : 28544 : omnipitr-archive : LOG : Timer [Sending ./pg_xlog/00000001000000DE00000092 to db2:/mnt/db/prod/db2-walarchive/00000001000000DE00000092] took: 0.573s
-    2011-01-20 20:25:40.079230 +0000 : 28544 : omnipitr-archive : LOG : Segment ./pg_xlog/00000001000000DE00000092 successfully sent to all destinations.
-    2011-01-20 20:27:03.014960 +0000 : 28770 : omnipitr-archive : LOG : Called with parameters: -v -l /var/log/omnipitr/omnipitr-^Y-^m-^d.log -s /var/lib/pgsql/omnipitr/state/ -t /var/tmp/ -dr gzip=db2:/mnt/db/prod/walarchive/ -dr db2:/mnt/db/prod/db2-walarchive/ -db /var/lib/pgsql/omnipitr/backup.xlogs pg_xlog/00000001000000DE00000093
+    2011-01-20 20:25:40.033344 +0000 : 28544 : omnipitr-archive : LOG : Timer [Sending ./pg_wal/00000001000000DE00000092 to db2:/mnt/db/prod/db2-walarchive/00000001000000DE00000092] took: 0.573s
+    2011-01-20 20:25:40.079230 +0000 : 28544 : omnipitr-archive : LOG : Segment ./pg_wal/00000001000000DE00000092 successfully sent to all destinations.
+    2011-01-20 20:27:03.014960 +0000 : 28770 : omnipitr-archive : LOG : Called with parameters: -v -l /var/log/omnipitr/omnipitr-^Y-^m-^d.log -s /var/lib/pgsql/omnipitr/state/ -t /var/tmp/ -dr gzip=db2:/mnt/db/prod/walarchive/ -dr db2:/mnt/db/prod/db2-walarchive/ -db /var/lib/pgsql/omnipitr/backup.xlogs pg_wal/00000001000000DE00000093
     2011-01-20 20:27:04.350370 +0000 : 28770 : omnipitr-archive : LOG : Timer [Compressing with gzip] took: 1.279s
     2011-01-20 20:27:04.889989 +0000 : 28770 : omnipitr-archive : LOG : Timer [Sending /var/tmp/omnipitr-archive/00000001000000DE00000093/00000001000000DE00000093.gz to db2:/mnt/db/prod/walarchive/00000001000000DE00000093.gz] took: 0.481s
-    2011-01-20 20:27:05.503586 +0000 : 28770 : omnipitr-archive : LOG : Timer [Sending ./pg_xlog/00000001000000DE00000093 to db2:/mnt/db/prod/db2-walarchive/00000001000000DE00000093] took: 0.563s
-    2011-01-20 20:27:05.547792 +0000 : 28770 : omnipitr-archive : LOG : Segment ./pg_xlog/00000001000000DE00000093 successfully sent to all destinations.
+    2011-01-20 20:27:05.503586 +0000 : 28770 : omnipitr-archive : LOG : Timer [Sending ./pg_wal/00000001000000DE00000093 to db2:/mnt/db/prod/db2-walarchive/00000001000000DE00000093] took: 0.563s
+    2011-01-20 20:27:05.547792 +0000 : 28770 : omnipitr-archive : LOG : Segment ./pg_wal/00000001000000DE00000093 successfully sent to all destinations.
 
 as you can see we now see exact command line that was used to run the
 omnipitr-archive, and we see times of all important operations: compressing

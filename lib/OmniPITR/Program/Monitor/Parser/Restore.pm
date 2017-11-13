@@ -53,7 +53,7 @@ sub handle_line {
     my $D    = shift;
     my $S    = $self->state();
 
-    if ( $D->{ 'line' } =~ m{\ALOG : Called with parameters: .* ([a-f0-9]{24}) pg_xlog/RECOVERYXLOG\s*\z}i ) {
+    if ( $D->{ 'line' } =~ m{\ALOG : Called with parameters: .* ([a-f0-9]{24}) pg_wal/RECOVERYXLOG\s*\z}i ) {
         my ( $timeline, $xlog_offset ) = $self->split_xlog_filename( $1 );
         $S->{ $timeline }->{ $xlog_offset }->[ 0 ] ||= $D->{ 'epoch' };
         return;

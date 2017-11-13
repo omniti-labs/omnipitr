@@ -112,8 +112,8 @@ sub compress_pgdata {
     my $self = shift;
     $self->log->time_start( 'Compressing $PGDATA' ) if $self->verbose;
 
-    my @excludes = qw( pg_log/* pg_xlog/0* pg_xlog/archive_status/* postmaster.pid );
-    for my $dir ( qw( pg_log pg_xlog ) ) {
+    my @excludes = qw( pg_log/* pg_wal/0* pg_wal/archive_status/* postmaster.pid );
+    for my $dir ( qw( pg_log pg_wal ) ) {
         push @excludes, $dir if -l File::Spec->catfile( $self->{ 'data-dir' }, $dir );
     }
 
@@ -171,12 +171,12 @@ sub start_pg_backup {
 
         $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . '.real',                 $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . '.real' );
         $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . ".real/$subdir",         $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . ".real/$subdir" );
-        $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog" );
-        $self->log->fatal( 'Cannot symlink %s to %s: %s', $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' }, $OS_ERROR )
-            unless symlink( $self->{ 'xlogs' } . ".real/$subdir/pg_xlog", $self->{ 'xlogs' } );
+        $self->log->fatal( 'Cannot create directory %s : %s', $self->{ 'xlogs' } . ".real/$subdir/pg_wal", $OS_ERROR ) unless mkdir( $self->{ 'xlogs' } . ".real/$subdir/pg_wal" );
+        $self->log->fatal( 'Cannot symlink %s to %s: %s', $self->{ 'xlogs' } . ".real/$subdir/pg_wal", $self->{ 'xlogs' }, $OS_ERROR )
+            unless symlink( $self->{ 'xlogs' } . ".real/$subdir/pg_wal", $self->{ 'xlogs' } );
     }
 
-    my $start_backup_output = $self->psql( "SELECT w, pg_xlogfile_name(w) from (select pg_start_backup('omnipitr') as w ) as x" );
+    my $start_backup_output = $self->psql( "SELECT w, pg_walfile_name(w) from (select pg_start_backup('omnipitr') as w ) as x" );
     $start_backup_output =~ s/\s*\z//;
 
     $self->log->log( q{pg_start_backup('omnipitr') returned %s.}, $start_backup_output );
