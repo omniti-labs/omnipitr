@@ -2,6 +2,17 @@
 
 =encoding utf8
 
+=head2 2019-06-25
+
+=over
+
+=item * Use numerical time zone offsets in backup meta files, instead of
+timezone codes, as it's more portable. Per report
+( https://github.com/omniti-labs/omnipitr/issues/42 ) from Mike from New
+Zealand.
+
+=back
+
 =head2 2017-11-16
 
 =over

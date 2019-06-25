@@ -36,7 +36,7 @@ sub new {
         'started_at' => time(),
         'hostname'   => hostname(),
     };
-    $self->{ 'meta' }->{ 'timezone' } = strftime( '%Z', localtime( $self->{ 'meta' }->{ 'started_at' } ) );
+    $self->{ 'meta' }->{ 'timezone' } = strftime( '%z', localtime( $self->{ 'meta' }->{ 'started_at' } ) );
     $self->check_debug();
     $self->read_args();
     $self->validate_args();
